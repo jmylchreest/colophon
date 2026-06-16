@@ -117,16 +117,51 @@ dateless one is a `page` (standing chrome: surfaced in the nav menu, not in the 
 An author can override this with a `type:` in frontmatter (see
 [Authoring → page types](content.md#page-types)), including custom types like `project`.
 
-A theme can tailor a type two ways — pick whichever suits:
+As a theme author you don't have to do anything: **every type renders with `page.html`** unless
+you opt in. When you want a type to look different, you have two ways — pick whichever suits.
 
-1. **A dedicated template.** Add `themes/<theme>/<type>.html` (e.g. `project.html`); entries of
-   that type render with it. Any type without its own file uses `page.html`.
-2. **Branch inside `page.html`.** The `page_type` variable holds the resolved type, so a shared
-   template can switch on it: `{% if page_type == "project" %}…{% else %}…{% endif %}`.
+**1. A dedicated template** — add `themes/<theme>/<type>.html`. An entry of that type renders
+with it; any type without its own file falls back to `page.html`. The file is an ordinary
+single-entry template and receives the **same variables as `page.html`** (see the table below).
+For example, to give `type: project` entries a bespoke layout:
 
-A custom type is *listed* (post-like) by default; the built-in `page` is the only *standing*
-(nav) type. So `type: page` makes a dated entry standing, and `type: post` makes a dateless
-one listed.
+```html
+{# themes/mytheme/project.html — renders entries with `type: project` #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><title>{{ meta_title }}</title>
+  <link rel="stylesheet" href="{{ base_path }}style.css">{{ seo_head|safe }}
+</head>
+<body>
+  <article class="project">
+    <h1>{{ title }}</h1>
+    {% if image %}<img class="project-shot" src="{{ image }}" alt="{{ title }}">{% endif %}
+    {{ content|safe }}
+    {% if tags %}<footer>{% for t in tags %}<a href="{{ t.url }}">{{ t.name }}</a> {% endfor %}</footer>{% endif %}
+  </article>
+</body>
+</html>
+```
+
+**2. Branch inside `page.html`** — the `page_type` variable holds the resolved type, so one
+template can switch on it without a separate file:
+
+```html
+{% if page_type == "project" %}
+  <span class="badge">Project</span>
+{% elif page_type == "page" %}
+  {# a standing page — maybe hide the date/reading-time line #}
+{% else %}
+  <time>{{ date }}</time> · {{ read_time }} min
+{% endif %}
+```
+
+**Placement.** A custom type is *listed* (post-like) by default; the built-in `page` is the only
+*standing* (nav) type. So `type: page` makes a dated entry standing (it appears in `nav_pages`,
+not in the index list or feeds), and `type: post` makes a dateless one listed. You don't render
+the nav/list yourself per type — the build routes entries into `nav_pages` (standing) vs `pages`
+(listed) for you; your per-type template only styles the single entry.
 
 ## The templating language
 
@@ -260,7 +295,8 @@ A minimal `themes/mytheme/page.html`:
 </html>
 ```
 
-**4. Add the index** (`themes/mytheme/index.html`) — the post list and per-tag pages:
+**4. Add the index** (`themes/mytheme/index.html`) — the post list, the nav menu (standing
+pages like About), and per-tag pages:
 
 ```html
 <!doctype html>
@@ -268,6 +304,7 @@ A minimal `themes/mytheme/page.html`:
 <head><meta charset="utf-8"><title>{{ heading }}</title>
   <link rel="stylesheet" href="{{ base_path }}style.css">{{ feed_head|safe }}</head>
 <body>
+  {% if nav_pages %}<nav>{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a> {% endfor %}</nav>{% endif %}
   <h1>{{ heading }}</h1>
   <ul>
   {% for p in pages %}
@@ -279,16 +316,24 @@ A minimal `themes/mytheme/page.html`:
 </html>
 ```
 
-**5. Decide how rich blocks render.** Do nothing (raw text shows, like `minimal`), or enhance
+`nav_pages` is the list of standing pages (`{title, url}`); `pages` is the chronological posts.
+The build sorts entries into these two buckets by [page type](#page-types) — you just render
+them. (Add the same `nav_pages` block to `page.html` so the menu appears on entries too.)
+
+**5. (Optional) Tailor specific page types.** Add a `<type>.html` template, or branch on the
+`page_type` variable inside `page.html`, to give a type its own look. See
+[Page types](#page-types). Skip this and every entry just uses `page.html`.
+
+**6. Decide how rich blocks render.** Do nothing (raw text shows, like `minimal`), or enhance
 them with the `has_*` gates as shown in [Enhancing rich blocks](#enhancing-rich-blocks). The
 vendored libraries are inherited from `default`, so `{{ base_path }}vendor/katex/…` resolves
 with no extra files in your theme.
 
-**6. Add your own assets.** Any non-`.html` file under `themes/mytheme/` is copied to the
+**7. Add your own assets.** Any non-`.html` file under `themes/mytheme/` is copied to the
 output root, keeping its path: `themes/mytheme/logo.svg` → `/logo.svg`, referenced as
 `{{ base_path }}logo.svg`. Self-host fonts the same way and `@import` them from your CSS.
 
-**7. Build and ship:**
+**8. Build and ship:**
 
 ```sh
 colophon build --env production    # writes public/ with your theme
