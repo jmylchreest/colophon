@@ -58,7 +58,11 @@ func New(root string, cfg config.SourceConfig) (core.Source, error) {
 		return s, nil // inert optional source
 	}
 	for _, p := range strList(cfg.Settings["path"]) {
-		s.scanRoots = append(s.scanRoots, resolveDir(vault, p))
+		// A blog path is always relative to the vault; a leading "/" (vault-root style, as
+		// Obsidian writes internal paths) is allowed and ignored, so "/Blog/x" == "Blog/x".
+		if rel := strings.TrimPrefix(p, "/"); rel != "" {
+			s.scanRoots = append(s.scanRoots, filepath.Join(vault, filepath.FromSlash(rel)))
+		}
 	}
 	if len(s.scanRoots) == 0 {
 		s.scanRoots = []string{vault}
@@ -123,34 +127,34 @@ func expandHome(p string) string {
 
 func str(v any) string { s, _ := v.(string); return s }
 
-// strList reads a config value that may be a scalar string or a list of strings, trimming
-// blanks. `tag: blog` and `tag: [blog, essay]` both work, as do path forms.
+// strList reads a config value that may be a scalar string or a list of strings, and also
+// splits comma-separated values, trimming blanks. So `tag: blog`, `tag: [blog, essay]`, and a
+// `tag: "{env:TAGS}"` that interpolates to "blog,essay" all yield the same list — letting a
+// single environment variable feed a list-valued field.
 func strList(v any) []string {
-	add := func(out []string, s string) []string {
-		if s = strings.TrimSpace(s); s != "" {
-			return append(out, s)
+	var out []string
+	addCSV := func(s string) {
+		for _, part := range strings.Split(s, ",") {
+			if p := strings.TrimSpace(part); p != "" {
+				out = append(out, p)
+			}
 		}
-		return out
 	}
 	switch x := v.(type) {
 	case string:
-		return add(nil, x)
+		addCSV(x)
 	case []string:
-		var out []string
 		for _, e := range x {
-			out = add(out, e)
+			addCSV(e)
 		}
-		return out
 	case []any:
-		var out []string
 		for _, e := range x {
 			if s, ok := e.(string); ok {
-				out = add(out, s)
+				addCSV(s)
 			}
 		}
-		return out
 	}
-	return nil
+	return out
 }
 
 func (s *Source) Documents(ctx context.Context) ([]core.Content, error) {
@@ -162,6 +166,10 @@ func (s *Source) Documents(ctx context.Context) ([]core.Content, error) {
 	seen := map[string]bool{}
 	var docs []core.Content
 	for _, root := range s.scanRoots {
+		if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
+			s.warnf("scan path %q does not exist in the vault — nothing published from it (check vault/path)", root)
+			continue
+		}
 		walked, err := mddir.Walk(root, nil)
 		if err != nil {
 			return nil, err

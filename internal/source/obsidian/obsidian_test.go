@@ -313,3 +313,41 @@ func TestTagAndPathAcceptScalarOrList(t *testing.T) {
 		t.Errorf("scalar and list forms should both select a.md, got %d and %d", len(ds), len(dl))
 	}
 }
+
+func TestStrList(t *testing.T) {
+	cases := []struct {
+		in   any
+		want []string
+	}{
+		{"blog", []string{"blog"}},
+		{"blog,essay", []string{"blog", "essay"}},     // a single env value splits on commas
+		{" blog , essay ", []string{"blog", "essay"}}, // trimmed
+		{[]any{"a", "b,c"}, []string{"a", "b", "c"}},  // list whose element is itself CSV
+		{"", nil},
+	}
+	for _, c := range cases {
+		got := strList(c.in)
+		if strings.Join(got, ",") != strings.Join(c.want, ",") {
+			t.Errorf("strList(%v) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}
+
+// A path is vault-relative; a leading "/" (vault-root style) is tolerated, and a
+// comma-separated env value yields multiple scan paths.
+func TestPathLeadingSlashAndCSV(t *testing.T) {
+	vault := writeTree(t, map[string]string{
+		"Blog/a.md":  "---\ntitle: A\npublish: true\n---\nx",
+		"Notes/b.md": "---\ntitle: B\npublish: true\n---\nx",
+		"Other/c.md": "---\ntitle: C\npublish: true\n---\nx",
+	})
+	src, _ := New("/", config.SourceConfig{ID: "v", Driver: "obsidian",
+		Settings: map[string]any{"vault": vault, "path": "/Blog,Notes"}}) // leading slash + CSV
+	docs, err := src.Documents(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := docPaths(docs); len(got) != 2 || got[0] != "a.md" || got[1] != "b.md" {
+		t.Errorf("path '/Blog,Notes' = %v, want [a.md b.md]", got)
+	}
+}

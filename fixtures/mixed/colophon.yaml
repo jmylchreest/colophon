@@ -18,18 +18,19 @@ sites:
       - match: "**/assets/**"
         publisher: r2
 
-# Set OBSIDIAN_BLOG to an Obsidian vault; unset → that source contributes nothing.
+# Set OBSIDIAN_VAULT to an Obsidian vault root; unset → that source contributes nothing.
+# Optionally set BLOG_PATH (vault-relative; leading "/" ok; comma-separated for several) and
+# BLOG_TAGS (comma-separated). See fixtures/mixed/.env + gen-dotenv.sh to populate these.
 sources:
   - id: content
     driver: md-dir
     path: ./content
   - id: vault
     driver: obsidian
-    vault: "{env:OBSIDIAN_BLOG:-}"   # the vault root
-    publish_required: false          # no tags set → publish every scanned note
-    # Narrow it: scan only sub-folders, and/or publish by tag (scalar or list), e.g.
-    #   path: [blog, essays]
-    #   tag: blog                     # notes tagged #blog (frontmatter or inline) become eligible
+    vault: "{env:OBSIDIAN_VAULT:-}"   # the vault root
+    path: "{env:BLOG_PATH:-}"         # vault-relative folder(s); empty → whole vault
+    tag: "{env:BLOG_TAGS:-}"          # publish by tag(s); empty → the publish: flag gates
+    publish_required: false           # used only when no tags: publish every scanned note
 
 # Publishers are pure mechanism (how to deploy). Environments decide what/where.
 publishers:

@@ -42,12 +42,16 @@ sources:
   assets elsewhere. An empty value (e.g. an unset `{env:VAR:-}`) yields no documents, so an
   env-driven source whose var is unset just contributes nothing.
 - **`path`** — a folder, or a **list** of folders, within the vault to scan (the union; a note
-  under *any* of them is in scope). Omit it to scan the whole vault. Slugs are relative to the
-  scanned folder, so `path: blog` publishes `blog/hello.md` at `/hello/`.
+  under *any* of them is in scope). Omit it to scan the whole vault. Paths are vault-relative
+  and a leading `/` (vault-root style) is ignored, so `/Blog` and `Blog` are the same. Slugs
+  are relative to the scanned folder, so `path: Blog` publishes `Blog/hello.md` at `/hello/`.
 - **`tag`** — a tag, or a **list** of tags. A note matches if it carries **any** of them — in
   frontmatter `tags:` **or** as an inline `#tag`, Forestry / "digital-garden" style (leading
   `#` optional, case-insensitive; `blog` also matches the nested `#blog/published`). An
   explicit `publish: false` still opts a note out.
+
+Both `path` and `tag` also accept a **comma-separated string**, so a single environment
+variable can feed a list: `path: "{env:BLOG_PATH}"` with `BLOG_PATH=Blog,Notes/pub` scans both.
 - **`publish_required`** — applies **only when no tags are set**: `true` (default) honours
   Obsidian's `publish: true` whitelist; `false` publishes every scanned note.
 
