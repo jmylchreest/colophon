@@ -46,10 +46,11 @@ func (c *PersonaListCmd) Run() error {
 // plus the top-K most relevant exemplars from its own content. The calling agent is the
 // intelligence; colophon only supplies the context.
 type PersonaContextCmd struct {
-	Persona string `arg:"" optional:"" help:"Persona id (defaults to the only persona, or 'default')"`
-	Topic   string `help:"Topic/outline to retrieve exemplars for (ranked by relevance)"`
-	TopK    int    `name:"top-k" default:"3" help:"Number of exemplars to emit"`
-	JSON    bool   `help:"Output JSON"`
+	Persona string   `arg:"" optional:"" help:"Persona id (defaults to the only persona, or 'default')"`
+	Topic   string   `help:"Topic/outline to retrieve exemplars for (ranked by relevance)"`
+	Tag     []string `help:"Only draw exemplars tagged with this tag; repeatable"`
+	TopK    int      `name:"top-k" default:"3" help:"Number of exemplars to emit"`
+	JSON    bool     `help:"Output JSON"`
 }
 
 func (c *PersonaContextCmd) Run() error {
@@ -66,7 +67,7 @@ func (c *PersonaContextCmd) Run() error {
 			id = "default"
 		}
 	}
-	ctx, err := persona.BuildContext(cfg, id, c.Topic, c.TopK)
+	ctx, err := persona.BuildContext(cfg, id, c.Topic, c.TopK, c.Tag...)
 	if err != nil {
 		return err
 	}

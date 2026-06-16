@@ -13,6 +13,7 @@ type CorpusDoc struct {
 	Title      string
 	Date       time.Time
 	SourcePath string
+	Tags       []string
 	Body       string
 }
 
@@ -37,6 +38,7 @@ func Corpus(cfg *config.Config) ([]CorpusDoc, error) {
 			Title:      fm.Title,
 			Date:       fm.Date,
 			SourcePath: d.doc.SourcePath,
+			Tags:       fm.Tags,
 			Body:       d.doc.Body,
 		})
 	}

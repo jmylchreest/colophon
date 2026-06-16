@@ -21,7 +21,10 @@ type CLI struct {
 	Serve         ServeCmd         `cmd:"" help:"Serve every environment locally with live reload"`
 	Publish       PublishCmd       `cmd:"" help:"Build and deploy/mirror to publishers (gated)"`
 	Themes        ThemesCmd        `cmd:"" help:"List built-in themes or eject one to customise"`
-	Persona       PersonaCmd       `cmd:"" help:"Manage personas and style corpus"`
+	Authors       AuthorsCmd       `cmd:"" aliases:"author" help:"List authors (the bylines) or show one"`
+	Persona       PersonaCmd       `cmd:"" aliases:"personas" help:"List writing voices or emit write-as context"`
+	Sources       SourcesCmd       `cmd:"" aliases:"source" help:"Show where content lives and how posts are marked publishable"`
+	Posts         PostsCmd         `cmd:"" aliases:"post" help:"List content entries (for editing and cross-referencing)"`
 	Search        SearchCmd        `cmd:"" help:"Search content (lexical or semantic)"`
 	Sync          SyncCmd          `cmd:"" help:"Pull API sources (notion/hackmd) into content/"`
 	Doctor        DoctorCmd        `cmd:"" help:"Validate the project config and report problems"`

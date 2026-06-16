@@ -41,7 +41,7 @@ type Context struct {
 // BuildContext returns the write-as context for persona id: its style guide and references,
 // plus the top-k exemplars from its own content ranked by BM25 against topic (or the most
 // recent posts when topic is empty). topK <= 0 defaults to 3.
-func BuildContext(cfg *config.Config, id, topic string, topK int) (*Context, error) {
+func BuildContext(cfg *config.Config, id, topic string, topK int, tags ...string) (*Context, error) {
 	p := Find(cfg, id)
 	if p == nil {
 		return nil, fmt.Errorf("unknown persona %q (have: %s)", id, strings.Join(IDs(cfg), ", "))
@@ -58,9 +58,13 @@ func BuildContext(cfg *config.Config, id, topic string, topK int) (*Context, err
 	soleDefault := len(cfg.Personas) == 1
 	var mine []build.CorpusDoc
 	for _, d := range corpus {
-		if d.PersonaID == id || (d.PersonaID == "" && soleDefault) {
-			mine = append(mine, d)
+		if d.PersonaID != id && (d.PersonaID != "" || !soleDefault) {
+			continue
 		}
+		if len(tags) > 0 && !hasAnyTag(d.Tags, tags) {
+			continue // narrow the corpus to exemplars carrying one of the requested tags
+		}
+		mine = append(mine, d)
 	}
 	return &Context{
 		Persona:    *p,
@@ -69,6 +73,18 @@ func BuildContext(cfg *config.Config, id, topic string, topK int) (*Context, err
 		Topic:      topic,
 		Exemplars:  rank(mine, topic, topK),
 	}, nil
+}
+
+// hasAnyTag reports whether doc carries any of the wanted tags (case-insensitive).
+func hasAnyTag(docTags, wanted []string) bool {
+	for _, w := range wanted {
+		for _, t := range docTags {
+			if strings.EqualFold(t, w) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Find returns the persona with the given id, or nil.

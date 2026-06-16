@@ -28,7 +28,9 @@ author** is the default; with no authors at all, the byline is **"Anonymous"** (
 without an author still builds — it's just unattributed).
 
 ```sh
-colophon persona list --json   # personas (voices); authors are read from authors/*.yaml
+colophon authors               # list bylines (alias: colophon author)
+colophon author show ada       # one author's full h-card
+colophon authors --json        # machine-readable (for a skill/agent)
 ```
 
 ## Personas (the writing voice)
@@ -62,13 +64,24 @@ writing. `persona context` returns a voice's style guide and references plus the
 
 ```sh
 colophon persona context technical --topic "raft leader election"
-colophon persona context technical --topic "raft" --top-k 5 --json
+colophon persona context technical --topic "raft" --tag distributed --top-k 5 --json
 ```
 
 - With `--topic`, exemplars are ranked by relevance (a pure-Go BM25 over the persona's posts —
   no embeddings, no API key). Without a topic, the most recent posts are returned.
+- `--tag` (repeatable) narrows the corpus to exemplars carrying that tag.
 - `--top-k` sets how many exemplars to emit (default 3).
 - The persona id is optional when there is a single persona (or one named `default`).
+
+## Finding where to write & what exists
+
+Two commands round out the authoring toolbox (both take `--json`):
+
+```sh
+colophon sources               # where each source's content lives + how a post is marked live
+colophon posts                 # existing entries: slug, title, type, author, persona, tags
+colophon posts --tag go --author ada   # filter, e.g. to find cross-reference targets
+```
 
 This is the core of the agent write-as flow: an agent picks a **voice** (persona) for style
 and an **author** for the byline, fetches the write-as context, drafts in that voice, previews,
