@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ meta_title }} · {{ site_title }}</title>
+{{ seo_head|safe }}
+<link rel="stylesheet" href="{{ base_path }}style.css">
+{% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
+{{ feed_head|safe }}
+</head>
+<body>
+<header class="site-header"><a href="{{ base_path }}">{{ site_title }}</a></header>
+<main>
+<article>
+{% if draft %}<p class="draft">Draft — not published</p>{% endif %}
+{% if embargoed %}<p class="embargo">Embargoed until {{ embargo_until }} — not yet public</p>{% endif %}
+{% if hero %}<img class="hero" src="{{ hero }}" alt="">{% endif %}
+<h1>{{ title }}</h1>
+{% if date %}<p class="meta"><time datetime="{{ date }}">{{ date }}</time></p>{% endif %}
+{{ content|safe }}
+{% if tags %}<p class="tags">{% for tg in tags %}<a class="tag" href="{{ tg.url }}">#{{ tg.name }}</a> {% endfor %}</p>{% endif %}
+</article>
+</main>
+<footer class="site-footer">Built with <a href="https://github.com/jmylchreest/colophon">colophon</a></footer>
+
+{# Progressive enhancement: vendored libraries upgrade the already-readable raw blocks, loaded only when the page uses them. A theme may swap these for a CDN, another library, or nothing — the markup contract is unchanged. #}
+{% if has_code %}
+<link rel="stylesheet" href="{{ base_path }}vendor/highlight/github.min.css" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>
+{% endif %}
+{% if has_math %}
+<link rel="stylesheet" href="{{ base_path }}vendor/katex/katex.min.css">
+<script defer src="{{ base_path }}vendor/katex/katex.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.math').forEach(function (el) {
+    try {
+      katex.render(el.textContent, el, {
+        displayMode: el.classList.contains('math-display'),
+        throwOnError: false,
+      });
+    } catch (e) { /* leave the raw LaTeX in place */ }
+  });
+});
+</script>
+{% endif %}
+{% if has_mermaid %}
+<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({ startOnLoad: true })"></script>
+{% endif %}
+</body>
+</html>

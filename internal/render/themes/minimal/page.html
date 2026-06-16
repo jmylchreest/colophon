@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ meta_title }} · {{ site_title }}</title>
+{{ seo_head|safe }}
+<link rel="stylesheet" href="{{ base_path }}style.css">
+{% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
+{{ feed_head|safe }}
+</head>
+<body>
+<header><a href="{{ base_path }}">{{ site_title }}</a></header>
+<main>
+<article>
+{% if draft %}<p class="note">[draft — not published]</p>{% endif %}
+{% if embargoed %}<p class="note">[embargoed until {{ embargo_until }}]</p>{% endif %}
+<h1>{{ title }}</h1>
+{% if date %}<p class="meta"><time datetime="{{ date }}">{{ date }}</time></p>{% endif %}
+{# Minimal theme: no client-side JS. colophon's raw blocks (code/math/mermaid) show as plain text. #}
+{{ content|safe }}
+{% if tags %}<p class="meta">Tags:{% for tg in tags %} <a href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</p>{% endif %}
+</article>
+</main>
+<footer><a href="{{ base_path }}">← {{ site_title }}</a></footer>
+</body>
+</html>

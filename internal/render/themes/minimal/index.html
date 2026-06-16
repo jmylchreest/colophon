@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ site_title }}</title>
+<link rel="stylesheet" href="{{ base_path }}style.css">
+{% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
+{{ feed_head|safe }}
+</head>
+<body>
+<header><a href="{{ base_path }}">{{ site_title }}</a></header>
+<main>
+<h1>{{ heading|default:site_title }}</h1>
+<ul>
+{% for p in pages %}
+  <li><a href="{{ base_path }}{{ p.url }}">{{ p.title }}</a>{% if p.date %} — <time class="meta" datetime="{{ p.date }}">{{ p.date }}</time>{% endif %}{% if p.draft %} [draft]{% endif %}{% if p.embargoed %} [embargoed]{% endif %}{% for tg in p.tags %} <a href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</li>
+{% endfor %}
+</ul>
+{% if feeds %}<p class="meta">Subscribe:{% for f in feeds %} <a href="{{ f.href }}">{{ f.label }}</a>{% endfor %}</p>{% endif %}
+</main>
+<footer>Built with colophon</footer>
+</body>
+</html>

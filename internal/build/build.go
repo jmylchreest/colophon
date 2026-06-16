@@ -1,0 +1,806 @@
+// Package build is the content pipeline: it reads markdown from content/, renders
+// it through the theme engine, and writes the canonical static tree to public/.
+//
+// This is the M1 thin slice. Deliberately deferred (tracked for later M1+ work):
+// incremental/content-hash skipping, feeds, publish_after embargo filtering, and
+// multi-persona publications. Draft posts are already excluded from production builds.
+package build
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/url"
+	"os"
+	"path"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/jmylchreest/colophon/internal/clog"
+	"github.com/jmylchreest/colophon/internal/config"
+	"github.com/jmylchreest/colophon/internal/core"
+	"github.com/jmylchreest/colophon/internal/render"
+	"github.com/jmylchreest/colophon/internal/source"
+	"github.com/jmylchreest/colophon/markdown"
+)
+
+// Result summarises a build.
+type Result struct {
+	Pages  int
+	OutDir string
+	// NextEmbargo is the soonest future publish_after across non-draft content (the
+	// next time a production build would reveal a new post), or nil if none pending.
+	NextEmbargo *time.Time
+}
+
+// Options control a single build. They come from an Environment (or defaults).
+type Options struct {
+	// OutDir is where the canonical tree is written. Required.
+	OutDir string
+	// IncludeDrafts builds not-yet-public posts — drafts and embargoed (publish_after
+	// in the future). Production builds leave both out; preview/serve include them.
+	IncludeDrafts bool
+	// Now is the build instant for embargo evaluation; zero means time.Now().
+	Now time.Time
+	// Title, BaseURL and Theme override the site's values when non-empty.
+	Title   string
+	BaseURL string
+	Theme   string
+	// BasePath prefixes every internal link (so output can be hosted under a subpath,
+	// e.g. /<site>/<env>/ for serve, or /repo/ for project pages). Empty means derive
+	// it from BaseURL's path; the result always starts and ends with "/".
+	BasePath string
+	// Publishers is the environment's deploy targets. It activates asset routing only for
+	// routes whose target publisher is deploying (so a build/serve with no targets keeps
+	// assets co-located). Empty means no routing.
+	Publishers []string
+	// Routes overrides the site's routing rules when non-nil — used by publish to supply
+	// rules whose base_url has been resolved from the target publisher (e.g. a discovered
+	// R2 public URL). Nil uses the site's rules as written.
+	Routes []core.RouteRule
+	// Log receives SOURCE/BUILD progress lines; nil silences them.
+	Log *clog.Logger
+}
+
+// resolveBasePath picks the base path: an explicit value wins, else the path component
+// of baseURL, else "/". It is normalised to start and end with a single "/".
+func resolveBasePath(explicit, baseURL string) string {
+	p := explicit
+	if p == "" {
+		if u, err := url.Parse(baseURL); err == nil {
+			p = u.Path
+		}
+	}
+	p = strings.Trim(p, "/")
+	if p == "" {
+		return "/"
+	}
+	return "/" + p + "/"
+}
+
+type page struct {
+	Title        string
+	Date         string
+	Published    time.Time // raw frontmatter date, for feeds/sitemap
+	Description  string    // frontmatter description or derived excerpt
+	URL          string    // base_path-relative, e.g. posts/hello/
+	Out          string    // path under public/, e.g. posts/hello/index.html
+	HTML         string
+	Draft        bool   // included only because this is a preview build
+	Embargoed    bool   // included only because this is a preview build
+	EmbargoUntil string // formatted publish_after, when Embargoed
+
+	Hero       string // hero banner URL: page-relative when co-located, absolute when routed
+	Image      string // preview image href for the index card (rooted path or absolute), or ""
+	ImageAbs   string // absolute preview image URL for og:image, or ""
+	Tags       []string
+	Categories []string
+	Persona    string        // persona id from frontmatter (for author attribution)
+	SEO        *markdown.SEO // optional search/social overrides
+
+	HasMath    bool // page uses math — theme loads KaTeX only when true
+	HasMermaid bool // page has a mermaid diagram — theme loads Mermaid only when true
+	HasCode    bool // page has a code block — theme loads the highlighter only when true
+}
+
+// Run builds the first configured site into opts.OutDir, applying any environment
+// overrides carried by opts.
+func Run(cfg *config.Config, opts Options) (Result, error) {
+	if len(cfg.Sites) == 0 {
+		return Result{}, fmt.Errorf("no sites configured")
+	}
+	if opts.OutDir == "" {
+		return Result{}, fmt.Errorf("build: OutDir is required")
+	}
+	site := cfg.Sites[0]
+	if opts.Title != "" {
+		site.Title = opts.Title
+	}
+	if opts.BaseURL != "" {
+		site.BaseURL = opts.BaseURL
+	}
+	if opts.Theme != "" {
+		site.Theme = opts.Theme
+	}
+	outDir := opts.OutDir
+	basePath := resolveBasePath(opts.BasePath, site.BaseURL)
+	now := opts.Now
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	docs, err := gatherDocuments(cfg, opts.Log)
+	if err != nil {
+		return Result{}, err
+	}
+	// Routes: publish supplies fully-resolved rules via opts.Routes; a plain build resolves
+	// an empty route base_url from the target publisher's configured public_url (no network).
+	routes := opts.Routes
+	if routes == nil {
+		routes = resolveRoutesFromConfig(site.Routing, cfg)
+	}
+	router := core.NewRouter(routes, opts.Publishers)
+	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router)
+	if err != nil {
+		return Result{}, err
+	}
+	opts.Log.Step("BUILD", "", "pages", len(pages), "assets", len(assets), "drafts", opts.IncludeDrafts)
+
+	eng, err := render.New(cfg.Root, site.Theme)
+	if err != nil {
+		return Result{}, err
+	}
+
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return Result{}, err
+	}
+
+	// written records every output path so a post-build sweep can remove stale files
+	// (deleted posts, renamed slugs) that no longer belong in the tree.
+	written := make(map[string]struct{})
+	write := func(rel string, b []byte) error {
+		full := filepath.Join(outDir, rel)
+		if err := writeFile(full, b); err != nil {
+			return err
+		}
+		written[full] = struct{}{}
+		return nil
+	}
+
+	formats := feedFormats(site)
+	feedHead := feedDiscoveryLinks(site, formats)
+
+	favicon, err := writeFavicon(write, eng, cfg.Root, site)
+	if err != nil {
+		return Result{}, err
+	}
+
+	for _, p := range pages {
+		persona := resolvePersona(cfg, p.Persona)
+		ctx := map[string]any{
+			"site_title":    site.Title,
+			"base_url":      site.BaseURL,
+			"base_path":     basePath,
+			"feed_head":     feedHead,
+			"seo_head":      seoHead(site, p, persona),
+			"meta_title":    metaTitle(p),
+			"favicon":       favicon,
+			"title":         p.Title,
+			"date":          p.Date,
+			"description":   p.Description,
+			"content":       p.HTML,
+			"draft":         p.Draft,
+			"embargoed":     p.Embargoed,
+			"embargo_until": p.EmbargoUntil,
+			"hero":          p.Hero,
+			"image":         p.Image,
+			"image_abs":     p.ImageAbs,
+			"tags":          tagLinks(p.Tags, basePath),
+			"category":      pageCategory(p),
+			"read_time":     readingTime(p.HTML),
+			"toc":           tableOfContents(p.HTML),
+			"has_math":      p.HasMath,
+			"has_mermaid":   p.HasMermaid,
+			"has_code":      p.HasCode,
+		}
+		for k, v := range authorVars(persona) {
+			ctx[k] = v
+		}
+		html, err := eng.Render("page.html", ctx)
+		if err != nil {
+			return Result{}, err
+		}
+		if err := write(p.Out, []byte(html)); err != nil {
+			return Result{}, err
+		}
+	}
+
+	list := make([]map[string]any, len(pages))
+	for i, p := range pages {
+		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "tags": tagLinks(p.Tags, basePath)}
+	}
+	index, err := eng.Render("index.html", map[string]any{
+		"site_title": site.Title,
+		"base_url":   site.BaseURL,
+		"base_path":  basePath,
+		"feed_head":  feedHead,
+		"favicon":    favicon,
+		"heading":    site.Title,
+		"feeds":      feedLinks(formats, basePath),
+		"pages":      list,
+	})
+	if err != nil {
+		return Result{}, err
+	}
+	if err := write("index.html", []byte(index)); err != nil {
+		return Result{}, err
+	}
+
+	// Tag pages: one post listing per tag, reusing the index template with a heading. Tag
+	// chips on each post (page.html) link here, so tags become cross-entry navigation.
+	if err := writeTagPages(write, eng, site, basePath, feedHead, favicon, pages, list); err != nil {
+		return Result{}, err
+	}
+
+	// Copy the theme's static files (style.css, vendored JS/fonts, etc.) verbatim.
+	themeAssets, err := eng.Assets()
+	if err != nil {
+		return Result{}, err
+	}
+	for _, name := range themeAssets {
+		b, err := eng.Asset(name)
+		if err != nil {
+			return Result{}, err
+		}
+		if err := write(name, b); err != nil {
+			return Result{}, err
+		}
+	}
+
+	if err := writeFeeds(write, site, cfg, formats, pages); err != nil {
+		return Result{}, err
+	}
+	opts.Log.Detail("BUILD", "", "feeds", strings.Join(formats, " "), "sitemap", true, "robots", true)
+
+	// Copy referenced assets through their owning source. A missing asset warns (a likely
+	// broken link) rather than failing the whole build.
+	ctx := context.Background()
+	for _, a := range assets {
+		rc, err := a.src.Open(ctx, a.srcPath)
+		if err != nil {
+			opts.Log.Step("ASSET", a.src.ID(), "missing", a.srcPath)
+			continue
+		}
+		b, err := io.ReadAll(rc)
+		_ = rc.Close()
+		if err != nil {
+			return Result{}, err
+		}
+		if err := write(a.outPath, b); err != nil {
+			return Result{}, err
+		}
+		opts.Log.Detail("ASSET", a.src.ID(), "file", a.outPath, "bytes", len(b))
+	}
+
+	if err := sweep(outDir, written); err != nil {
+		return Result{}, err
+	}
+	return Result{Pages: len(pages), OutDir: outDir, NextEmbargo: nextEmbargo}, nil
+}
+
+// sourceDoc pairs a document with the source it came from, so the build can resolve the
+// document's assets (relative image refs) back through that source.
+type sourceDoc struct {
+	doc core.Content
+	src core.Source
+}
+
+// gatherDocuments collects the content documents from every configured source (or the
+// default md-dir at content/ when none is configured), logging each.
+func gatherDocuments(cfg *config.Config, log *clog.Logger) ([]sourceDoc, error) {
+	srcs, err := resolveSources(cfg)
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	var docs []sourceDoc
+	for _, s := range srcs {
+		got, err := s.Documents(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("source %s: %w", s.ID(), err)
+		}
+		log.Step("SOURCE", s.ID(), "driver", s.Driver(), "docs", len(got))
+		for _, d := range got {
+			log.Detail("SOURCE", s.ID(), "file", d.SourcePath)
+			docs = append(docs, sourceDoc{doc: d, src: s})
+		}
+	}
+	return docs, nil
+}
+
+func resolveSources(cfg *config.Config) ([]core.Source, error) {
+	if len(cfg.Sources) == 0 {
+		s, err := source.Open(cfg.Root, config.SourceConfig{ID: "content", Driver: "md-dir"})
+		if err != nil {
+			return nil, err
+		}
+		return []core.Source{s}, nil
+	}
+	out := make([]core.Source, 0, len(cfg.Sources))
+	for _, sc := range cfg.Sources {
+		s, err := source.Open(cfg.Root, sc)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// included is a document that survived the draft/embargo filter, with its resolved slug.
+type included struct {
+	c         core.Content
+	src       core.Source
+	slug      string
+	embargoed bool
+}
+
+// assetRef is a file an output page references and must carry along: read srcPath from
+// src, write it to outPath (relative to the output dir).
+type assetRef struct {
+	src     core.Source
+	srcPath string
+	outPath string
+}
+
+// buildPages renders the gathered documents to pages sorted newest-first, the assets
+// they reference, and the soonest pending embargo. A document is skipped from production
+// (includeDrafts false) when it is a draft or its publish_after is still in the future;
+// preview builds include both, marking embargoed ones. Two passes so wikilinks resolve
+// against every other document's URL.
+func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, baseURL string, router *core.Router) ([]page, []assetRef, *time.Time, error) {
+	var items []included
+	var next *time.Time
+	links := linkResolver{}
+	for _, sd := range docs {
+		c := sd.doc
+		fm := c.Frontmatter
+		next = considerEmbargo(next, fm, now)
+
+		embargoed := fm.PublishAfter != nil && now.Before(*fm.PublishAfter)
+		if !includeDrafts && (fm.Draft || embargoed) {
+			continue
+		}
+		slug := slugFor(c.SourcePath, fm.Slug)
+		links.add(c.SourcePath, slug, basePath)
+		items = append(items, included{c: c, src: sd.src, slug: slug, embargoed: embargoed})
+	}
+
+	// Collect referenced assets, co-located beside their page so the relative ref still
+	// resolves: a ref in posts/hello.md becomes a file under the posts/hello/ output dir.
+	var assets []assetRef
+	seen := map[string]bool{}
+	addAsset := func(it included, ref string) {
+		if !localRef(ref) {
+			return
+		}
+		out := path.Clean(path.Join(it.slug, ref))
+		if seen[out] {
+			return
+		}
+		seen[out] = true
+		assets = append(assets, assetRef{
+			src:     it.src,
+			srcPath: path.Clean(path.Join(path.Dir(it.c.SourcePath), ref)),
+			outPath: out,
+		})
+	}
+	for _, it := range items {
+		for _, ref := range imageRefs(it.c.Body) {
+			addAsset(it, ref)
+		}
+		addAsset(it, it.c.Frontmatter.Hero)  // hero banner
+		addAsset(it, it.c.Frontmatter.Image) // preview/OG image
+	}
+
+	md := newMarkdown()
+
+	pages := make([]page, 0, len(items))
+	for _, it := range items {
+		fm := it.c.Frontmatter
+		var buf bytes.Buffer
+		body := preprocessCallouts(resolveWikilinks(rewriteAssetURLs(it.c.Body, it.slug, router), links))
+		if err := md.Convert([]byte(body), &buf); err != nil {
+			return nil, nil, nil, fmt.Errorf("%s: %w", it.c.SourcePath, err)
+		}
+
+		title := fm.Title
+		if title == "" {
+			title = it.slug
+		}
+		html := buf.String()
+		desc := fm.Description
+		if desc == "" {
+			desc = excerpt(html, 200)
+		}
+		p := page{
+			Title:       title,
+			Date:        formatDate(fm.Date),
+			Published:   fm.Date,
+			Description: desc,
+			URL:         it.slug + "/", // base_path-relative; templates prepend base_path
+			Out:         filepath.Join(filepath.FromSlash(it.slug), "index.html"),
+			HTML:        html,
+			Draft:       fm.Draft,
+			Embargoed:   it.embargoed,
+		}
+		if it.embargoed {
+			p.EmbargoUntil = fm.PublishAfter.Format("2006-01-02 15:04 MST")
+		}
+		if localRef(fm.Hero) {
+			out := path.Clean(path.Join(it.slug, fm.Hero))
+			if url := router.AssetURL(out); url != "" {
+				p.Hero = url // served from the object store
+			} else {
+				p.Hero = fm.Hero // co-located beside the page, page-relative
+			}
+		}
+		if localRef(fm.Image) {
+			out := path.Clean(path.Join(it.slug, fm.Image))
+			if url := router.AssetURL(out); url != "" {
+				p.Image, p.ImageAbs = url, url
+			} else {
+				p.Image, p.ImageAbs = basePath+out, absURL(baseURL, out)
+			}
+		}
+		p.HasMermaid = strings.Contains(html, `class="mermaid"`)
+		p.HasMath = strings.Contains(html, `class="math`)
+		p.HasCode = strings.Contains(html, "<pre><code")
+		p.Tags = fm.Tags
+		p.Categories = fm.Categories
+		p.Persona = fm.Persona
+		p.SEO = fm.SEO
+		pages = append(pages, p)
+	}
+
+	sort.SliceStable(pages, func(i, j int) bool { return pages[i].Date > pages[j].Date })
+	return pages, assets, next, nil
+}
+
+var imageRE = regexp.MustCompile(`!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))`)
+
+// imageRefs returns the link destinations of markdown image syntax (![alt](dest)). The
+// <…> destination form is recognised so refs with spaces survive. Obsidian ![[embed]] is
+// rewritten to this form by the obsidian source before the build sees it.
+func imageRefs(body string) []string {
+	var refs []string
+	for _, m := range imageRE.FindAllStringSubmatch(body, -1) {
+		ref := m[1]
+		if ref == "" {
+			ref = m[2]
+		}
+		refs = append(refs, ref)
+	}
+	return refs
+}
+
+var imageRewriteRE = regexp.MustCompile(`(!\[[^\]]*\]\()\s*(?:<([^>]+)>|([^)\s]+))`)
+
+// rewriteAssetURLs rewrites local image destinations that a route binds to an object store
+// so they point at the store's absolute public URL (e.g. https://assets.example.com/…)
+// instead of the co-located relative path. Unrouted and external refs are left untouched.
+func rewriteAssetURLs(body, slug string, router *core.Router) string {
+	if !router.Active() {
+		return body
+	}
+	return imageRewriteRE.ReplaceAllStringFunc(body, func(m string) string {
+		sub := imageRewriteRE.FindStringSubmatch(m)
+		dest := sub[2]
+		if dest == "" {
+			dest = sub[3]
+		}
+		if !localRef(dest) {
+			return m
+		}
+		if url := router.AssetURL(path.Clean(path.Join(slug, dest))); url != "" {
+			return sub[1] + "<" + url + ">"
+		}
+		return m
+	})
+}
+
+// localRef reports whether a ref is a relative path to copy (not external, root-absolute,
+// or a fragment).
+func localRef(ref string) bool {
+	if ref == "" || strings.HasPrefix(ref, "/") || strings.HasPrefix(ref, "#") {
+		return false
+	}
+	if i := strings.IndexByte(ref, ':'); i >= 0 && i < strings.IndexByte(ref+"/", '/') {
+		return false // has a scheme (http:, data:, mailto:)
+	}
+	return true
+}
+
+// considerEmbargo returns the sooner of next and fm's publish_after, considering only
+// non-draft posts whose embargo is still in the future. Drafts are ignored because
+// they stay gated regardless of time, so they never trigger an automatic build.
+func considerEmbargo(next *time.Time, fm markdown.Frontmatter, now time.Time) *time.Time {
+	if fm.Draft || fm.PublishAfter == nil {
+		return next
+	}
+	pa := *fm.PublishAfter
+	if !pa.After(now) {
+		return next
+	}
+	if next == nil || pa.Before(*next) {
+		return &pa
+	}
+	return next
+}
+
+// NextEmbargo returns the soonest future publish_after across non-draft documents from
+// every configured source — the next instant a production build would publish something
+// new — or nil if nothing is pending.
+func NextEmbargo(cfg *config.Config, now time.Time) (*time.Time, error) {
+	docs, err := gatherDocuments(cfg, nil)
+	if err != nil {
+		return nil, err
+	}
+	var next *time.Time
+	for _, sd := range docs {
+		next = considerEmbargo(next, sd.doc.Frontmatter, now)
+	}
+	return next, nil
+}
+
+// slugFor derives a clean site path from a content-relative file path, honouring an
+// explicit frontmatter slug for the final segment. The .md extension is dropped, a
+// trailing /index is collapsed (foo/index.md -> foo), folder structure is preserved,
+// and every segment is normalised (lower-case, spaces/punctuation -> single hyphens)
+// so "Archive/My Post.md" -> "archive/my-post".
+func slugFor(rel, override string) string {
+	s := filepath.ToSlash(rel)
+	s = strings.TrimSuffix(s, filepath.Ext(s))
+	s = strings.TrimSuffix(s, "/index")
+	if override != "" {
+		if dir := pathDir(s); dir != "" {
+			s = dir + "/" + override
+		} else {
+			s = override
+		}
+	}
+	return normalizeSlug(s)
+}
+
+// normalizeSlug slugifies each path segment and drops empties.
+func normalizeSlug(s string) string {
+	var out []string
+	for _, seg := range strings.Split(s, "/") {
+		if seg = slugifySegment(seg); seg != "" {
+			out = append(out, seg)
+		}
+	}
+	return strings.Join(out, "/")
+}
+
+// slugifySegment lower-cases a single segment, keeping [a-z0-9] and collapsing any run
+// of other characters to a single hyphen, with hyphens trimmed from the ends.
+func slugifySegment(s string) string {
+	var b strings.Builder
+	hyphen := false
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			hyphen = false
+		} else if !hyphen && b.Len() > 0 {
+			b.WriteByte('-')
+			hyphen = true
+		}
+	}
+	return strings.TrimRight(b.String(), "-")
+}
+
+func pathDir(s string) string {
+	if i := strings.LastIndex(s, "/"); i >= 0 {
+		return s[:i]
+	}
+	return ""
+}
+
+// tagLinks maps a page's tags to {name, url} entries pointing at their tag pages.
+func tagLinks(tags []string, basePath string) []map[string]any {
+	out := make([]map[string]any, 0, len(tags))
+	for _, t := range tags {
+		if s := normalizeSlug(t); s != "" {
+			out = append(out, map[string]any{"name": t, "url": basePath + "tags/" + s + "/"})
+		}
+	}
+	return out
+}
+
+// writeTagPages renders a listing page per tag at tags/<slug>/, reusing the index template
+// (with a heading and the tag's posts). list[i] is the index-item map for pages[i].
+func writeTagPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, feedHead, favicon string, pages []page, list []map[string]any) error {
+	type group struct {
+		name  string
+		items []map[string]any
+	}
+	groups := map[string]*group{}
+	var slugs []string
+	for i, p := range pages {
+		for _, t := range p.Tags {
+			s := normalizeSlug(t)
+			if s == "" {
+				continue
+			}
+			g := groups[s]
+			if g == nil {
+				g = &group{name: t}
+				groups[s] = g
+				slugs = append(slugs, s)
+			}
+			g.items = append(g.items, list[i])
+		}
+	}
+	sort.Strings(slugs)
+	for _, s := range slugs {
+		g := groups[s]
+		html, err := eng.Render("index.html", map[string]any{
+			"site_title": site.Title,
+			"base_url":   site.BaseURL,
+			"base_path":  basePath,
+			"feed_head":  feedHead,
+			"favicon":    favicon,
+			"heading":    "Tagged “" + g.name + "”",
+			"pages":      g.items,
+		})
+		if err != nil {
+			return err
+		}
+		if err := write("tags/"+s+"/index.html", []byte(html)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeFavicon copies the site icon into the output and returns its filename for the theme
+// to link, or "" if none is available. A project-root favicon (site.Favicon) wins; else the
+// theme's favicon.svg is used. The output keeps the source extension so the browser can
+// infer the type.
+func writeFavicon(write func(string, []byte) error, eng render.Engine, root string, site core.Site) (string, error) {
+	if site.Favicon != "" {
+		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(site.Favicon)))
+		if err != nil {
+			return "", fmt.Errorf("favicon %s: %w", site.Favicon, err)
+		}
+		name := "favicon" + strings.ToLower(path.Ext(site.Favicon))
+		return name, write(name, b)
+	}
+	b, err := eng.Asset("favicon.svg")
+	if err != nil {
+		return "", nil // theme ships no default favicon; skip the link
+	}
+	return "favicon.svg", write("favicon.svg", b)
+}
+
+// resolveRoutesFromConfig fills an empty route base_url from its target publisher's
+// configured public_url, so a route can omit base_url and inherit the store's URL. Publish
+// resolves further (provider discovery); this is the config-only fallback a plain build uses.
+func resolveRoutesFromConfig(routes []core.RouteRule, cfg *config.Config) []core.RouteRule {
+	if len(routes) == 0 {
+		return routes
+	}
+	out := make([]core.RouteRule, len(routes))
+	for i, r := range routes {
+		out[i] = r
+		if r.BaseURL != "" {
+			continue
+		}
+		if pc := cfg.Publisher(r.Publisher); pc != nil {
+			if u, _ := pc.Settings["public_url"].(string); u != "" {
+				out[i].BaseURL = u
+			}
+		}
+	}
+	return out
+}
+
+// absURL joins a base_url root and a base_path-relative page path into an absolute URL
+// (for og:image and similar), returning "" when there is no path.
+func absURL(base, p string) string {
+	if p == "" {
+		return ""
+	}
+	return strings.TrimRight(base, "/") + "/" + strings.TrimLeft(p, "/")
+}
+
+func formatDate(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format("2006-01-02")
+}
+
+func writeFile(path string, b []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, b, 0o644)
+}
+
+// sweep deletes every file under root that this build did not write, then removes any
+// directories left empty. It reconciles the output tree to exactly match the inputs,
+// so deleting a post or renaming a slug never leaves an orphan behind. root is always a
+// colophon-owned output dir (public/ or .colophon/...), so this only removes our files.
+func sweep(root string, keep map[string]struct{}) error {
+	var stale []string
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if _, ok := keep[p]; !ok {
+			stale = append(stale, p)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for _, f := range stale {
+		if err := os.Remove(f); err != nil {
+			return err
+		}
+	}
+	return removeEmptyDirs(root)
+}
+
+// ReconcileDirs removes any immediate subdirectory of base whose name is not in keep.
+// It is how an orchestrator drops the build-output trees of deleted targets (e.g. a
+// removed environment). A missing base is not an error. It only ever touches dirs that
+// are purely build output — never durable scratch like cache/ or corpus/.
+func ReconcileDirs(base string, keep map[string]bool) error {
+	entries, err := os.ReadDir(base)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if e.IsDir() && !keep[e.Name()] {
+			if err := os.RemoveAll(filepath.Join(base, e.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func removeEmptyDirs(root string) error {
+	var dirs []string
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err == nil && d.IsDir() && p != root {
+			dirs = append(dirs, p)
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	// Deepest first, so a dir is removed only after its (now-empty) children.
+	sort.Slice(dirs, func(i, j int) bool { return len(dirs[i]) > len(dirs[j]) })
+	for _, d := range dirs {
+		if entries, _ := os.ReadDir(d); len(entries) == 0 {
+			_ = os.Remove(d)
+		}
+	}
+	return nil
+}
