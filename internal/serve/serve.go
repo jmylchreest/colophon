@@ -7,15 +7,22 @@ package serve
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"html"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -23,6 +30,10 @@ import (
 	"github.com/jmylchreest/colophon/internal/build"
 	"github.com/jmylchreest/colophon/internal/config"
 )
+
+// rebuildTTL bounds how stale a served tree can be: an HTML request reuses the last build
+// unless a watched file changed since (see markAllDirty) or the tree is older than this.
+const rebuildTTL = 2 * time.Second
 
 // reloadPath is the SSE endpoint; reloadScript (injected into pages) listens on it.
 const reloadPath = "/_colophon/reload"
@@ -44,6 +55,15 @@ type target struct {
 	opts   build.Options
 }
 
+// buildState is one target's cached-build bookkeeping: its own lock so targets rebuild
+// independently (a slow env doesn't block another), the time of the last build for the TTL
+// check, and a dirty flag the watcher sets so the next request rebuilds promptly.
+type buildState struct {
+	mu        sync.Mutex  // serialises this target's rebuilds; guards lastBuilt
+	lastBuilt time.Time   // when build() last completed for this target
+	dirty     atomic.Bool // a watched file changed since lastBuilt → rebuild on next request
+}
+
 // Server hosts the preview of every environment for the first configured site.
 type Server struct {
 	root string
@@ -54,7 +74,8 @@ type Server struct {
 	site    string
 	targets []target
 
-	buildMu sync.Mutex // serialises rebuilds so concurrent requests don't race on a tree
+	buildsMu sync.Mutex             // guards the builds map
+	builds   map[string]*buildState // per-target build state, keyed by target name
 
 	clientMu sync.Mutex
 	clients  map[chan struct{}]bool
@@ -71,6 +92,7 @@ func New(cfg *config.Config) (*Server, error) {
 		cfg:     cfg,
 		site:    site,
 		targets: targets,
+		builds:  map[string]*buildState{},
 		clients: map[chan struct{}]bool{},
 	}, nil
 }
@@ -115,11 +137,17 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 	targets := s.targets
 	s.mu.RUnlock()
 	for _, t := range targets {
-		if err := s.rebuild(t); err != nil {
+		if err := s.forceBuild(t); err != nil {
 			return fmt.Errorf("build %s: %w", t.name, err)
 		}
 	}
-	go s.watch()
+
+	// One context drives shutdown: Ctrl-C / SIGTERM cancels it, which stops the watcher,
+	// the pending browser-open, and the HTTP server (so an in-flight build isn't killed
+	// mid-write).
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	go s.watch(ctx)
 
 	fmt.Printf("colophon serve → http://localhost%s/\n", port(addr))
 	for _, t := range targets {
@@ -134,7 +162,7 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 		if openTarget != "" {
 			if u, ok := s.resolveURL(addr, targets[0], openTarget); ok {
 				fmt.Printf("opening %s\n", u)
-				go func() { time.Sleep(300 * time.Millisecond); openBrowser(u) }()
+				go openBrowserAfter(ctx, 300*time.Millisecond, u)
 			} else {
 				fmt.Printf("  (unknown --open target %q)\n", openTarget)
 			}
@@ -144,7 +172,23 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(reloadPath, s.handleReload)
 	mux.HandleFunc("/", s.route)
-	return http.ListenAndServe(addr, mux)
+	srv := &http.Server{Addr: addr, Handler: mux}
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- srv.ListenAndServe() }()
+	select {
+	case err := <-errCh:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case <-ctx.Done():
+		stop() // restore default signal handling: a second Ctrl-C aborts the drain
+		fmt.Fprintln(os.Stderr, "\ncolophon: shutting down…")
+		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		return srv.Shutdown(shutCtx)
+	}
 }
 
 // printWellKnown lists the home/latest/sitemap/feed URLs for a target, so a person or an
@@ -160,10 +204,10 @@ func (s *Server) printWellKnown(addr string, t target) {
 }
 
 // resolveURL maps an --open target name to a full URL under the given environment.
-func (s *Server) resolveURL(addr string, t target, target_ string) (string, bool) {
+func (s *Server) resolveURL(addr string, t target, openName string) (string, bool) {
 	base := "http://localhost" + port(addr) + t.prefix
 	var path string
-	switch target_ {
+	switch openName {
 	case "home":
 		path = ""
 	case "latest":
@@ -183,7 +227,7 @@ func (s *Server) resolveURL(addr string, t target, target_ string) (string, bool
 	case "robots":
 		path = "robots.txt"
 	default:
-		path = strings.Trim(target_, "/")
+		path = strings.Trim(openName, "/")
 		if path != "" && !strings.Contains(path, ".") {
 			path += "/" // looks like a slug, not a file
 		}
@@ -213,6 +257,19 @@ func (s *Server) latestSlug() (string, bool) {
 	return best, best != ""
 }
 
+// openBrowserAfter opens url once delay elapses, unless ctx is cancelled first (the server
+// is shutting down). The delay gives the listener a moment to come up; tying it to ctx keeps
+// the open inside the server's lifecycle instead of a detached sleep.
+func openBrowserAfter(ctx context.Context, delay time.Duration, url string) {
+	t := time.NewTimer(delay)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+	case <-t.C:
+		openBrowser(url)
+	}
+}
+
 // openBrowser best-effort launches the OS browser at url; failure is ignored (the URL was
 // already printed).
 func openBrowser(url string) {
@@ -230,7 +287,21 @@ func openBrowser(url string) {
 	_ = exec.Command(name, args...).Start()
 }
 
-func (s *Server) rebuild(t target) error {
+// buildStateFor returns the per-target build state, creating it on first use.
+func (s *Server) buildStateFor(name string) *buildState {
+	s.buildsMu.Lock()
+	defer s.buildsMu.Unlock()
+	bs := s.builds[name]
+	if bs == nil {
+		bs = &buildState{}
+		s.builds[name] = bs
+	}
+	return bs
+}
+
+// build runs the actual build for t. The caller must hold the target's buildState.mu so two
+// requests for the same env don't race on its output tree.
+func (s *Server) build(t target) error {
 	s.mu.RLock()
 	cfg := s.cfg
 	s.mu.RUnlock()
@@ -239,10 +310,48 @@ func (s *Server) rebuild(t target) error {
 	// resolvable within the preview, instead of pointing at the configured base_url.
 	opts := t.opts
 	opts.BaseURL = "http://localhost" + port(s.addr) + strings.TrimSuffix(t.prefix, "/")
-	s.buildMu.Lock()
-	defer s.buildMu.Unlock()
 	_, err := build.Run(cfg, opts)
 	return err
+}
+
+// forceBuild rebuilds t unconditionally (startup and config reload) and records the time.
+func (s *Server) forceBuild(t target) error {
+	bs := s.buildStateFor(t.name)
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
+	if err := s.build(t); err != nil {
+		return err
+	}
+	bs.lastBuilt = time.Now()
+	bs.dirty.Store(false)
+	return nil
+}
+
+// ensureBuilt rebuilds t only when needed: a watched file changed since the last build, the
+// cached tree is older than rebuildTTL, or it was never built. Otherwise it reuses the tree
+// on disk — so browsing N pages no longer recompiles the whole site N times.
+func (s *Server) ensureBuilt(t target) error {
+	bs := s.buildStateFor(t.name)
+	bs.mu.Lock()
+	defer bs.mu.Unlock()
+	if !bs.lastBuilt.IsZero() && !bs.dirty.Load() && time.Since(bs.lastBuilt) < rebuildTTL {
+		return nil
+	}
+	if err := s.build(t); err != nil {
+		return err
+	}
+	bs.lastBuilt = time.Now()
+	bs.dirty.Store(false)
+	return nil
+}
+
+// markAllDirty flags every known target so its next request rebuilds (a watched file changed).
+func (s *Server) markAllDirty() {
+	s.buildsMu.Lock()
+	defer s.buildsMu.Unlock()
+	for _, bs := range s.builds {
+		bs.dirty.Store(true)
+	}
 }
 
 func (s *Server) route(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +372,7 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if isPage(r.URL.Path) {
-			if err := s.rebuild(t); err != nil {
+			if err := s.ensureBuilt(t); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -346,7 +455,7 @@ func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 // watch debounces filesystem changes and reacts: a content/theme edit broadcasts a
 // reload; a colophon.yaml edit reloads the config first. A failure to start the watcher
 // degrades to rebuild-on-refresh, not an error.
-func (s *Server) watch() {
+func (s *Server) watch(ctx context.Context) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "colophon: live reload disabled: %v\n", err)
@@ -364,6 +473,8 @@ func (s *Server) watch() {
 	configDirty := false
 	for {
 		select {
+		case <-ctx.Done(): // server shutting down: closing w ends this loop
+			return
 		case ev, ok := <-w.Events:
 			if !ok {
 				return
@@ -383,6 +494,7 @@ func (s *Server) watch() {
 				configDirty = false
 				s.reconfigure()
 			} else {
+				s.markAllDirty() // the next page request rebuilds; until then serve the cache
 				s.broadcast()
 			}
 		case _, ok := <-w.Errors:
@@ -419,7 +531,7 @@ func (s *Server) reconfigure() {
 	s.mu.Unlock()
 
 	for _, t := range targets {
-		if err := s.rebuild(t); err != nil {
+		if err := s.forceBuild(t); err != nil {
 			fmt.Fprintf(os.Stderr, "colophon: rebuild %s failed: %v\n", t.name, err)
 		}
 	}
@@ -450,11 +562,18 @@ func (s *Server) broadcast() {
 	}
 }
 
+// addTree watches dir and its subdirectories (fsnotify is non-recursive, so each dir is added
+// individually). Hidden directories (.git, .obsidian, …) are pruned: they hold no rendered
+// content and can be huge, so watching them would burn the inotify watch budget for nothing.
 func addTree(w *fsnotify.Watcher, dir string) {
 	_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
-		if err == nil && d.IsDir() {
-			_ = w.Add(p)
+		if err != nil || !d.IsDir() {
+			return nil
 		}
+		if name := d.Name(); name != "." && strings.HasPrefix(name, ".") && p != dir {
+			return filepath.SkipDir
+		}
+		_ = w.Add(p)
 		return nil
 	})
 }
@@ -476,9 +595,19 @@ func isPage(p string) bool {
 	return strings.HasSuffix(p, "/") || strings.HasSuffix(p, ".html")
 }
 
+// port returns the ":port" suffix of a listen address for building localhost URLs. It accepts
+// host:port (":8080", "localhost:8080", "[::1]:8080") or a bare port ("8080"); anything that
+// doesn't yield a numeric port falls back to the default so the printed URLs stay valid.
 func port(addr string) string {
-	if i := strings.LastIndex(addr, ":"); i >= 0 {
-		return addr[i:]
+	if _, p, err := net.SplitHostPort(addr); err == nil {
+		if _, err := strconv.Atoi(p); err == nil {
+			return ":" + p
+		}
 	}
-	return addr
+	if p := strings.TrimPrefix(addr, ":"); p != "" {
+		if _, err := strconv.Atoi(p); err == nil {
+			return ":" + p
+		}
+	}
+	return ":8080"
 }
