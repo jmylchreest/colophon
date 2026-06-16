@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ meta_title }} · {{ site_title }}</title>
+{{ seo_head|safe }}
+<link rel="stylesheet" href="{{ base_path }}style.css">
+{% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
+{{ feed_head|safe }}
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="site-header">
+  <div class="header-top">
+    <a class="site-name" href="{{ base_path }}">{{ site_title }}</a>
+    <div class="header-right">
+      <span class="header-feeds"><a href="{{ base_path }}rss.xml">RSS</a><a href="{{ base_path }}atom.xml">Atom</a><a href="{{ base_path }}feed.json">JSON</a></span>
+      <input id="theme-switch" class="toggle" type="checkbox" role="switch" checked><label for="theme-switch" class="sr">Dark mode</label>
+    </div>
+  </div>
+</div>
+
+<main class="article-container">
+  <header class="article-header">
+    {% if category %}<span class="article-section">{{ category }}</span>{% endif %}
+    {% if draft %}<span class="article-section">Draft</span>{% endif %}
+    {% if embargoed %}<span class="article-section">Embargoed · {{ embargo_until }}</span>{% endif %}
+    <h1 class="article-title">{{ title }}</h1>
+    {% if description %}<p class="article-dek">{{ description }}</p>{% endif %}
+    <div class="byline">{{ author_name|default:site_title }}{% if date %} · {{ date }}{% endif %} · {{ read_time }} min read</div>
+  </header>
+
+  <div class="prose">
+    {{ content|safe }}
+  </div>
+
+  <footer class="article-footer">
+    {% if tags %}<div class="footer-tags">{% for tg in tags %}<a class="ftag" href="{{ tg.url }}">{{ tg.name }}</a>{% endfor %}</div>{% endif %}
+  </footer>
+</main>
+
+<script>
+window.addEventListener('scroll', () => { const d = document.documentElement; document.getElementById('progress').style.width = (d.scrollTop / (d.scrollHeight - d.clientHeight) * 100) + '%'; });
+document.getElementById('theme-switch').addEventListener('change', (e) => { document.documentElement.dataset.theme = e.target.checked ? 'dark' : 'light'; });
+</script>
+{% if has_code %}<link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css"><script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>{% endif %}
+{% if has_math %}<link rel="stylesheet" href="{{ base_path }}vendor/katex/katex.min.css"><script defer src="{{ base_path }}vendor/katex/katex.min.js"></script><script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.math').forEach(function(el){try{katex.render(el.textContent,el,{displayMode:el.classList.contains('math-display'),throwOnError:false});}catch(e){}});});</script>{% endif %}
+{% if has_mermaid %}<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true})"></script>{% endif %}
+</body>
+</html>

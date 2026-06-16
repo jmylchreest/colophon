@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('press-theme')||'dark';}catch(e){}</script>
+<title>{{ heading|default:site_title }}</title>
+<link rel="stylesheet" href="{{ base_path }}style.css">
+{% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
+{{ feed_head|safe }}
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="colo-goo"><feColorMatrix in="SourceGraphic" type="matrix"
+    values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10"/></filter>
+</defs></svg>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="{{ base_path }}">{{ site_title }}</a>
+    <div class="topbar-right">
+      <nav class="feeds" aria-label="Subscribe">
+        <a class="feed" href="{{ base_path }}rss.xml"><span class="tip">RSS</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83C19.56 11.41 12.59 4.44 4 4.44zM4 10.1v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83C13.9 14.53 9.47 10.1 4 10.1z"/></svg></a>
+        <a class="feed" href="{{ base_path }}atom.xml"><span class="tip">Atom</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83C19.56 11.41 12.59 4.44 4 4.44zM4 10.1v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83C13.9 14.53 9.47 10.1 4 10.1z"/></svg></a>
+        <a class="feed" href="{{ base_path }}feed.json"><span class="tip">JSON</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83C19.56 11.41 12.59 4.44 4 4.44zM4 10.1v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83C13.9 14.53 9.47 10.1 4 10.1z"/></svg></a>
+      </nav>
+      <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
+    </div>
+  </div>
+</header>
+
+<section class="home-hero">
+  <h1 class="ink">{{ heading|default:site_title }}</h1>
+  <p class="lede">Write it once. Own it forever. Publish anywhere.</p>
+</section>
+
+<main class="wrap">
+  <ul class="post-list">
+  {% for p in pages %}
+    <a class="post-row" href="{{ base_path }}{{ p.url }}">
+      <time>{% if p.date %}{{ p.date }}{% endif %}</time>
+      <div>
+        <div class="pt">{{ p.title }}</div>
+        <div class="badges">{% if p.draft %}<span class="chip">draft</span>{% endif %}{% if p.embargoed %}<span class="chip">embargoed</span>{% endif %}{% for tg in p.tags %}<span class="chip">#{{ tg.name }}</span>{% endfor %}</div>
+      </div>
+    </a>
+  {% endfor %}
+  </ul>
+</main>
+
+<footer class="foot">Published with colophon{% if feeds %} ·{% for f in feeds %} <a href="{{ f.href }}" style="color:var(--muted)">{{ f.label }}</a>{% endfor %}{% endif %}</footer>
+
+<script>
+(function () {
+  var tt = document.getElementById('themeToggle'), root = document.documentElement;
+  function apply(t) { root.dataset.theme = t; if (tt) tt.setAttribute('aria-checked', t === 'dark'); }
+  apply(root.dataset.theme || 'dark');
+  if (tt) tt.addEventListener('click', function () { var t = root.dataset.theme === 'dark' ? 'light' : 'dark'; apply(t); try { localStorage.setItem('press-theme', t); } catch (e) {} });
+})();
+</script>
+</body>
+</html>

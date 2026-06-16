@@ -1,0 +1,21 @@
+# colophon project configuration — local publisher e2e fixture.
+
+sites:
+  - id: main
+    title: "colophon · local e2e"
+    base_url: "{env:SITE_URL:-http://localhost:8080}"
+    theme: default
+    personas: [default]
+    federation:
+      feeds: [rss, atom, json]
+    search: lexical
+
+publishers:
+  - id: local
+    driver: local
+    path: ./dist
+
+environments:
+  - name: dist
+    publish: [local]
+    include_drafts: true

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('obsidian2-theme')||'dark';}catch(e){}</script>
+<title>{{ meta_title }} · {{ site_title }}</title>
+{{ seo_head|safe }}
+<link rel="stylesheet" href="{{ base_path }}style.css">
+{% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
+{{ feed_head|safe }}
+</head>
+<body>
+<div class="progress" id="prog"></div>
+
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" href="{{ base_path }}">{{ site_title }}</a>
+    <div class="nav">
+      <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
+    </div>
+  </div>
+</nav>
+
+<div class="hero-full">
+  <div class="hero-bg"{% if hero %} style="background-image:url('{{ hero }}')"{% endif %}></div>
+  <div class="hero-gradient"></div>
+  <div class="hero-content">
+    <div class="hero-meta-row">
+      {% if category %}<span class="hero-category">{{ category }}</span><span class="hero-dot">·</span>{% endif %}
+      {% if date %}<span class="hero-date">{{ date }}</span><span class="hero-dot">·</span>{% endif %}
+      <span class="hero-readtime">{{ read_time }} min read</span>
+    </div>
+    <h1 class="hero-title">{{ title }}</h1>
+    {% if description %}<p class="hero-sub">{{ description }}</p>{% endif %}
+    <div class="hero-author">
+      <div class="hero-avatar">{{ author_initials|default:"·" }}</div>
+      <div>
+        <div class="hero-author-name">{{ author_name|default:site_title }}</div>
+        {% if author_bio %}<div class="hero-author-role">{{ author_bio }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="article-wrap">
+  <div class="prose">
+    {{ content|safe }}
+  </div>
+
+  <aside class="side-col">
+    {% if toc %}
+    <div class="side-card">
+      <div class="side-card-title">In this article</div>
+      {% for h in toc %}<a class="toc-link lvl-{{ h.level }}" href="#{{ h.id }}">{{ h.text }}</a>{% endfor %}
+    </div>
+    {% endif %}
+    {% if tags %}
+    <div class="side-card">
+      <div class="side-card-title">Tags</div>
+      <div class="side-tags">{% for tg in tags %}<a href="{{ tg.url }}">{{ tg.name }}</a>{% endfor %}</div>
+    </div>
+    {% endif %}
+    {% if author_name %}
+    <div class="side-card">
+      <div class="side-card-title">Author</div>
+      <div class="author-row">
+        <div class="hero-avatar author-avatar-sm">{{ author_initials }}</div>
+        <div class="author-name-sm">{{ author_name }}</div>
+      </div>
+      {% if author_bio %}<div class="author-bio-sm">{{ author_bio }}</div>{% endif %}
+    </div>
+    {% endif %}
+    <div class="side-card nl-card">
+      <div class="nl-title">Stay in the loop</div>
+      <div class="nl-desc">Subscribe via your favourite feed reader.</div>
+      <div class="nl-feeds">
+        <a href="{{ base_path }}rss.xml">RSS</a>
+        <a href="{{ base_path }}atom.xml">Atom</a>
+        <a href="{{ base_path }}feed.json">JSON</a>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+window.addEventListener('scroll', () => { const d = document.documentElement; document.getElementById('prog').style.width = (d.scrollTop / (d.scrollHeight - d.clientHeight) * 100) + '%'; });
+(function(){ var tt=document.getElementById('themeToggle'), r=document.documentElement; function apply(t){ r.dataset.theme=t; if(tt) tt.setAttribute('aria-checked', t==='dark'); } apply(r.dataset.theme||'dark'); if(tt) tt.addEventListener('click', function(){ var t=r.dataset.theme==='dark'?'light':'dark'; apply(t); try{localStorage.setItem('obsidian2-theme',t);}catch(e){} }); })();
+</script>
+{% if has_code %}<link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css"><script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>{% endif %}
+{% if has_math %}<link rel="stylesheet" href="{{ base_path }}vendor/katex/katex.min.css"><script defer src="{{ base_path }}vendor/katex/katex.min.js"></script><script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.math').forEach(function(el){try{katex.render(el.textContent,el,{displayMode:el.classList.contains('math-display'),throwOnError:false});}catch(e){}});});</script>{% endif %}
+{% if has_mermaid %}<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:'dark'})"></script>{% endif %}
+</body>
+</html>

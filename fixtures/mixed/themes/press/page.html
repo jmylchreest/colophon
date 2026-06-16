@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('press-theme')||'dark';}catch(e){}</script>
+<title>{{ meta_title }} · {{ site_title }}</title>
+{{ seo_head|safe }}
+<link rel="stylesheet" href="{{ base_path }}style.css">
+{% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
+{{ feed_head|safe }}
+</head>
+<body>
+<div id="progress"></div>
+
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="{{ base_path }}">{{ site_title }}</a>
+    <div class="topbar-right">
+      <nav class="feeds" aria-label="Subscribe">
+        <a class="feed" href="{{ base_path }}rss.xml"><span class="tip">RSS</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83C19.56 11.41 12.59 4.44 4 4.44zM4 10.1v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83C13.9 14.53 9.47 10.1 4 10.1z"/></svg></a>
+        <a class="feed" href="{{ base_path }}atom.xml"><span class="tip">Atom</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83C19.56 11.41 12.59 4.44 4 4.44zM4 10.1v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83C13.9 14.53 9.47 10.1 4 10.1z"/></svg></a>
+        <a class="feed" href="{{ base_path }}feed.json"><span class="tip">JSON</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83C19.56 11.41 12.59 4.44 4 4.44zM4 10.1v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83C13.9 14.53 9.47 10.1 4 10.1z"/></svg></a>
+      </nav>
+      <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="post-wrap">
+  {% if toc %}
+  <nav class="toc">
+    <div class="toc-title">Contents</div>
+    {% for h in toc %}<a class="lvl-{{ h.level }}" href="#{{ h.id }}">{{ h.text }}</a>{% endfor %}
+  </nav>
+  {% else %}<div></div>{% endif %}
+
+  <main class="post-main">
+    <header class="post-hero">
+      <a class="back" href="{{ base_path }}">← {{ site_title }}</a>
+      <div style="margin-top:1.5rem">
+        {% if category %}<span class="eyebrow">{{ category }}</span>{% endif %}
+        {% if draft %}<span class="eyebrow">Draft</span>{% endif %}
+        {% if embargoed %}<span class="eyebrow">Embargoed · {{ embargo_until }}</span>{% endif %}
+      </div>
+      <h1>{{ title }}</h1>
+      {% if description %}<p class="dek">{{ description }}</p>{% endif %}
+      <div class="byline">
+        <div class="av">{{ author_initials|default:"·" }}</div>
+        <div>
+          <div class="nm">{{ author_name|default:site_title }}</div>
+          <div class="mt">{% if date %}{{ date }} · {% endif %}{{ read_time }} min read</div>
+        </div>
+      </div>
+    </header>
+
+    {% if hero %}<figure class="cover"><img src="{{ hero }}" alt=""></figure>{% endif %}
+
+    <article class="prose">{{ content|safe }}</article>
+
+    <footer class="post-foot">
+      {% if tags %}<div class="tags">{% for tg in tags %}<a class="chip" href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</div>{% endif %}
+      {% if author_name %}
+      <div class="note">
+        <div class="av">{{ author_initials }}</div>
+        <div>
+          <div class="nm">{{ author_name }}</div>
+          {% if author_bio %}<div class="bio">{{ author_bio }}</div>{% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </footer>
+  </main>
+</div>
+
+<footer class="foot">Published with colophon</footer>
+
+<script>
+(function () {
+  var tt = document.getElementById('themeToggle'), root = document.documentElement;
+  function apply(t) { root.dataset.theme = t; if (tt) tt.setAttribute('aria-checked', t === 'dark'); }
+  apply(root.dataset.theme || 'dark');
+  if (tt) tt.addEventListener('click', function () { var t = root.dataset.theme === 'dark' ? 'light' : 'dark'; apply(t); try { localStorage.setItem('press-theme', t); } catch (e) {} });
+  window.addEventListener('scroll', function () { var d = document.documentElement; var p = document.getElementById('progress'); if (p) p.style.width = (d.scrollTop / (d.scrollHeight - d.clientHeight) * 100) + '%'; }, { passive: true });
+})();
+</script>
+{% if has_code %}
+<link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css">
+<script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>
+{% endif %}
+{% if has_math %}
+<link rel="stylesheet" href="{{ base_path }}vendor/katex/katex.min.css">
+<script defer src="{{ base_path }}vendor/katex/katex.min.js"></script>
+<script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.math').forEach(function(el){try{katex.render(el.textContent,el,{displayMode:el.classList.contains('math-display'),throwOnError:false});}catch(e){}});});</script>
+{% endif %}
+{% if has_mermaid %}
+<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:(document.documentElement.dataset.theme==='light'?'default':'dark')})"></script>
+{% endif %}
+</body>
+</html>

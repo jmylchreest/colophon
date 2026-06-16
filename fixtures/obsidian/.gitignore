@@ -1,0 +1,4 @@
+# colophon build output and derived state
+/public/
+/dist/
+/.colophon/

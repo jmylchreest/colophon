@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('signal-theme')||'dark';}catch(e){}</script>
+<title>{{ meta_title }} · {{ site_title }}</title>
+{{ seo_head|safe }}
+<link rel="stylesheet" href="{{ base_path }}style.css">
+{% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
+{{ feed_head|safe }}
+</head>
+<body>
+<div id="progress"></div>
+<header class="site">
+  <div class="site-bar">
+    <a class="site-logo" href="{{ base_path }}">{{ site_title }}</a>
+    <div class="bar-right">
+      <div class="breadcrumb">
+        <a href="{{ base_path }}">home</a><span class="sep">/</span>
+        <a href="{{ base_path }}">posts</a><span class="sep">/</span>
+        <span class="current">{{ title }}</span>
+      </div>
+      <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
+    </div>
+  </div>
+</header>
+
+<div class="hero-block">
+  <div class="file-header">
+    <div class="file-sidebar">
+      <div><span class="prop">author:</span> <span class="val">"{{ author_name|default:site_title }}"</span></div>
+      {% if date %}<div><span class="prop">date:</span> <span class="val">"{{ date }}"</span></div>{% endif %}
+      <div><span class="prop">reading:</span> <span class="val">"{{ read_time }} min"</span></div>
+      <div><span class="prop">tags:</span> <span class="val">{{ tags|length }}</span></div>
+    </div>
+    <div class="file-main">
+      {% if category %}<div class="post-type">{{ category }}</div>{% endif %}
+      <h1 class="hero-title">{{ title }}</h1>
+      {% if description %}<p class="hero-desc">{{ description }}</p>{% endif %}
+    </div>
+  </div>
+  {% if hero %}<img class="hero-banner" src="{{ hero }}" alt="{{ title }}">{% endif %}
+  <div class="status-line">
+    <div class="sl-item"><span class="sl-dot"></span><span class="sl-val-green">{% if draft %}draft{% elif embargoed %}embargoed{% else %}published{% endif %}</span></div>
+    <div class="sl-item"><span class="sl-key">reading:</span><span class="sl-val">{{ read_time }} min</span></div>
+    {% if category %}<div class="sl-item"><span class="sl-key">topic:</span><span class="sl-val">{{ category }}</span></div>{% endif %}
+  </div>
+</div>
+
+<div class="main-grid">
+  <article class="article">
+    {{ content|safe }}
+  </article>
+
+  <aside class="r-sidebar">
+    {% if toc %}
+    <div class="r-box">
+      <div class="r-box-title">// Contents</div>
+      {% for h in toc %}<a class="toc-item lvl-{{ h.level }}" href="#{{ h.id }}">{{ h.text }}</a>{% endfor %}
+    </div>
+    {% endif %}
+    {% if tags %}
+    <div class="r-box">
+      <div class="r-box-title">// Tags</div>
+      <div class="tag-list">{% for tg in tags %}<a class="ctag" href="{{ tg.url }}">{{ tg.name }}</a>{% endfor %}</div>
+    </div>
+    {% endif %}
+  </aside>
+</div>
+
+<script>
+window.addEventListener('scroll',function(){var d=document.documentElement;document.getElementById('progress').style.width=(d.scrollTop/(d.scrollHeight-d.clientHeight)*100)+'%';});
+(function(){ var tt=document.getElementById('themeToggle'), r=document.documentElement; function apply(t){ r.dataset.theme=t; if(tt) tt.setAttribute('aria-checked', t==='dark'); } apply(r.dataset.theme||'dark'); if(tt) tt.addEventListener('click', function(){ var t=r.dataset.theme==='dark'?'light':'dark'; apply(t); try{localStorage.setItem('signal-theme',t);}catch(e){} }); })();
+</script>
+
+{% if has_code %}<link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css"><script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>{% endif %}
+{% if has_math %}<link rel="stylesheet" href="{{ base_path }}vendor/katex/katex.min.css"><script defer src="{{ base_path }}vendor/katex/katex.min.js"></script><script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.math').forEach(function(el){try{katex.render(el.textContent,el,{displayMode:el.classList.contains('math-display'),throwOnError:false});}catch(e){}});});</script>{% endif %}
+{% if has_mermaid %}<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:(document.documentElement.dataset.theme==='light'?'default':'dark')})"></script>{% endif %}
+</body>
+</html>

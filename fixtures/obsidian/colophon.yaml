@@ -1,0 +1,43 @@
+# "obsidian" e2e fixture: built entirely from one or more Obsidian vault folders.
+#   export OBSIDIAN_BLOG="$HOME/OBSIDIAN/Blog/blog.i0.pm"
+#   export OBSIDIAN_BLOG2="$HOME/OBSIDIAN/Blog/notes"   # optional
+
+sites:
+  - id: main
+    title: "{env:SITE_TITLE:-colophon · obsidian e2e}"
+    base_url: "{env:SITE_URL:-http://localhost:8080}"
+    theme: default
+    personas: [default]
+    federation:
+      feeds: [rss, atom, json]
+    search: lexical
+
+sources:
+  - id: blog
+    driver: obsidian
+    path: "{env:OBSIDIAN_BLOG:-}"
+    publish_required: false      # publish every note (dedicated blog folder)
+  - id: notes
+    driver: obsidian
+    path: "{env:OBSIDIAN_BLOG2:-}"
+    publish_required: false
+
+publishers:
+  - id: local
+    driver: local
+    path: ./dist
+  - id: cf
+    driver: cloudflare-pages
+    project: "{env:CF_PAGES_PROJECT:-colophon-obsidian}"
+    account_id: "{env:CLOUDFLARE_ACCOUNT_ID}"
+
+environments:
+  - name: production
+    publish: [cf]
+    allow_publish: false
+    base_url: "{env:BASE_URL:-}"
+    overrides:
+      cf:
+        branch: main
+  - name: dist
+    publish: [local]

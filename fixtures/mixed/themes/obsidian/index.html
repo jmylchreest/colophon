@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ heading|default:site_title }}</title>
+<link rel="stylesheet" href="{{ base_path }}style.css">
+{% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
+{{ feed_head|safe }}
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" href="{{ base_path }}">{{ site_title }}</a>
+    <div class="nav">
+      <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
+    </div>
+  </div>
+</nav>
+
+<header class="index-head">
+  <h1 class="index-title">{{ heading|default:site_title }}</h1>
+  {% if feeds %}<div class="index-feeds">{% for f in feeds %}<a href="{{ f.href }}">{{ f.label }}</a>{% endfor %}</div>{% endif %}
+</header>
+
+<ul class="post-list">
+{% for p in pages %}
+  <li>
+    <a class="title" href="{{ base_path }}{{ p.url }}">{{ p.title }}</a>
+    <div class="meta">{% if p.date %}{{ p.date }}{% endif %}{% if p.draft %} · draft{% endif %}{% if p.embargoed %} · embargoed{% endif %}{% for tg in p.tags %} · <a href="{{ tg.url }}" class="meta-tag">{{ tg.name }}</a>{% endfor %}</div>
+  </li>
+{% endfor %}
+</ul>
+
+<script>
+(function(){ var tt=document.getElementById('themeToggle'), r=document.documentElement; function apply(t){ r.dataset.theme=t; if(tt) tt.setAttribute('aria-checked', t==='dark'); } apply(r.dataset.theme||'dark'); if(tt) tt.addEventListener('click', function(){ var t=r.dataset.theme==='dark'?'light':'dark'; apply(t); try{localStorage.setItem('obsidian2-theme',t);}catch(e){} }); })();
+</script>
+</body>
+</html>

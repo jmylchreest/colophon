@@ -1,0 +1,45 @@
+# colophon project configuration — Cloudflare Pages e2e fixture.
+# No secrets live here: the API token comes from CLOUDFLARE_API_TOKEN, and the
+# account id / project name resolve from the environment with sensible fallbacks.
+
+sites:
+  - id: main
+    title: "colophon · Cloudflare e2e"
+    base_url: "{env:SITE_URL:-http://localhost:8080}"
+    theme: default
+    personas: [default]
+    federation:
+      feeds: [rss, atom, json]
+    search: lexical
+
+# Publishers are pure mechanism (how to deploy). Environments decide what/where.
+publishers:
+  - id: local                  # offline build target, for diffing output
+    driver: local
+    path: ./dist
+  - id: cf
+    driver: cloudflare-pages
+    project: "{env:CF_PAGES_PROJECT:-colophon-e2e}"
+    account_id: "{env:CLOUDFLARE_ACCOUNT_ID}"
+    # prune: 1   # keep only the newest deployment per branch (default); 0 keeps all
+
+environments:
+  - name: production
+    publish: [cf]
+    allow_publish: false       # require --allow-publish to deploy
+    base_url: "{env:BASE_URL:-}"   # set BASE_URL for a custom domain; else cf provides it
+    overrides:
+      cf:
+        branch: main           # production branch
+
+  - name: preview
+    publish: [cf]
+    include_drafts: true
+    title: "colophon · Cloudflare e2e (preview)"
+    overrides:
+      cf:
+        branch: preview        # cf derives the preview branch alias
+
+  - name: dist
+    publish: [local]           # local copy; ungated, no creds
+    include_drafts: true

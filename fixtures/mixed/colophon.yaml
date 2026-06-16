@@ -1,0 +1,95 @@
+# "mixed" e2e fixture: the Cloudflare setup, publishing the merged content of a local
+# md-dir and an Obsidian vault.
+
+sites:
+  - id: main
+    title: "colophon · mixed e2e"
+    base_url: "{env:SITE_URL:-http://localhost:8080}"
+    theme: press                 # the default theme
+    personas: [default]
+    federation:
+      feeds: [rss, atom, json]
+    search: lexical
+    # Route images to the R2 object store instead of shipping them with the Pages
+    # deployment (which has a file/size budget). The rewrite target is inherited from the
+    # r2 publisher: its public_url, or — on publish — its auto-discovered R2 domain.
+    # Inert until a URL is resolvable, so local builds keep assets co-located.
+    routing:
+      - match: "**/assets/**"
+        publisher: r2
+
+# Set OBSIDIAN_BLOG to a vault folder; unset → that source contributes nothing.
+sources:
+  - id: content
+    driver: md-dir
+    path: ./content
+  - id: vault
+    driver: obsidian
+    path: "{env:OBSIDIAN_BLOG:-}"
+    publish_required: false    # publish every note (dedicated blog folder)
+
+# Publishers are pure mechanism (how to deploy). Environments decide what/where.
+publishers:
+  - id: local                  # offline build target, for diffing output
+    driver: local
+    path: ./dist               # environments override this per-env (see `text` below)
+  - id: cf
+    driver: cloudflare-pages
+    project: "{env:CF_PAGES_PROJECT:-colophon-e2e}"
+    account_id: "{env:CLOUDFLARE_ACCOUNT_ID}"
+    # prune: 1   # keep only the newest deployment per branch (default); 0 keeps all
+  - id: r2                     # object store for images (S3-compatible)
+    driver: cloudflare-r2
+    bucket: "{env:R2_BUCKET:-colophon-assets}"
+    account_id: "{env:CLOUDFLARE_ACCOUNT_ID}"
+    public_url: "{env:R2_PUBLIC_URL:-}"
+    description: "colophon · mixed e2e assets"  # human label in .well-known/colophon.json; the resolved site/sitemap/feeds URLs are added automatically
+    # creds come from env: R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY (never config)
+
+environments:
+  - name: production
+    publish: [cf, r2]          # HTML to Pages, routed images to R2
+    allow_publish: false       # require --allow-publish to deploy
+    base_url: "{env:BASE_URL:-}"   # set BASE_URL for a custom domain; else cf provides it
+    overrides:
+      cf:
+        branch: main           # production branch
+
+  - name: preview
+    publish: [cf, r2]
+    include_drafts: true
+    title: "colophon · Cloudflare e2e (preview)"
+    overrides:
+      cf:
+        branch: preview        # cf derives the preview branch alias
+
+  - name: dist
+    publish: [local]           # local copy; ungated, no creds
+    include_drafts: true
+
+  - name: text                 # preview the minimal text-only theme before promoting it
+    publish: [local]
+    include_drafts: true
+    theme: minimal
+    title: "colophon · text theme"
+    overrides:
+      local:
+        path: ./dist-text       # one `local` publisher, a distinct dir per environment
+
+  # Theme previews — `colophon serve` renders all of these at /main/<env>/ so you can
+  # compare them. press is the site default (production/preview/dist use it).
+  - name: flux
+    publish: [local]
+    include_drafts: true
+    theme: flux
+    overrides: { local: { path: ./dist-flux } }
+  - name: signal
+    publish: [local]
+    include_drafts: true
+    theme: signal
+    overrides: { local: { path: ./dist-signal } }
+  - name: obsidian
+    publish: [local]
+    include_drafts: true
+    theme: obsidian
+    overrides: { local: { path: ./dist-obsidian } }

@@ -1,0 +1,14 @@
+# A persona is a blog identity. Content is attributed to a persona, not a human.
+id: default
+display_name: "Me"
+byline: "Me"
+kind: individual               # individual (one operator) | brand (shared)
+hcard:
+  name: "Me"
+  bio: "Writes things."
+  urls: []
+# style:                       # optional — only used for AI-assisted writing
+#   guide: "Conversational, concise, technical when needed."
+#   references: []
+sites: [main]                  # sites this persona may publish to
+operators: []                  # humans/agents allowed to write as this persona
