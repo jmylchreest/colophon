@@ -2,12 +2,19 @@
 
 A theme turns colophon's page data into HTML. Themes are
 [pongo2](https://github.com/flosch/pongo2) templates (Jinja2/Django syntax) plus static
-assets. Two themes ship built in:
+assets. Three themes ship built in:
 
 - **`default`** — full-featured: hero banners, index thumbnails, and vendored
-  highlight.js / KaTeX / Mermaid for code, maths and diagrams.
+  highlight.js / KaTeX / Mermaid for code, maths and diagrams, plus self-hosted web fonts.
+- **`press`** — colophon.blog's brand theme. Literary-modern (Fraunces over Inter), light &
+  dark, drifting glow, ink-blob title reveal, feed popouts. It *inherits* `default` (see
+  [base themes](#base-themes-inheriting-another-theme)), so it reuses the same vendored
+  libraries and fonts without shipping its own copy.
 - **`minimal`** — plain, readable text. No JavaScript and no web fonts; rich blocks show as
   their raw source (the [raw-block contract](content.md#the-raw-block-contract-progressive-enhancement)).
+
+More themes (`flux`, `signal`, `obsidian`) live in [`contrib/themes/`](#community-themes-contribthemes)
+and are installed by copying them into your project.
 
 ## Selecting a theme
 
@@ -37,14 +44,16 @@ colophon serve                # serves every environment, each with its own them
 ## Inspecting and ejecting themes
 
 ```sh
-colophon themes list            # default, minimal
+colophon themes list            # default, minimal, press
 colophon themes eject minimal   # copies the built-in into themes/minimal/ to edit
 colophon themes eject default   # full default theme, incl. its vendored libraries
 ```
 
 `eject` writes a built-in theme to `themes/<name>/` in your project; the on-disk copy then
 overrides the built-in (use `--force` to overwrite an existing directory). It's the easiest
-way to start customising — eject, then edit only the files you care about.
+way to start customising — eject, then edit only the files you care about. Ejecting an
+overlay theme (e.g. `press`) writes only *its own* files; the base theme's inherited assets
+stay in the binary and still resolve at build, so the eject stays small.
 
 ## Supplying your own theme
 
@@ -61,6 +70,31 @@ themes/
 ```
 
 An unknown theme name with no `themes/<name>/` directory falls back to the `default` theme.
+
+### Base themes (inheriting another theme)
+
+A theme can inherit another theme's templates and static assets by declaring a base. For an
+on-disk theme this is automatic: any `themes/<name>/` directory **inherits `default`**, so it
+only needs the files it changes (this is why dropping in a single `style.css` works). A
+built-in theme inherits explicitly via a one-line `base` file naming the base theme — the
+built-in `press` theme contains `base` → `default`, so it reuses the default's vendored
+libraries and fonts and supplies only its own `page.html`, `index.html` and `style.css`.
+
+Resolution order, highest precedence first: your project's `themes/<name>/` → the theme's
+own files → its base theme's files. The `base` marker is never copied to the output.
+
+### Community themes (`contrib/themes/`)
+
+The colophon repo ships extra themes under `contrib/themes/` that are **not** baked into the
+binary. To use one, copy it into your project and select it:
+
+```sh
+cp -r contrib/themes/flux myblog/themes/flux
+# then, in colophon.yaml:  theme: flux
+```
+
+Because on-disk themes inherit `default`, a contrib theme only carries its own templates and
+`style.css`; the vendored libraries and fonts come from the built-in `default` at build time.
 
 ### Theme files
 

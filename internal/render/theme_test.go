@@ -70,6 +70,42 @@ func TestThemeDefaultHasVendor(t *testing.T) {
 	}
 }
 
+func TestBaseThemeInheritsAssets(t *testing.T) {
+	// press is an overlay built-in: it declares `base: default`, so it must inherit the
+	// default theme's vendored assets (fonts/JS) while serving its own templates + CSS.
+	press, err := newThemeSource("", "press")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Its own page template renders, not a fallback.
+	body, err := press.read("page.html")
+	if err != nil {
+		t.Fatalf("press page.html: %v", err)
+	}
+	if !strings.Contains(string(body), "topbar") {
+		t.Error("press should serve its own page.html (expected its topbar markup)")
+	}
+	assets, err := press.staticAssets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hasFonts, hasCSS, leakedBase bool
+	for _, a := range assets {
+		hasFonts = hasFonts || a == "vendor/fonts.css"
+		hasCSS = hasCSS || a == "style.css"
+		leakedBase = leakedBase || a == baseMarker
+	}
+	if !hasFonts {
+		t.Error("press should inherit the default theme's vendored fonts")
+	}
+	if !hasCSS {
+		t.Error("press should ship its own style.css")
+	}
+	if leakedBase {
+		t.Errorf("the %q marker must not be emitted as a static asset", baseMarker)
+	}
+}
+
 func TestUnknownThemeFallsBackToDefault(t *testing.T) {
 	// A name with no built-in and no on-disk dir inherits the default's templates.
 	ts, err := newThemeSource("", "does-not-exist")

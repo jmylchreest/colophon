@@ -16,6 +16,11 @@ var builtinThemes embed.FS
 // DefaultTheme is used when a site/environment names no theme.
 const DefaultTheme = "default"
 
+// baseMarker is an optional one-line file in a built-in theme naming another built-in
+// it inherits from (templates + static assets). It lets a brand theme (e.g. press) reuse
+// the default theme's vendored fonts/JS without duplicating ~5MB of embedded bytes.
+const baseMarker = "base"
+
 // BuiltinThemes lists the embedded theme names, sorted.
 func BuiltinThemes() []string {
 	entries, _ := fs.ReadDir(builtinThemes, "themes")
@@ -29,9 +34,10 @@ func BuiltinThemes() []string {
 	return names
 }
 
-// ExtractTheme copies a built-in theme's files to destDir (e.g. themes/<name>/ in a
+// ExtractTheme copies a built-in theme's own files to destDir (e.g. themes/<name>/ in a
 // project) so the author can edit them; the on-disk copy then overrides the built-in.
-// It returns the slash-relative paths written.
+// Inherited base-theme files (e.g. the vendored assets) are left in the binary and still
+// resolve at build, so the eject stays small. It returns the slash-relative paths written.
 func ExtractTheme(name, destDir string) ([]string, error) {
 	sub, err := fs.Sub(builtinThemes, "themes/"+name)
 	if err != nil {
@@ -42,7 +48,7 @@ func ExtractTheme(name, destDir string) ([]string, error) {
 	}
 	var written []string
 	err = fs.WalkDir(sub, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil || d.IsDir() || p == baseMarker {
 			return err
 		}
 		b, err := fs.ReadFile(sub, p)
@@ -62,25 +68,26 @@ func ExtractTheme(name, destDir string) ([]string, error) {
 	return written, err
 }
 
-// themeSource reads theme files, preferring an on-disk override over the built-in theme.
-// Built-in themes live under internal/render/themes/<name>/ (embedded); a project may
-// override any file by placing it at themes/<name>/ in the project root.
+// themeSource reads theme files, preferring an on-disk override over the built-in theme(s).
+// Built-in themes live under internal/render/themes/<name>/ (embedded); a built-in may
+// inherit a base via the `base` marker (base-first in layers). A project may override any
+// file by placing it at themes/<name>/ in the project root (diskDir, highest precedence).
 type themeSource struct {
-	diskDir  string
-	embedded fs.FS // the chosen built-in theme, or the default if the name is unknown
+	diskDir string  // optional on-disk override dir (symlinks resolved when listing assets)
+	layers  []fs.FS // base-first, overlay-last: reads check overlay→base, assets union all
 }
 
 func newThemeSource(root, theme string) (*themeSource, error) {
 	if theme == "" {
 		theme = DefaultTheme
 	}
-	emb, err := builtinTheme(theme)
+	layers, err := embeddedLayers(theme)
 	if err != nil {
 		return nil, err
 	}
-	ts := &themeSource{embedded: emb}
+	ts := &themeSource{layers: layers}
 	// A project theme dir overrides the built-in per-file (and may add files). It is used
-	// for both a named built-in's overrides and an entirely custom theme.
+	// for both a named built-in's overrides and an entirely custom (on-disk) theme.
 	dir := filepath.Join(root, "themes", theme)
 	if fi, err := os.Stat(dir); err == nil && fi.IsDir() {
 		ts.diskDir = dir
@@ -88,16 +95,30 @@ func newThemeSource(root, theme string) (*themeSource, error) {
 	return ts, nil
 }
 
-// builtinTheme returns the embedded FS rooted at the named theme, falling back to the
-// default theme when the name is not a built-in (so a project-only theme name still has
-// the default's files to inherit from).
-func builtinTheme(name string) (fs.FS, error) {
+// embeddedLayers returns the base→overlay FS layers for a theme name. A known built-in
+// resolves to its own FS, prefixed by its base theme's layers if it declares one. An
+// unknown name falls back to the default theme as a single base layer, so a project-only
+// (on-disk) theme still inherits the default's templates and vendored assets.
+func embeddedLayers(name string) ([]fs.FS, error) {
 	if sub, err := fs.Sub(builtinThemes, "themes/"+name); err == nil {
 		if _, err := fs.Stat(sub, "page.html"); err == nil {
-			return sub, nil
+			if b, err := fs.ReadFile(sub, baseMarker); err == nil {
+				if base := strings.TrimSpace(string(b)); base != "" && base != name {
+					baseLayers, err := embeddedLayers(base)
+					if err != nil {
+						return nil, err
+					}
+					return append(baseLayers, sub), nil
+				}
+			}
+			return []fs.FS{sub}, nil
 		}
 	}
-	return fs.Sub(builtinThemes, "themes/"+DefaultTheme)
+	def, err := fs.Sub(builtinThemes, "themes/"+DefaultTheme)
+	if err != nil {
+		return nil, err
+	}
+	return []fs.FS{def}, nil
 }
 
 func (t *themeSource) read(name string) ([]byte, error) {
@@ -106,34 +127,53 @@ func (t *themeSource) read(name string) ([]byte, error) {
 			return b, nil
 		}
 	}
-	return fs.ReadFile(t.embedded, name)
+	var lastErr error
+	for i := len(t.layers) - 1; i >= 0; i-- { // overlay → base
+		if b, err := fs.ReadFile(t.layers[i], name); err == nil {
+			return b, nil
+		} else {
+			lastErr = err
+		}
+	}
+	if lastErr == nil {
+		lastErr = fs.ErrNotExist
+	}
+	return nil, lastErr
 }
 
-// staticAssets lists the theme's non-template files (everything but *.html), slash-paths
-// relative to the theme root, unioning the built-in theme with any on-disk override so a
-// project can add assets (fonts, extra CSS). The build copies each verbatim to the output.
+// staticAssets lists the theme's non-template files (everything but *.html and the base
+// marker), slash-paths relative to the theme root, unioning every layer (base→overlay)
+// with any on-disk override so a project can add assets (fonts, extra CSS). On-disk
+// override dirs may be symlinks (e.g. a fixture pointing at contrib/themes/<name>); they
+// are resolved before walking so the real files are found. The build copies each verbatim.
 func (t *themeSource) staticAssets() ([]string, error) {
 	seen := map[string]struct{}{}
 	add := func(p string) {
-		if !strings.HasSuffix(p, ".html") {
+		if !strings.HasSuffix(p, ".html") && p != baseMarker {
 			seen[p] = struct{}{}
 		}
 	}
-	if err := fs.WalkDir(t.embedded, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
+	for _, layer := range t.layers {
+		if err := fs.WalkDir(layer, ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			add(p)
+			return nil
+		}); err != nil {
+			return nil, err
 		}
-		add(p)
-		return nil
-	}); err != nil {
-		return nil, err
 	}
 	if t.diskDir != "" {
-		_ = filepath.WalkDir(t.diskDir, func(p string, d os.DirEntry, err error) error {
+		base := t.diskDir
+		if resolved, err := filepath.EvalSymlinks(t.diskDir); err == nil {
+			base = resolved
+		}
+		_ = filepath.WalkDir(base, func(p string, d os.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return nil
 			}
-			if rel, err := filepath.Rel(t.diskDir, p); err == nil {
+			if rel, err := filepath.Rel(base, p); err == nil {
 				add(filepath.ToSlash(rel))
 			}
 			return nil
