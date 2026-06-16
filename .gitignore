@@ -11,8 +11,9 @@ public/
 dist/
 dist-*/
 
-# Local agent tooling (machine-specific runtime state)
-.aide/
+# Local agent tooling (machine-specific runtime state); shared/ IS committable
+.aide/*
+!.aide/shared/
 
 # Editors / OS
 .DS_Store
