@@ -26,7 +26,10 @@ import (
 	"github.com/jmylchreest/colophon/internal/publish"
 )
 
-func init() { publish.Register("cloudflare-pages", New) }
+func init() {
+	publish.Register("cloudflare-pages", New)
+	publish.RegisterEnv("cloudflare-pages", "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN")
+}
 
 // upload batch limits, kept well under the API's per-request ceilings.
 const (

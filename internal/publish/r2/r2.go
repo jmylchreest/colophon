@@ -32,7 +32,12 @@ import (
 	"github.com/jmylchreest/colophon/internal/publish"
 )
 
-func init() { publish.Register("cloudflare-r2", New) }
+func init() {
+	publish.Register("cloudflare-r2", New)
+	// R2 uses S3 data-plane keys (AWS_* are accepted as fallbacks) and CLOUDFLARE_API_TOKEN
+	// for the control-plane discovery / r2.dev enable.
+	publish.RegisterEnv("cloudflare-r2", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "CLOUDFLARE_API_TOKEN")
+}
 
 // bucketNameRE matches the S3/R2 naming rules below the length check: lowercase letters,
 // numbers and hyphens, beginning and ending with a letter or number (no dots).

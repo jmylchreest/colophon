@@ -91,6 +91,11 @@ type Config struct {
 
 	// Root is the project directory the config was loaded from.
 	Root string `yaml:"-"`
+
+	// EnvRefs are the {env:VAR} variable names the config references (set or not), for
+	// `colophon env`. Deploy-secret env vars (read by publishers, not in the config) are
+	// added on top of these by the command.
+	EnvRefs []string `yaml:"-"`
 }
 
 // Environment returns the named environment, or nil if not configured.
@@ -140,6 +145,7 @@ func Load(root string) (*Config, error) {
 		return nil, fmt.Errorf("decode %s: %w", path, err)
 	}
 	cfg.Root = root
+	cfg.EnvRefs = envRefs(raw)
 
 	personas, err := loadPersonas(filepath.Join(root, "personas"))
 	if err != nil {

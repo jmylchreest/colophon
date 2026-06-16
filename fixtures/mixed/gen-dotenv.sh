@@ -15,10 +15,14 @@ cd "$(dirname "$0")"
 
 ENV_FILE=.env
 
-# Vars the config interpolates, plus the env-only deploy secrets (never in the config).
-config_vars=$(grep -oE '\{env:[A-Z0-9_]+' colophon.yaml | sed 's/{env://' | sort -u)
-secret_vars="CLOUDFLARE_API_TOKEN R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY"
-vars=$(printf '%s\n' $config_vars $secret_vars | sort -u)
+# Ask colophon which env vars this project uses (config {env:VAR} placeholders + the deploy
+# secrets its configured publishers read) — no hard-coded list, so new vars/publishers are
+# picked up automatically. Prefer an installed binary; else run from source.
+if command -v colophon >/dev/null 2>&1; then
+  vars=$(colophon env)
+else
+  vars=$(go run "$(cd ../.. && pwd)/cmd/colophon" env)
+fi
 
 # prior <NAME>: the value of NAME in the existing .env, without touching this shell.
 prior() {

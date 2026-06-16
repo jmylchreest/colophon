@@ -25,6 +25,7 @@ type CLI struct {
 	Search        SearchCmd        `cmd:"" help:"Search content (lexical or semantic)"`
 	Sync          SyncCmd          `cmd:"" help:"Pull API sources (notion/hackmd) into content/"`
 	Doctor        DoctorCmd        `cmd:"" help:"Validate the project config and report problems"`
+	Env           EnvCmd           `cmd:"" help:"List the environment variables this project uses"`
 
 	Version kong.VersionFlag `help:"Print version and exit"`
 }

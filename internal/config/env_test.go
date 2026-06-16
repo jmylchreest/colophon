@@ -1,6 +1,24 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestEnvRefs(t *testing.T) {
+	raw := []byte(`sites:
+  - base_url: "{env:BASE_URL}"
+publishers:
+  - bucket: "{env:R2_BUCKET:-default}"
+    project: "{env:CF_PAGES_PROJECT}"
+    dup: "{env:BASE_URL}"`)
+	if got := strings.Join(envRefs(raw), ","); got != "BASE_URL,CF_PAGES_PROJECT,R2_BUCKET" {
+		t.Errorf("envRefs = %q, want sorted unique BASE_URL,CF_PAGES_PROJECT,R2_BUCKET", got)
+	}
+	if len(envRefs([]byte("no placeholders"))) != 0 {
+		t.Error("envRefs should be empty when nothing is referenced")
+	}
+}
 
 func TestInterpolateEnv(t *testing.T) {
 	t.Setenv("COLOPHON_TEST_SET", "value")
