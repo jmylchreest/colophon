@@ -249,16 +249,13 @@ func (c *PublishCmd) publishEnv(ctx context.Context, root string, cfg *config.Co
 			tree = selectFS{base: base, keep: func(p string) bool { return router.Keep(id, p) }}
 			log.Detail("PUBLISH", t.id, "env", name, "routed", router.Owns(t.id))
 		}
-		changes, err := t.pub.Plan(ctx, tree)
+		result, err := publish.Run(ctx, tree, t.pub)
 		if err != nil {
-			return fmt.Errorf("plan %s: %w", t.id, err)
-		}
-		result, err := t.pub.Apply(ctx, tree, changes)
-		if err != nil {
-			return fmt.Errorf("apply %s: %w", t.id, err)
+			return fmt.Errorf("deploy %s: %w", t.id, err)
 		}
 		log.Step("PUBLISH", t.id, "env", name, "files", result.Total,
-			"uploaded", result.Uploaded, "bytes", result.Bytes, "unchanged", result.Total-result.Uploaded)
+			"uploaded", result.Uploaded, "deleted", result.Deleted, "bytes", result.Bytes,
+			"unchanged", result.Total-result.Uploaded)
 		if result.URL != "" {
 			log.Step("PUBLISH", t.id, "env", name, "url", result.URL)
 		}

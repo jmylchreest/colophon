@@ -15,11 +15,13 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"io/fs"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"regexp"
@@ -78,17 +80,22 @@ func New(root string, cfg config.PublisherConfig) (core.Publisher, error) {
 	if region == "" {
 		region = "auto"
 	}
+	deleteOrphaned := true
+	if v, ok := cfg.Settings["delete_orphaned"].(bool); ok {
+		deleteOrphaned = v
+	}
 	p := &Publisher{
-		id:          cfg.ID,
-		bucket:      bucket,
-		endpoint:    strings.TrimRight(endpoint, "/"),
-		region:      region,
-		location:    get("location"),
-		description: get("description"),
-		publicURL:   strings.TrimRight(get("public_url"), "/"),
-		accessKey:   firstEnv("R2_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
-		secretKey:   firstEnv("R2_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
-		client:      &http.Client{Timeout: 2 * time.Minute},
+		id:             cfg.ID,
+		bucket:         bucket,
+		endpoint:       strings.TrimRight(endpoint, "/"),
+		region:         region,
+		location:       get("location"),
+		description:    get("description"),
+		publicURL:      strings.TrimRight(get("public_url"), "/"),
+		deleteOrphaned: deleteOrphaned,
+		accessKey:      firstEnv("R2_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
+		secretKey:      firstEnv("R2_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
+		client:         &http.Client{Timeout: 2 * time.Minute},
 	}
 	// A control-plane token (shared with the Pages publisher) enables public-URL discovery
 	// for providers that support it; the endpoint→provider glob table (provider.go) decides
@@ -100,18 +107,19 @@ func New(root string, cfg config.PublisherConfig) (core.Publisher, error) {
 }
 
 type Publisher struct {
-	id          string
-	bucket      string
-	endpoint    string
-	region      string
-	location    string
-	description string
-	publicURL   string
-	cf          *cfAPI
-	accessKey   string
-	secretKey   string
-	client      *http.Client
-	log         *clog.Logger
+	id             string
+	bucket         string
+	endpoint       string
+	region         string
+	location       string
+	description    string
+	publicURL      string
+	deleteOrphaned bool
+	cf             *cfAPI
+	accessKey      string
+	secretKey      string
+	client         *http.Client
+	log            *clog.Logger
 }
 
 func (p *Publisher) SetLogger(l *clog.Logger) { p.log = l }
@@ -126,58 +134,46 @@ func (p *Publisher) ensureCreds() error {
 	return nil
 }
 
-// Plan uploads only what changed: it compares each file's MD5 to the object's ETag (the
-// MD5 of a non-multipart object), scheduling a transfer when they differ or it is absent.
-func (p *Publisher) Plan(ctx context.Context, tree fs.FS) ([]core.Change, error) {
+// Deployed lists the bucket into a key → ETag (MD5) manifest. The shared planner diffs the
+// tree against it, so only new/changed objects upload and orphaned ones are deleted.
+func (p *Publisher) Deployed(ctx context.Context) (core.State, bool, error) {
 	if err := p.ensureCreds(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	var changes []core.Change
-	err := fs.WalkDir(tree, ".", func(name string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		b, err := fs.ReadFile(tree, name)
-		if err != nil {
-			return err
-		}
-		sum := md5hex(b)
-		etag, err := p.head(ctx, name)
-		if err != nil {
-			return err
-		}
-		if etag == sum {
-			return nil // already present, unchanged
-		}
-		changes = append(changes, core.Change{Path: name, Op: core.OpUpload, Hash: sum})
-		return nil
-	})
-	return changes, err
+	state, err := p.listObjects(ctx)
+	return state, true, err
 }
 
-// Apply uploads every scheduled object.
-func (p *Publisher) Apply(ctx context.Context, tree fs.FS, changes []core.Change) (core.Result, error) {
-	var res core.Result
+func (p *Publisher) Hash(name string, b []byte) string { return publish.MD5Hex(b) }
+
+// Protected keeps the provenance manifest (.well-known/colophon.json, written by
+// WriteManifest) from being deleted as an orphan, since the build tree never contains it.
+func (p *Publisher) Protected(name string) bool {
+	return strings.HasPrefix(name, ".well-known/")
+}
+
+// Put uploads an object; Delete removes one — the per-file apply surface the planner drives.
+func (p *Publisher) Put(ctx context.Context, name string, b []byte) error {
+	if err := p.put(ctx, name, b); err != nil {
+		return err
+	}
+	p.log.Detail("PUBLISH", p.id, "put", name, "bytes", len(b))
+	return nil
+}
+
+func (p *Publisher) Delete(ctx context.Context, name string) error {
+	if err := p.deleteObject(ctx, name); err != nil {
+		return err
+	}
+	p.log.Detail("PUBLISH", p.id, "delete", name)
+	return nil
+}
+
+func (p *Publisher) Commit(ctx context.Context, tree fs.FS, plan *core.Plan) (core.Result, error) {
 	if err := p.ensureCreds(); err != nil {
-		return res, err
+		return core.Result{}, err
 	}
-	for _, c := range changes {
-		if c.Op != core.OpUpload {
-			continue
-		}
-		b, err := fs.ReadFile(tree, c.Path)
-		if err != nil {
-			return res, err
-		}
-		if err := p.put(ctx, c.Path, b); err != nil {
-			return res, err
-		}
-		res.Uploaded++
-		res.Bytes += int64(len(b))
-		p.log.Detail("PUBLISH", p.id, "put", c.Path, "bytes", len(b))
-	}
-	res.Total = res.Uploaded
-	return res, nil
+	return publish.CommitFiles(ctx, tree, p, plan, p.deleteOrphaned)
 }
 
 func (p *Publisher) Invalidate(ctx context.Context, paths []string) error { return nil }
@@ -273,21 +269,68 @@ func (p *Publisher) bucketExists(ctx context.Context) (bool, error) {
 	}
 }
 
-// head returns the object's ETag (MD5 hex, unquoted), or "" if it does not exist.
-func (p *Publisher) head(ctx context.Context, key string) (string, error) {
-	resp, err := p.do(ctx, http.MethodHead, p.objectPath(key), nil)
+// listResult is the subset of an S3 ListObjectsV2 response colophon needs.
+type listResult struct {
+	IsTruncated           bool   `xml:"IsTruncated"`
+	NextContinuationToken string `xml:"NextContinuationToken"`
+	Contents              []struct {
+		Key  string `xml:"Key"`
+		ETag string `xml:"ETag"`
+	} `xml:"Contents"`
+}
+
+// listObjects enumerates the bucket via ListObjectsV2 (paginated) into a key → ETag (MD5)
+// manifest. The signed canonical query string is built by url.Values.Encode (sorted, encoded).
+func (p *Publisher) listObjects(ctx context.Context) (core.State, error) {
+	state := core.State{}
+	token := ""
+	for {
+		params := url.Values{"list-type": {"2"}}
+		if token != "" {
+			params.Set("continuation-token", token)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.endpoint+"/"+p.bucket, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.URL.RawQuery = params.Encode()
+		signV4(req, "/"+p.bucket, p.accessKey, p.secretKey, p.region, emptyPayloadHash, now())
+		resp, err := p.client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode/100 != 2 {
+			msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+			drain(resp)
+			return nil, fmt.Errorf("r2 list %s: %s: %s", p.bucket, resp.Status, strings.TrimSpace(string(msg)))
+		}
+		var lr listResult
+		err = xml.NewDecoder(resp.Body).Decode(&lr)
+		drain(resp)
+		if err != nil {
+			return nil, fmt.Errorf("r2 list %s: %w", p.bucket, err)
+		}
+		for _, c := range lr.Contents {
+			state[c.Key] = strings.Trim(c.ETag, `"`)
+		}
+		if !lr.IsTruncated || lr.NextContinuationToken == "" {
+			return state, nil
+		}
+		token = lr.NextContinuationToken
+	}
+}
+
+// deleteObject removes an object; a missing object is not an error (already gone).
+func (p *Publisher) deleteObject(ctx context.Context, key string) error {
+	resp, err := p.do(ctx, http.MethodDelete, p.objectPath(key), nil)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer drain(resp)
-	switch resp.StatusCode {
-	case http.StatusNotFound:
-		return "", nil
-	case http.StatusOK:
-		return strings.Trim(resp.Header.Get("ETag"), `"`), nil
-	default:
-		return "", fmt.Errorf("r2 head %s: %s", key, resp.Status)
+	if resp.StatusCode/100 != 2 && resp.StatusCode != http.StatusNotFound {
+		return fmt.Errorf("r2 delete %s: %s", key, resp.Status)
 	}
+	return nil
 }
 
 // put uploads an object with a content type inferred from its extension.

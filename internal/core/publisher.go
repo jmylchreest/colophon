@@ -34,19 +34,47 @@ type Result struct {
 	URL string
 }
 
-// Publisher deploys the canonical static tree to one destination. Implementations
-// are idempotent: Plan diffs the tree against the target's manifest, Apply uploads
-// or deletes only what changed (reading bytes from the same tree), and Invalidate
-// busts any CDN cache for the changed paths. Each driver lives in its own package
-// under internal/publish and self-registers; core knows only this interface.
-// Drivers: local, cloudflare-pages, s3-cloudfront, webdav, rsync-ssh, git-pages.
+// State is a destination's managed contents as path (slash-separated) → content hash — a
+// publisher's "manifest" of what is currently deployed. The generic planner diffs the build
+// tree against it.
+type State map[string]string
+
+// Plan is the reconciliation between a build tree and a publisher's deployed State, computed
+// by the generic incremental planner (publish.Run). Desired is every file in the tree mapped
+// to its hash; Upload is the new-or-changed subset (each carrying its Hash); Delete is the
+// managed paths that are gone from the tree (orphans), minus any the publisher Protects.
+type Plan struct {
+	Desired State
+	Upload  []Change
+	Delete  []Change
+}
+
+// Publisher deploys the canonical static tree to one destination. The generic planner
+// (publish.Run) diffs the tree against the publisher's Deployed state into a Plan and hands
+// it to Commit, so each driver only describes its destination — how to read its state, hash a
+// file, and apply changes — and incremental publishing is shared. Each driver lives in its own
+// package under internal/publish and self-registers; core knows only this interface.
+// Drivers: local, cloudflare-pages, cloudflare-r2, and (later) s3, webdav, rsync-ssh, git-pages.
 type Publisher interface {
 	// ID is the configured publisher id (e.g. "cf-prod").
 	ID() string
 	// Driver is the implementation key (e.g. "cloudflare-pages").
 	Driver() string
-	Plan(ctx context.Context, tree fs.FS) ([]Change, error)
-	Apply(ctx context.Context, tree fs.FS, changes []Change) (Result, error)
+	// Deployed reports the destination's current managed state as path → hash. ok is false
+	// when the backend cannot (or need not) enumerate — a content-addressed/transactional
+	// platform such as Pages — in which case the planner treats every file as an upload and
+	// computes no deletes, leaving removals to the platform's own immutable-snapshot semantics.
+	Deployed(ctx context.Context) (state State, ok bool, err error)
+	// Hash computes a file's content hash in the same scheme Deployed reports.
+	Hash(name string, b []byte) string
+	// Protected reports a managed path the planner must never delete (e.g. a provenance
+	// manifest the publisher itself writes).
+	Protected(name string) bool
+	// Commit applies plan to the destination and returns the run summary. Per-file backends
+	// honour plan.Upload/plan.Delete; transactional backends use plan.Desired. Total is the
+	// size of the deployed tree (len(plan.Desired)).
+	Commit(ctx context.Context, tree fs.FS, plan *Plan) (Result, error)
+	// Invalidate busts any CDN cache for the changed paths (a no-op where deploys are immutable).
 	Invalidate(ctx context.Context, paths []string) error
 }
 

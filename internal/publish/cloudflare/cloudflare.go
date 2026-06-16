@@ -89,37 +89,35 @@ func New(root string, cfg config.PublisherConfig) (core.Publisher, error) {
 func (p *Publisher) ID() string     { return p.id }
 func (p *Publisher) Driver() string { return "cloudflare-pages" }
 
-// Plan hashes every file in the tree with the Pages scheme. The server decides what
-// actually needs uploading (via check-missing); the manifest still lists every file.
-func (p *Publisher) Plan(ctx context.Context, tree fs.FS) ([]core.Change, error) {
-	var changes []core.Change
-	err := fs.WalkDir(tree, ".", func(name string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		b, err := fs.ReadFile(tree, name)
-		if err != nil {
-			return err
-		}
-		changes = append(changes, core.Change{Path: name, Op: core.OpUpload, Hash: hashAsset(name, b)})
-		return nil
-	})
-	return changes, err
-}
+// Deployed returns ok=false: Pages is content-addressed and transactional, so the planner
+// marks every file an upload (no enumeration, no deletes) and Commit lets the server decide
+// what to transfer (check-missing) and which paths to serve (the full deployment manifest).
+func (p *Publisher) Deployed(ctx context.Context) (core.State, bool, error) { return nil, false, nil }
 
-// Apply uploads any missing assets and creates a deployment from the full manifest.
-func (p *Publisher) Apply(ctx context.Context, tree fs.FS, changes []core.Change) (core.Result, error) {
-	var res core.Result
-	res.Total = len(changes)
+func (p *Publisher) Hash(name string, b []byte) string { return hashAsset(name, b) }
+func (p *Publisher) Protected(name string) bool        { return false }
 
-	manifest := make(map[string]string, len(changes))
-	pathFor := make(map[string]string, len(changes))
+// Commit uploads any missing assets and creates a deployment from the full manifest
+// (plan.Desired). New and changed files are "missing" hashes and get uploaded; removed files
+// are simply absent from the manifest, so the immutable deployment stops serving them.
+func (p *Publisher) Commit(ctx context.Context, tree fs.FS, plan *core.Plan) (core.Result, error) {
+	res := core.Result{Total: len(plan.Desired)}
+
+	paths := make([]string, 0, len(plan.Desired))
+	for name := range plan.Desired {
+		paths = append(paths, name)
+	}
+	sort.Strings(paths) // deterministic upload order
+
+	manifest := make(map[string]string, len(plan.Desired))
+	pathFor := make(map[string]string, len(plan.Desired))
 	var hashes []string
-	for _, c := range changes {
-		manifest["/"+c.Path] = c.Hash
-		if _, seen := pathFor[c.Hash]; !seen {
-			pathFor[c.Hash] = c.Path
-			hashes = append(hashes, c.Hash)
+	for _, name := range paths {
+		h := plan.Desired[name]
+		manifest["/"+name] = h
+		if _, seen := pathFor[h]; !seen {
+			pathFor[h] = name
+			hashes = append(hashes, h)
 		}
 	}
 

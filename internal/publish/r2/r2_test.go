@@ -2,6 +2,7 @@ package r2
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/jmylchreest/colophon/internal/config"
 	"github.com/jmylchreest/colophon/internal/core"
+	"github.com/jmylchreest/colophon/internal/publish"
 )
 
 func TestWriteManifest(t *testing.T) {
@@ -78,6 +80,20 @@ func (f *fakeStore) handler(bucket string) http.HandlerFunc {
 				return
 			}
 			w.WriteHeader(http.StatusNotFound)
+		case http.MethodGet: // ListObjectsV2
+			if !isBucket {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			prefix := "/" + bucket + "/"
+			var sb strings.Builder
+			sb.WriteString(`<?xml version="1.0"?><ListBucketResult>`)
+			for path, etag := range f.objects {
+				fmt.Fprintf(&sb, `<Contents><Key>%s</Key><ETag>"%s"</ETag></Contents>`,
+					strings.TrimPrefix(path, prefix), etag)
+			}
+			sb.WriteString(`<IsTruncated>false</IsTruncated></ListBucketResult>`)
+			_, _ = w.Write([]byte(sb.String()))
 		case http.MethodPut:
 			if isBucket {
 				f.bucketCreated = true
@@ -86,6 +102,9 @@ func (f *fakeStore) handler(bucket string) http.HandlerFunc {
 				f.objects[r.URL.Path] = md5hex(body)
 			}
 			w.WriteHeader(http.StatusOK)
+		case http.MethodDelete:
+			delete(f.objects, r.URL.Path)
+			w.WriteHeader(http.StatusNoContent)
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
@@ -99,7 +118,7 @@ func newTestPublisher(t *testing.T) (*Publisher, *fakeStore) {
 	t.Cleanup(srv.Close)
 	p := &Publisher{
 		id: "r2", bucket: "b", endpoint: srv.URL, region: "auto",
-		accessKey: "AKID", secretKey: "secret", client: srv.Client(),
+		deleteOrphaned: true, accessKey: "AKID", secretKey: "secret", client: srv.Client(),
 	}
 	return p, store
 }
@@ -137,26 +156,19 @@ func TestProvisionSendsLocationHint(t *testing.T) {
 	}
 }
 
-func TestPlanApplyUploadsSignedRequests(t *testing.T) {
+func TestRunUploadsSkipsAndDeletes(t *testing.T) {
 	p, store := newTestPublisher(t)
 	tree := fstest.MapFS{
 		"index.html":             {Data: []byte("<h1>hi</h1>")},
 		"posts/p/assets/cat.png": {Data: []byte("img-bytes")},
 	}
 
-	changes, err := p.Plan(context.Background(), tree)
+	res, err := publish.Run(context.Background(), tree, p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(changes) != 2 {
-		t.Fatalf("expected 2 changes for an empty store, got %d", len(changes))
-	}
-	res, err := p.Apply(context.Background(), tree, changes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.Uploaded != 2 {
-		t.Errorf("uploaded = %d, want 2", res.Uploaded)
+	if res.Uploaded != 2 || res.Total != 2 {
+		t.Errorf("first run: uploaded=%d total=%d, want 2/2", res.Uploaded, res.Total)
 	}
 	if _, ok := store.objects["/b/posts/p/assets/cat.png"]; !ok {
 		t.Error("asset was not stored at its keyed path")
@@ -168,13 +180,26 @@ func TestPlanApplyUploadsSignedRequests(t *testing.T) {
 		}
 	}
 
-	// A second Plan sees the objects (ETag present) and schedules nothing.
-	again, err := p.Plan(context.Background(), tree)
+	// Re-run unchanged: the listing reports the ETags, so nothing transfers or deletes.
+	res, err = publish.Run(context.Background(), tree, p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(again) != 0 {
-		t.Errorf("re-plan should skip unchanged objects, got %d changes", len(again))
+	if res.Uploaded != 0 || res.Deleted != 0 || res.Total != 2 {
+		t.Errorf("re-run: uploaded=%d deleted=%d total=%d, want 0/0/2", res.Uploaded, res.Deleted, res.Total)
+	}
+
+	// Drop a file from the tree: the orphaned object is deleted.
+	smaller := fstest.MapFS{"index.html": {Data: []byte("<h1>hi</h1>")}}
+	res, err = publish.Run(context.Background(), smaller, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Deleted != 1 || res.Total != 1 {
+		t.Errorf("after removal: deleted=%d total=%d, want 1/1", res.Deleted, res.Total)
+	}
+	if _, ok := store.objects["/b/posts/p/assets/cat.png"]; ok {
+		t.Error("orphaned object was not deleted")
 	}
 }
 
@@ -209,9 +234,9 @@ func TestNewRejectsBadBucket(t *testing.T) {
 	}
 }
 
-func TestApplyRequiresCreds(t *testing.T) {
+func TestDeployedRequiresCreds(t *testing.T) {
 	p := &Publisher{id: "r2", bucket: "b", endpoint: "https://x", region: "auto"}
-	if _, err := p.Plan(context.Background(), fstest.MapFS{}); err == nil {
-		t.Error("Plan without credentials should error")
+	if _, _, err := p.Deployed(context.Background()); err == nil {
+		t.Error("Deployed without credentials should error")
 	}
 }
