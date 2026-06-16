@@ -1,0 +1,18 @@
+# Binaries
+/colophon
+
+# Go
+*.test
+*.out
+
+# colophon build/publish output & cache (root project or any fixture)
+public/
+.colophon/
+dist/
+dist-*/
+
+# Local agent tooling (machine-specific runtime state)
+.aide/
+
+# Editors / OS
+.DS_Store
