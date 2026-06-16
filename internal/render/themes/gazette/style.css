@@ -1,0 +1,24 @@
+/* gazette — a second editorial theme that proves the shared base: it ships ONLY this
+   style.css (tokens). Templates, app.js and the whole chrome are inherited from press via
+   the `base` marker, and the chrome is restyled purely by overriding the token contract.
+   Warm "newsprint" palette: amber accent, paper light mode, no ink-reveal flourish. */
+@import url("base.css");
+@import url("vendor/fonts.css");
+
+:root {
+  --bg: #13110e; --surface: #1b1813; --elevated: #231f18; --border: #322c22;
+  --text: #efe9dd; --muted: #a89b85; --faint: #6b6253;
+  --accent: #e0a04a; --accent-2: #7bb0a0; --on-accent: #1a1408;
+  --accent-soft: rgba(224,160,74,0.14);
+  --glow-1: rgba(224,160,74,0.22); --glow-2: rgba(123,176,160,0.16);
+  --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --maxw: 720px;
+}
+html[data-theme="light"] {
+  --bg: #f3ede1; --surface: #fffdf8; --elevated: #eae2d2; --border: #ddd2bd;
+  --text: #241e15; --muted: #6e6452; --faint: #9a8e76;
+  --accent: #b06a1f; --accent-2: #3f7a68; --on-accent: #fffdf8;
+  --accent-soft: rgba(176,106,31,0.10);
+  --glow-1: rgba(176,106,31,0.14); --glow-2: rgba(63,122,104,0.10);
+}

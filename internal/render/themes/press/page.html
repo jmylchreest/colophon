@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script>var d=document.documentElement;d.classList.add('js');try{d.dataset.theme=localStorage.getItem('press-theme')||'dark';}catch(e){}</script>
+<script>var d=document.documentElement;d.classList.add('js');try{var t=localStorage.getItem('press-theme');if(!t)t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';d.dataset.theme=t;}catch(e){}</script>
 <title>{{ meta_title }} · {{ site_title }}</title>
 {{ seo_head|safe }}
 <link rel="stylesheet" href="{{ base_path }}style.css">
@@ -38,28 +38,29 @@
         </div></div>
         <button class="feeds-toggle" id="feedsToggle" type="button" aria-expanded="false" aria-controls="feedsTrack" aria-label="Show subscribe links"><svg class="feeds-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
       </div>
-      <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
-      {% if nav_pages %}
       <div class="menu">
         <button class="menu-btn" id="menuToggle" type="button" aria-expanded="false" aria-controls="menuPanel" aria-label="Open menu"><svg class="menu-ico" viewBox="0 0 64 48" aria-hidden="true"><path d="M19,15 L45,15 C72,15 58,50 42,34 L19,11"></path><path d="M19,24 L45,24"></path><path d="M45,33 L19,33 C-6,33 6,50 14.9822874,41 L45,11"></path></svg></button>
-        <nav class="menu-panel" id="menuPanel" aria-label="Pages">
+        <nav class="menu-panel" id="menuPanel" aria-label="Menu">
           <div class="menu-inner">
             {% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% endfor %}
+            <div class="menu-foot">
+              <span class="menu-foot-label">Theme</span>
+              <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle colour theme"><span class="tt-knob"></span></button>
+            </div>
           </div>
         </nav>
       </div>
-      {% endif %}
     </div>
   </div>
 </header>
 
-<div class="post-wrap">
+<div class="post-wrap{% if not toc %} solo{% endif %}">
   {% if toc %}
   <nav class="toc">
     <div class="toc-title">Contents</div>
     {% for h in toc %}<a class="lvl-{{ h.level }}" href="#{{ h.id }}">{{ h.text }}</a>{% endfor %}
   </nav>
-  {% else %}<div></div>{% endif %}
+  {% endif %}
 
   <main class="post-main">
     <header class="post-hero">

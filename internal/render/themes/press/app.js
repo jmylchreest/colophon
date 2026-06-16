@@ -9,13 +9,18 @@
   // avoid a flash; this wires the switch and persists the choice.
   function initTheme() {
     var tt = document.getElementById('themeToggle'), root = document.documentElement;
+    var sys = window.matchMedia ? matchMedia('(prefers-color-scheme: light)') : null;
+    function saved() { try { return localStorage.getItem('press-theme'); } catch (e) { return null; } }
     function apply(t) { root.dataset.theme = t; if (tt) tt.setAttribute('aria-checked', t === 'dark'); }
-    apply(root.dataset.theme || 'dark');
+    // default to the system theme; a saved choice (set by the toggle) overrides it.
+    apply(root.dataset.theme || saved() || (sys && sys.matches ? 'light' : 'dark'));
     if (tt) tt.addEventListener('click', function () {
       var t = root.dataset.theme === 'dark' ? 'light' : 'dark';
       apply(t);
       try { localStorage.setItem('press-theme', t); } catch (e) {}
     });
+    // follow OS changes while the visitor hasn't made an explicit choice
+    if (sys) sys.addEventListener('change', function (e) { if (!saved()) apply(e.matches ? 'light' : 'dark'); });
   }
 
   // Reading-progress bar at the top of a post.

@@ -101,16 +101,22 @@ func newThemeSource(root, theme string) (*themeSource, error) {
 // (on-disk) theme still inherits the default's templates and vendored assets.
 func embeddedLayers(name string) ([]fs.FS, error) {
 	if sub, err := fs.Sub(builtinThemes, "themes/"+name); err == nil {
-		if _, err := fs.Stat(sub, "page.html"); err == nil {
-			if b, err := fs.ReadFile(sub, baseMarker); err == nil {
-				if base := strings.TrimSpace(string(b)); base != "" && base != name {
-					baseLayers, err := embeddedLayers(base)
-					if err != nil {
-						return nil, err
-					}
-					return append(baseLayers, sub), nil
+		_, tmplErr := fs.Stat(sub, "page.html")
+		hasTemplate := tmplErr == nil
+		// A `base` marker lets a theme inherit another theme's templates, app.js and CSS;
+		// the theme's own files still override per name. This lets a theme ship only a
+		// style.css (tokens) and reuse the base theme's chrome — even without its own
+		// templates, which then resolve from the base layer.
+		if b, err := fs.ReadFile(sub, baseMarker); err == nil {
+			if base := strings.TrimSpace(string(b)); base != "" && base != name {
+				baseLayers, err := embeddedLayers(base)
+				if err != nil {
+					return nil, err
 				}
+				return append(baseLayers, sub), nil
 			}
+		}
+		if hasTemplate {
 			return []fs.FS{sub}, nil
 		}
 	}
