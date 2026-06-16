@@ -93,6 +93,7 @@ type page struct {
 	Draft        bool   // included only because this is a preview build
 	Embargoed    bool   // included only because this is a preview build
 	EmbargoUntil string // formatted publish_after, when Embargoed
+	Static       bool   // dateless page (e.g. About): kept out of the chronological list + feeds, surfaced in nav
 
 	Hero       string // hero banner URL: page-relative when co-located, absolute when routed
 	Image      string // preview image href for the index card (rooted path or absolute), or ""
@@ -179,12 +180,24 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		return Result{}, err
 	}
 
+	// Dateless pages (About, Now, …) are standing chrome, not dated posts: they surface in
+	// the nav menu rather than the chronological list/feeds. Posts drive the list, tags,
+	// authors and feeds; every page (post or static) still renders its own document.
+	navPages := navLinks(pages, basePath)
+	posts := make([]page, 0, len(pages))
+	for _, p := range pages {
+		if !p.Static {
+			posts = append(posts, p)
+		}
+	}
+
 	for _, p := range pages {
 		if isEmptyContent(p.HTML) {
 			opts.Log.Step("BUILD", "", "warn", fmt.Sprintf("post %q has no content", strings.TrimSuffix(p.URL, "/")))
 		}
 		persona := resolvePersona(cfg, p.Persona)
 		ctx := map[string]any{
+			"nav_pages":     navPages,
 			"site_title":    site.Title,
 			"base_url":      site.BaseURL,
 			"base_path":     basePath,
@@ -222,10 +235,14 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		}
 	}
 
-	list := make([]map[string]any, len(pages))
-	for i, p := range pages {
+	list := make([]map[string]any, len(posts))
+	for i, p := range posts {
 		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "tags": tagLinks(p.Tags, basePath)}
 	}
+	// Authors: one avatar per persona that wrote a post, most-recent-first, for the topbar
+	// widget. The same strip rides along on the archive listings (tags/authors).
+	authorGroups := collectAuthors(cfg, posts, list, basePath)
+	authors := authorStrip(authorGroups)
 	index, err := eng.Render("index.html", map[string]any{
 		"site_title": site.Title,
 		"base_url":   site.BaseURL,
@@ -234,6 +251,8 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		"favicon":    favicon,
 		"heading":    site.Title,
 		"feeds":      feedLinks(formats, basePath),
+		"authors":    authors,
+		"nav_pages":  navPages,
 		"pages":      list,
 	})
 	if err != nil {
@@ -245,7 +264,13 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 
 	// Tag pages: one post listing per tag, reusing the index template with a heading. Tag
 	// chips on each post (page.html) link here, so tags become cross-entry navigation.
-	if err := writeTagPages(write, eng, site, basePath, feedHead, favicon, pages, list); err != nil {
+	if err := writeTagPages(write, eng, site, basePath, feedHead, favicon, authors, navPages, posts, list); err != nil {
+		return Result{}, err
+	}
+
+	// Author pages: one post listing per persona at authors/<id>/, reached from the avatar
+	// widget. Same index template + heading, mirroring tag pages.
+	if err := writeAuthorPages(write, eng, site, basePath, feedHead, favicon, authors, navPages, authorGroups); err != nil {
 		return Result{}, err
 	}
 
@@ -445,6 +470,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 			HTML:        html,
 			Draft:       fm.Draft,
 			Embargoed:   it.embargoed,
+			Static:      fm.Date.IsZero(), // no date → a standing page (About, Now, …), not a dated post
 		}
 		if it.embargoed {
 			p.EmbargoUntil = fm.PublishAfter.Format("2006-01-02 15:04 MST")
@@ -632,7 +658,7 @@ func tagLinks(tags []string, basePath string) []map[string]any {
 
 // writeTagPages renders a listing page per tag at tags/<slug>/, reusing the index template
 // (with a heading and the tag's posts). list[i] is the index-item map for pages[i].
-func writeTagPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, feedHead, favicon string, pages []page, list []map[string]any) error {
+func writeTagPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, feedHead, favicon string, authors, navPages []map[string]any, pages []page, list []map[string]any) error {
 	type group struct {
 		name  string
 		items []map[string]any
@@ -664,6 +690,8 @@ func writeTagPages(write func(string, []byte) error, eng render.Engine, site cor
 			"feed_head":  feedHead,
 			"favicon":    favicon,
 			"heading":    "Tagged “" + g.name + "”",
+			"authors":    authors,
+			"nav_pages":  navPages,
 			"pages":      g.items,
 		})
 		if err != nil {

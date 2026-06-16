@@ -25,7 +25,7 @@ html[data-theme="light"] {
 html { scroll-behavior: smooth; }
 body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 17px;
   line-height: 1.7; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
-  overflow-x: hidden; transition: background 0.4s, color 0.4s; }
+  overflow-x: hidden; padding-bottom: 40px; transition: background 0.4s, color 0.4s; }
 
 /* glow layer is 160% of the viewport so its rectangular edges stay off-screen; only soft,
    fully-fading radials show through, and the small drift never brings an edge into view. */
@@ -56,19 +56,42 @@ a { color: inherit; }
 .topbar-right { display: flex; align-items: center; gap: 0.85rem; }
 
 /* feed popouts (own implementation of the hover-tooltip pattern) */
-.feeds { display: flex; align-items: center; gap: 0.4rem; }
+/* feed drawer: the RSS/Atom/JSON icons collapse behind a chevron and slide out horizontally
+   (grid-template-columns 0fr→1fr, the horizontal analogue of the nav dropdown). Gated on .js
+   so without scripting the icons just show and the chevron is hidden. */
+.feeds { display: flex; align-items: center; gap: 0.35rem; }
+.feeds-track { display: grid; grid-template-columns: 1fr;
+  transition: grid-template-columns 0.34s cubic-bezier(0.33,1,0.68,1); }
+/* vertical padding gives the feed icons' hover lift room inside the drawer's overflow clip
+   (overflow:hidden is needed for the horizontal collapse); horizontal padding stays 0 so the
+   collapsed width still reaches exactly 0. */
+.feeds-inner { overflow: hidden; min-width: 0; display: flex; align-items: center; gap: 0.4rem;
+  padding: 6px 0; }
+.js .feeds[data-open="false"] .feeds-track { grid-template-columns: 0fr; }
+.feeds[data-open="true"] .feeds-track { grid-template-columns: 1fr; }
+.feeds-toggle { display: none; }
+.js .feeds-toggle { width: 24px; height: 30px; padding: 0; display: grid; place-items: center;
+  cursor: pointer; background: none; border: none; color: var(--muted); outline: none;
+  -webkit-tap-highlight-color: transparent; transition: color 0.2s; }
+.js .feeds-toggle:hover { color: var(--accent); }
+.feeds-chev { width: 16px; height: 16px; transition: transform 0.34s cubic-bezier(0.33,1,0.68,1); }
+.feeds[data-open="true"] .feeds-chev { transform: rotate(180deg); }
 .feed { position: relative; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
   color: var(--muted); border: 1px solid var(--border); text-decoration: none;
   transition: color 0.25s, background 0.25s, border-color 0.25s, transform 0.25s cubic-bezier(0.68,-0.55,0.27,1.55); }
 .feed:hover { color: var(--on-accent); background: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
 .feed svg { width: 14px; height: 14px; }
-.feed .tip { position: absolute; top: 132%; left: 50%; transform: translateX(-50%) translateY(-5px);
-  background: var(--accent); color: var(--on-accent); font-size: 0.68rem; font-weight: 500; padding: 0.22rem 0.5rem;
-  border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; z-index: 10;
-  transition: opacity 0.25s, transform 0.25s cubic-bezier(0.68,-0.55,0.27,1.55); }
-.feed .tip::after { content: ""; position: absolute; bottom: 100%; left: 50%; width: 7px; height: 7px;
-  background: var(--accent); transform: translate(-50%,60%) rotate(45deg); }
-.feed:hover .tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* Shared caption tooltip for the feed icons and author avatars. position:fixed (placed by
+   app.js relative to the hovered icon) so it escapes the drawer/carousel overflow clipping
+   that would otherwise hide it — it can never be clipped or sit behind the page body. */
+.cap-tip { position: fixed; z-index: 100; pointer-events: none; left: 0; top: 0;
+  background: var(--accent); color: var(--on-accent); font-size: 0.68rem; font-weight: 500;
+  padding: 0.22rem 0.5rem; border-radius: 6px; white-space: nowrap;
+  opacity: 0; transform: translate(-50%, 4px);
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.68,-0.55,0.27,1.55); }
+.cap-tip.show { opacity: 1; transform: translate(-50%, 0); }
+.cap-tip::after { content: ""; position: absolute; bottom: 100%; left: 50%; width: 7px; height: 7px;
+  background: var(--accent); transform: translate(-50%, 60%) rotate(45deg); }
 
 /* sun↔moon morph theme toggle (own implementation) */
 .tt { position: relative; width: 48px; height: 26px; flex-shrink: 0; padding: 0; cursor: pointer;
@@ -182,7 +205,90 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 .note .av { width: 46px; height: 46px; font-size: 1rem; }
 .note .nm { font-weight: 600; }
 .note .bio { color: var(--muted); font-size: 0.9rem; margin-top: 0.2rem; line-height: 1.5; }
-.foot { text-align: center; color: var(--faint); font-size: 0.82rem; padding: 3rem 1.75rem; border-top: 1px solid var(--border); }
+/* ---------- author avatar strip (topbar) ---------- */
+.authors { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
+/* overflow-x:auto forces overflow-y to auto too, so the track clips vertically — the
+   vertical padding gives the avatars' hover lift room to show inside the clip box. */
+.auth-track { display: flex; align-items: center; gap: 0.4rem; overflow-x: auto; scroll-behavior: smooth;
+  max-width: 30vw; padding: 6px 0; scrollbar-width: none; -ms-overflow-style: none; }
+.auth-track::-webkit-scrollbar { display: none; }
+.auth { position: relative; flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; overflow: hidden; border: 1px solid var(--border);
+  color: var(--muted); text-decoration: none; background: var(--elevated);
+  transition: transform 0.2s, border-color 0.2s; }
+.auth:hover { color: var(--on-accent); background: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
+.auth img { width: 100%; height: 100%; object-fit: cover; }
+.auth-fb { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.02em; }
+.auth-chev { flex: 0 0 auto; width: 20px; height: 30px; padding: 0; cursor: pointer;
+  display: grid; place-items: center; background: none; border: none; color: var(--muted);
+  outline: none; -webkit-tap-highlight-color: transparent; transition: color 0.2s; }
+.auth-chev svg { width: 14px; height: 14px; display: block; }
+.auth-chev:hover:not(:disabled) { color: var(--accent); }
+.auth-chev:disabled { opacity: 0.3; cursor: default; }
+@media (max-width: 720px) { .auth-track { max-width: 38vw; } }
+
+/* ---------- nav menu: animated hamburger + popout ----------
+   "Side-exit" morph, built on Aaron Iker's dash-flow mechanism (codepen.io/aaroniker/pen/abzZbzR).
+   The top and bottom bars are rigid transforms of one airy arc, so they keep its wind-like
+   sweep and land on opposite sides — top dives to the bottom-right, bottom dives to the
+   bottom-left and rises to the top-right (forming the ✕). The middle bar slides out the right
+   edge, delayed so it leaves with the arms rather than before them. Keyed on aria-expanded. */
+.menu { position: relative; display: flex; }
+.menu-btn { position: relative; width: 30px; height: 30px; padding: 0; cursor: pointer;
+  display: grid; place-items: center; background: none; border: 1px solid var(--border);
+  border-radius: 50%; color: var(--text); outline: none; -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.2s, color 0.2s; }
+.menu-btn:hover { border-color: var(--accent); color: var(--accent); }
+.menu-ico { position: absolute; left: 50%; top: 50%; width: 36px; height: 27px;
+  transform: translate(-50%, -50%); stroke: currentColor; stroke-width: 4px;
+  stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.menu-ico path { stroke-dasharray: 26px 100px; stroke-dashoffset: 126px;
+  transition: stroke-dasharray 0.85s cubic-bezier(0.2,0.4,0.2,1.1) 0.15s,
+              stroke-dashoffset 0.85s cubic-bezier(0.2,0.4,0.2,1.1) 0.15s; }
+.menu-ico path:nth-child(1) { stroke-dasharray: 26px 107px; stroke-dashoffset: 133px; } /* top arm */
+.menu-ico path:nth-child(2) { stroke-dasharray: 26px 160px; stroke-dashoffset: 0;        /* middle: slides out, delayed */
+  transition: stroke-dashoffset 0.5s ease 0.2s; }
+.menu-btn[aria-expanded="true"] .menu-ico path:nth-child(1) { stroke-dashoffset: 58px; }
+.menu-btn[aria-expanded="true"] .menu-ico path:nth-child(2) { stroke-dashoffset: -90px; }
+.menu-btn[aria-expanded="true"] .menu-ico path:nth-child(3) { stroke-dashoffset: 57px; }
+/* Dropdown reveal (inspired by jkantner's "Dropdown Menu Effects"): the panel grows its
+   height open via grid-template-rows 0fr→1fr — the modern way to animate to auto height —
+   alongside a slight scale/opacity from the top-right; each link then staggers in. */
+.menu-panel { position: absolute; top: calc(100% + 0.5rem); right: 0; min-width: 9rem;
+  display: grid; grid-template-rows: 0fr;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.28); z-index: 50;
+  opacity: 0; transform: translateY(-6px) scale(0.97); transform-origin: top right;
+  pointer-events: none;
+  transition: grid-template-rows 0.34s cubic-bezier(0.33,1,0.68,1),
+              opacity 0.2s ease, transform 0.34s cubic-bezier(0.33,1,0.68,1); }
+.menu-inner { overflow: hidden; min-height: 0; display: flex; flex-direction: column;
+  gap: 0.1rem; padding: 0.4rem; }
+.menu-btn[aria-expanded="true"] ~ .menu-panel { grid-template-rows: 1fr; opacity: 1;
+  transform: none; pointer-events: auto; }
+.menu-panel a { color: var(--text); text-decoration: none; font-size: 0.9rem;
+  padding: 0.5rem 0.7rem; border-radius: 8px;
+  opacity: 0; transform: translateY(-5px);
+  transition: background 0.15s, color 0.15s, opacity 0.2s ease, transform 0.25s cubic-bezier(0.33,1,0.68,1); }
+.menu-btn[aria-expanded="true"] ~ .menu-panel a { opacity: 1; transform: none; }
+.menu-btn[aria-expanded="true"] ~ .menu-panel a:nth-child(1) { transition-delay: 0s, 0s, 0.08s, 0.08s; }
+.menu-btn[aria-expanded="true"] ~ .menu-panel a:nth-child(2) { transition-delay: 0s, 0s, 0.13s, 0.13s; }
+.menu-btn[aria-expanded="true"] ~ .menu-panel a:nth-child(3) { transition-delay: 0s, 0s, 0.18s, 0.18s; }
+.menu-btn[aria-expanded="true"] ~ .menu-panel a:nth-child(4) { transition-delay: 0s, 0s, 0.23s, 0.23s; }
+.menu-panel a:hover { background: var(--accent-soft); color: var(--accent); }
+
+/* ---------- post list: progressive reveal (enhancement; no-JS shows everything) ---------- */
+.js .post-row { opacity: 0; transform: translateY(10px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.js .post-row.in { opacity: 1; transform: none; }
+.js .post-row.in:hover { opacity: 0.62; }
+.reveal-sentinel { height: 1px; }
+
+/* ---------- footer: slim bar pinned to the viewport bottom, mirroring the topbar ---------- */
+.foot { position: fixed; bottom: 0; left: 0; right: 0; height: 40px; z-index: 40;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  color: var(--faint); font-size: 0.78rem; letter-spacing: 0.01em;
+  background: var(--bg); background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: saturate(140%) blur(8px); border-top: 1px solid var(--border); }
 
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .post-hero, .cover { animation: rise 0.7s ease both; }
