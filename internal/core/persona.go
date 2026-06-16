@@ -19,11 +19,11 @@ const (
 // HCard is the IndieWeb h-card identity for a persona. It drives bylines, author
 // pages, feeds, and (later) microformats2 / fediverse federation.
 type HCard struct {
-	Name   string   `yaml:"name"`
-	Bio    string   `yaml:"bio,omitempty"`
-	Avatar string   `yaml:"avatar,omitempty"`
-	Email  string   `yaml:"email,omitempty"`
-	URLs   []string `yaml:"urls,omitempty"`
+	Name   string   `yaml:"name" json:"name"`
+	Bio    string   `yaml:"bio,omitempty" json:"bio,omitempty"`
+	Avatar string   `yaml:"avatar,omitempty" json:"avatar,omitempty"`
+	Email  string   `yaml:"email,omitempty" json:"email,omitempty"`
+	URLs   []string `yaml:"urls,omitempty" json:"urls,omitempty"`
 }
 
 // Style is the optional voice/style profile for a persona. It is only consulted
@@ -32,9 +32,9 @@ type HCard struct {
 // guide plus retrieved exemplars from the persona's own corpus.
 type Style struct {
 	// Guide is the freeform style/system prompt: tone, formatting rules, do/don'ts.
-	Guide string `yaml:"guide,omitempty"`
+	Guide string `yaml:"guide,omitempty" json:"guide,omitempty"`
 	// References are links/glossaries/source docs the author may draw on.
-	References []string `yaml:"references,omitempty"`
+	References []string `yaml:"references,omitempty" json:"references,omitempty"`
 }
 
 // Persona is a blog identity. Content is attributed to a persona, not to a human;
@@ -42,19 +42,19 @@ type Style struct {
 // personas (1:many); a persona normally maps to one human operator, except brand
 // personas which may have several.
 type Persona struct {
-	ID          string      `yaml:"id"`
-	DisplayName string      `yaml:"display_name"`
-	Byline      string      `yaml:"byline,omitempty"`
-	Kind        PersonaKind `yaml:"kind"`
-	HCard       HCard       `yaml:"hcard"`
-	Style       Style       `yaml:"style,omitempty"`
+	ID          string      `yaml:"id" json:"id"`
+	DisplayName string      `yaml:"display_name" json:"display_name"`
+	Byline      string      `yaml:"byline,omitempty" json:"byline,omitempty"`
+	Kind        PersonaKind `yaml:"kind" json:"kind"`
+	HCard       HCard       `yaml:"hcard" json:"hcard"`
+	Style       Style       `yaml:"style,omitempty" json:"style,omitempty"`
 
 	// Sites lists the site IDs this persona is allowed to publish to. A site also
 	// declares which personas it accepts; a publication must satisfy both.
-	Sites []string `yaml:"sites"`
+	Sites []string `yaml:"sites" json:"sites"`
 	// Operators are the human/agent identifiers permitted to write as this persona.
 	// individual ⇒ exactly one; brand ⇒ one or more.
-	Operators []string `yaml:"operators,omitempty"`
+	Operators []string `yaml:"operators,omitempty" json:"operators,omitempty"`
 }
 
 // Validate checks the persona's internal consistency.
