@@ -102,9 +102,22 @@ var (
 // Parse splits a leading ---delimited YAML block from the markdown body. A file with
 // no opening (or closing) fence is treated as all body, no frontmatter.
 func Parse(raw []byte) (*Document, error) {
+	fm, body, err := ParseFrontmatter(raw)
+	if err != nil {
+		return nil, err
+	}
+	return &Document{Frontmatter: fm, Body: string(body)}, nil
+}
+
+// ParseFrontmatter is the cheap half of Parse: it splits the leading ---fenced YAML block
+// and returns the typed frontmatter plus the body as a sub-slice of raw (no copy). A caller
+// that filters on frontmatter alone (e.g. a source's publish gate) can decide before paying
+// to copy the body into a string. A file with no opening/closing fence is all body, no
+// frontmatter. The returned body aliases raw — copy it (string(body)) before retaining.
+func ParseFrontmatter(raw []byte) (Frontmatter, []byte, error) {
 	trimmed := bytes.TrimLeft(bytes.TrimPrefix(raw, bom), " \t\r\n")
 	if !bytes.HasPrefix(trimmed, fence) {
-		return &Document{Body: string(raw)}, nil
+		return Frontmatter{}, raw, nil
 	}
 	rest := trimmed[len(fence):]
 	if i := bytes.IndexByte(rest, '\n'); i >= 0 {
@@ -114,18 +127,18 @@ func Parse(raw []byte) (*Document, error) {
 	}
 	end := bytes.Index(rest, append([]byte("\n"), fence...))
 	if end < 0 {
-		return &Document{Body: string(raw)}, nil
+		return Frontmatter{}, raw, nil
 	}
 	var fm Frontmatter
 	if err := yaml.Unmarshal(rest[:end], &fm); err != nil {
-		return nil, err
+		return Frontmatter{}, nil, err
 	}
 	// Drop the closing fence's line terminator and a single conventional blank line
 	// after it, so "---\n\nbody" parses to "body" and round-trips with Marshal.
 	body := rest[end+1+len(fence):]
 	body = bytes.TrimPrefix(body, []byte("\n"))
 	body = bytes.TrimPrefix(body, []byte("\n"))
-	return &Document{Frontmatter: fm, Body: string(body)}, nil
+	return fm, body, nil
 }
 
 // Marshal renders the document to bytes: a frontmatter block then the body. The body

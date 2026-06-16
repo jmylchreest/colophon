@@ -69,18 +69,23 @@ func Walk(dir string, keep func(markdown.Frontmatter) bool) ([]core.Content, err
 		if err != nil {
 			return err
 		}
-		doc, err := markdown.Parse(raw)
+		// Split frontmatter first and apply keep before copying the body, so a note rejected
+		// on frontmatter (e.g. an Obsidian publish gate) skips the body-string allocation.
+		fm, body, err := markdown.ParseFrontmatter(raw)
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
-		if keep != nil && !keep(doc.Frontmatter) {
+		if keep != nil && !keep(fm) {
 			return nil
 		}
 		rel, err := filepath.Rel(dir, path)
 		if err != nil {
 			return err
 		}
-		docs = append(docs, core.Content{Document: *doc, SourcePath: filepath.ToSlash(rel)})
+		docs = append(docs, core.Content{
+			Document:   markdown.Document{Frontmatter: fm, Body: string(body)},
+			SourcePath: filepath.ToSlash(rel),
+		})
 		return nil
 	})
 	if err != nil {

@@ -33,6 +33,7 @@ import (
 	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/source"
 	"github.com/jmylchreest/colophon/internal/source/mddir"
+	"github.com/jmylchreest/colophon/markdown"
 )
 
 func init() { source.Register("obsidian", New) }
@@ -162,7 +163,8 @@ func (s *Source) Documents(ctx context.Context) ([]core.Content, error) {
 	if s.vault == "" || len(s.scanRoots) == 0 {
 		return nil, nil // inert optional source
 	}
-	idx := attachments([]string{s.vault})
+	idx := newAttachmentIndex(s.vault, s.scanRoots)
+	keep := s.frontmatterKeep()
 	seen := map[string]bool{}
 	var docs []core.Content
 	for _, root := range s.scanRoots {
@@ -170,7 +172,7 @@ func (s *Source) Documents(ctx context.Context) ([]core.Content, error) {
 			s.warnf("scan path %q does not exist in the vault — nothing published from it (check vault/path)", root)
 			continue
 		}
-		walked, err := mddir.Walk(root, nil)
+		walked, err := mddir.Walk(root, keep)
 		if err != nil {
 			return nil, err
 		}
@@ -192,6 +194,22 @@ func (s *Source) Documents(ctx context.Context) ([]core.Content, error) {
 	return docs, nil
 }
 
+// frontmatterKeep returns a frontmatter-only pre-filter for mddir.Walk when selection can be
+// decided without the body, so a non-matching note skips the body-string copy. In tag mode
+// selection can depend on inline body tags, so it returns nil (the body is needed) and
+// selected() does the full check. The publish-whitelist mode is decidable on frontmatter.
+func (s *Source) frontmatterKeep() func(markdown.Frontmatter) bool {
+	if len(s.tags) > 0 {
+		return nil
+	}
+	if s.publishRequired {
+		return func(fm markdown.Frontmatter) bool {
+			return fm.Publish != nil && *fm.Publish
+		}
+	}
+	return nil // no tags, publish not required: keep everything
+}
+
 // selected reports whether a note is intended for the blog — the source's only filtering
 // concern. With tags configured a note must carry one of them (unless opted out with
 // `publish: false`); without tags the `publish: true` whitelist applies per publishRequired.
@@ -211,10 +229,47 @@ func (s *Source) selected(c core.Content) bool {
 
 var embedRE = regexp.MustCompile(`!\[\[([^\]\n]+)\]\]`)
 
-// attachments indexes every non-markdown file under the given roots by lower-cased base
+// attachmentIndex resolves Obsidian attachment names (base name, lower-cased) to absolute
+// paths. It indexes the post scan roots eagerly and the rest of the vault only on demand:
+// most embeds live alongside the posts, so the full-vault walk is usually skipped entirely;
+// when it is needed it runs at most once. When a name exists both under a scan root and
+// elsewhere, the scan-root copy wins (attachments near the posts take precedence).
+type attachmentIndex struct {
+	vault     string
+	scoped    map[string]string // base name → abs path, from the scan roots (eager)
+	full      map[string]string // base name → abs path, whole vault (lazy)
+	fullBuilt bool
+}
+
+func newAttachmentIndex(vault string, scanRoots []string) *attachmentIndex {
+	ai := &attachmentIndex{vault: vault, scoped: indexAttachments(scanRoots)}
+	// If the scan already covers the whole vault, the scoped index is the full index —
+	// skip the redundant second walk on a miss.
+	if len(scanRoots) == 1 && scanRoots[0] == vault {
+		ai.full, ai.fullBuilt = ai.scoped, true
+	}
+	return ai
+}
+
+// lookup resolves an attachment base name, falling back to a one-time full-vault walk only
+// when the name isn't found among the scoped (near-the-posts) attachments.
+func (ai *attachmentIndex) lookup(name string) (string, bool) {
+	key := strings.ToLower(name)
+	if p, ok := ai.scoped[key]; ok {
+		return p, true
+	}
+	if !ai.fullBuilt {
+		ai.full = indexAttachments([]string{ai.vault})
+		ai.fullBuilt = true
+	}
+	p, ok := ai.full[key]
+	return p, ok
+}
+
+// indexAttachments indexes every non-markdown file under the given roots by lower-cased base
 // name, mapping it to its absolute path. An Obsidian embed resolves by name (not relative to
 // the note), so this lets a bare name find a concrete file; first match wins on a clash.
-func attachments(roots []string) map[string]string {
+func indexAttachments(roots []string) map[string]string {
 	idx := map[string]string{}
 	for _, dir := range roots {
 		if dir == "" {
@@ -240,14 +295,17 @@ func attachments(roots []string) map[string]string {
 // Targets resolve vault-wide by base name; the relative path is computed from the note's
 // real location to the attachment's, so it is correct even when posts live in a vault
 // sub-folder and the attachment lives elsewhere in the vault. Unresolved refs are left as-is.
-func (s *Source) resolveEmbeds(c *core.Content, root string, idx map[string]string) {
+func (s *Source) resolveEmbeds(c *core.Content, root string, idx *attachmentIndex) {
 	rel := func(ref string) (string, bool) {
 		target := stripEmbed(ref)
 		if i := strings.IndexAny(target, "|#"); i >= 0 {
 			target = strings.TrimSpace(target[:i])
 		}
-		attAbs, ok := idx[strings.ToLower(path.Base(target))]
-		if !ok || target == "" {
+		if target == "" {
+			return "", false
+		}
+		attAbs, ok := idx.lookup(path.Base(target))
+		if !ok {
 			return "", false
 		}
 		noteAbsDir := filepath.Join(root, filepath.FromSlash(path.Dir(c.SourcePath)))
