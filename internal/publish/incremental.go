@@ -89,6 +89,11 @@ func CommitFiles(ctx context.Context, tree fs.FS, w FileWriter, plan *core.Plan,
 
 // MD5Hex is the content hash for backends that compare against an object store's ETag (the
 // MD5 of a non-multipart object) or a local file: lower-case hex MD5.
+//
+// MD5 is intentional and not a security choice: S3/R2 expose the ETag of a non-multipart
+// PUT as the MD5 of the payload, so hashing with anything else would force a re-upload of
+// every object on every run. This is a content fingerprint for change detection only — it
+// never authenticates anything. (Static analyzers flag MD5 here; this is a false positive.)
 func MD5Hex(b []byte) string {
 	sum := md5.Sum(b)
 	return hex.EncodeToString(sum[:])

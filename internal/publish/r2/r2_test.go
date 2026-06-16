@@ -99,7 +99,7 @@ func (f *fakeStore) handler(bucket string) http.HandlerFunc {
 				f.bucketCreated = true
 			} else {
 				body, _ := io.ReadAll(r.Body)
-				f.objects[r.URL.Path] = md5hex(body)
+				f.objects[r.URL.Path] = publish.MD5Hex(body)
 			}
 			w.WriteHeader(http.StatusOK)
 		case http.MethodDelete:

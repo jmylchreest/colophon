@@ -12,8 +12,6 @@ package r2
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -144,6 +142,8 @@ func (p *Publisher) Deployed(ctx context.Context) (core.State, bool, error) {
 	return state, true, err
 }
 
+// Hash fingerprints an object for incremental upload. MD5 is intentional: it matches the R2
+// ETag for non-multipart PUTs, so unchanged objects skip re-upload (see publish.MD5Hex).
 func (p *Publisher) Hash(name string, b []byte) string { return publish.MD5Hex(b) }
 
 // Protected keeps the provenance manifest (.well-known/colophon.json, written by
@@ -384,11 +384,6 @@ func createBucketBody(location string) []byte {
 		return nil
 	}
 	return []byte("<CreateBucketConfiguration><LocationConstraint>" + location + "</LocationConstraint></CreateBucketConfiguration>")
-}
-
-func md5hex(b []byte) string {
-	sum := md5.Sum(b)
-	return hex.EncodeToString(sum[:])
 }
 
 func firstEnv(keys ...string) string {

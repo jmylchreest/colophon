@@ -72,7 +72,8 @@ type Publisher interface {
 	Protected(name string) bool
 	// Commit applies plan to the destination and returns the run summary. Per-file backends
 	// honour plan.Upload/plan.Delete; transactional backends use plan.Desired. Total is the
-	// size of the deployed tree (len(plan.Desired)).
+	// size of the deployed tree (len(plan.Desired)). Result.URL is set only when the driver
+	// exposes a deployed location (e.g. a Pages deployment URL); it is "" otherwise (e.g. R2).
 	Commit(ctx context.Context, tree fs.FS, plan *Plan) (Result, error)
 	// Invalidate busts any CDN cache for the changed paths (a no-op where deploys are immutable).
 	Invalidate(ctx context.Context, paths []string) error

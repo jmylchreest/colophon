@@ -98,7 +98,7 @@ func writeFeeds(write func(string, []byte) error, site core.Site, cfg *config.Co
 		}
 	}
 
-	fs := feed.Site{Title: site.Title, BaseURL: base, Author: feedAuthor(cfg)}
+	fs := feed.Site{Title: site.Title, BaseURL: base, Author: feedByline(cfg)}
 	renderers := map[string]func(feed.Site, []feed.Item) ([]byte, error){
 		"rss": feed.RSS, "atom": feed.Atom, "json": feed.JSON,
 	}
@@ -129,8 +129,10 @@ func writeFeeds(write func(string, []byte) error, site core.Site, cfg *config.Co
 	return write("robots.txt", []byte(robots))
 }
 
-// feedAuthor derives a byline from the first configured persona, if any.
-func feedAuthor(cfg *config.Config) string {
+// feedByline derives the feed-level byline from the first configured author. It is the
+// reader-facing name (an author), never a persona: the persona is the hidden writing voice
+// and must not leak into a public feed.
+func feedByline(cfg *config.Config) string {
 	if len(cfg.Authors) == 0 {
 		return ""
 	}
