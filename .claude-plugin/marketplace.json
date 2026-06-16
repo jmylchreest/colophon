@@ -1,0 +1,14 @@
+{
+  "name": "colophon",
+  "owner": {
+    "name": "John Mylchreest",
+    "url": "https://github.com/jmylchreest/colophon"
+  },
+  "plugins": [
+    {
+      "name": "colophon-skills",
+      "source": "./contrib/skills",
+      "description": "Authoring skills for colophon: write, edit, cross-link, metadata, and publish."
+    }
+  ]
+}
