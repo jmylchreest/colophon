@@ -1,0 +1,28 @@
+package cli
+
+import (
+	"github.com/jmylchreest/colophon/internal/config"
+	"github.com/jmylchreest/colophon/internal/serve"
+)
+
+// ServeCmd builds every environment of the first site and serves them locally under
+// /<site>/<env>/, with an index at the root. Includes drafts where the environment does.
+type ServeCmd struct {
+	Addr string `help:"Address to listen on" default:":8080"`
+}
+
+func (c *ServeCmd) Run() error {
+	root, err := findRoot()
+	if err != nil {
+		return err
+	}
+	cfg, err := config.Load(root)
+	if err != nil {
+		return err
+	}
+	srv, err := serve.New(cfg)
+	if err != nil {
+		return err
+	}
+	return srv.ListenAndServe(c.Addr)
+}
