@@ -27,6 +27,10 @@ sources:
     driver: obsidian
     path: "{env:OBSIDIAN_BLOG:-}"
     publish_required: false    # publish every note (dedicated blog folder)
+    # Tag mode alternative: drop `path` and instead point at the whole vault and pick a tag,
+    # digital-garden style (notes tagged #blog, in frontmatter or inline, become eligible):
+    #   vault: "{env:OBSIDIAN_VAULT:-}"
+    #   tag: blog
 
 # Publishers are pure mechanism (how to deploy). Environments decide what/where.
 publishers:

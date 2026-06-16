@@ -314,6 +314,11 @@ func gatherDocuments(cfg *config.Config, log *clog.Logger) ([]sourceDoc, error) 
 			return nil, fmt.Errorf("source %s: %w", s.ID(), err)
 		}
 		log.Step("SOURCE", s.ID(), "driver", s.Driver(), "docs", len(got))
+		if w, ok := s.(core.Warner); ok {
+			for _, m := range w.Warnings() {
+				log.Step("SOURCE", s.ID(), "warn", m)
+			}
+		}
 		for _, d := range got {
 			log.Detail("SOURCE", s.ID(), "file", d.SourcePath)
 			docs = append(docs, sourceDoc{doc: d, src: s})

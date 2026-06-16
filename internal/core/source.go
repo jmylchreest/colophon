@@ -24,3 +24,10 @@ type Source interface {
 	// WebDAV) fetches it. The caller closes the reader; a missing asset is an error.
 	Open(ctx context.Context, ref string) (io.ReadCloser, error)
 }
+
+// Warner is an optional Source capability: after Documents, the build collects and logs any
+// non-fatal warnings the source recorded (e.g. vault notes that matched the publish tag but
+// failed the structure checks and were skipped). Sources that never warn need not implement it.
+type Warner interface {
+	Warnings() []string
+}
