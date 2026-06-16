@@ -12,6 +12,18 @@ locates the entry and supplies the voice; you do the editing.
 
 The user wants to change an existing post in a colophon project (not create a new one).
 
+## Requirements
+
+This skill drives the `colophon` CLI. Before the first command, confirm it's installed:
+
+```sh
+command -v colophon || echo "colophon not found"
+```
+
+If it's missing, **stop and offer** the install — don't install it silently:
+`go install github.com/jmylchreest/colophon/cmd/colophon@latest` (or a release binary). Proceed
+only once it's on `PATH`.
+
 ## Workflow
 
 1. **Find the entry.** List entries to get the source file and metadata:
@@ -41,6 +53,7 @@ The user wants to change an existing post in a colophon project (not create a ne
 
 ## Guardrails
 
+- If `colophon` isn't installed, surface the install command and ask — never install it silently.
 - Don't rewrite more than asked. Don't silently change the title's slug or the byline.
 - Keep the post's draft/publish state unless the user asks to change it.
 - If the edit affects metadata (description/SEO/tags), hand off to `colophon-metadata`.

@@ -19,7 +19,17 @@ colophon never calls an LLM and never handles deploy secrets.
 | [`colophon-metadata`](skills/colophon-metadata/SKILL.md) | Fill the `seo:` block, description, and tags (reusing vocabulary). |
 | [`colophon-publish`](skills/colophon-publish/SKILL.md) | Validate, preview, and deploy (gated; secrets stay in the env). |
 
-Prerequisite: the `colophon` binary on `PATH` and a project with a `colophon.yaml`.
+## Requirements
+
+These skills drive the `colophon` CLI — they don't bundle it. You need the `colophon` binary on
+`PATH` and a project with a `colophon.yaml`. Install the binary with:
+
+```sh
+go install github.com/jmylchreest/colophon/cmd/colophon@latest
+```
+
+(or grab a release binary). Each skill preflight-checks for `colophon` and, if it's missing,
+asks before installing — it never installs software silently.
 
 ## Installing
 

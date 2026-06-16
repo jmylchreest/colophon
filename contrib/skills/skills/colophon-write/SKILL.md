@@ -13,6 +13,18 @@ pass it credentials.
 
 The user wants a new post/page for a colophon project (a directory with a `colophon.yaml`).
 
+## Requirements
+
+This skill drives the `colophon` CLI. Before the first command, confirm it's installed:
+
+```sh
+command -v colophon || echo "colophon not found"
+```
+
+If it's missing, **stop and offer** the install — don't install it silently:
+`go install github.com/jmylchreest/colophon/cmd/colophon@latest` (or a release binary). Proceed
+only once it's on `PATH`.
+
 ## Workflow
 
 1. **Confirm the byline and voice.** List what exists and pick (ask the user if unsure):
@@ -57,6 +69,7 @@ The user wants a new post/page for a colophon project (a directory with a `colop
 
 ## Guardrails
 
+- If `colophon` isn't installed, surface the install command and ask — never install it silently.
 - Don't invent facts not given by the user or the references. Don't fabricate links — use
   `[[wikilinks]]`.
 - Keep posts `draft: true` until the user says to publish. Never deploy from this skill.

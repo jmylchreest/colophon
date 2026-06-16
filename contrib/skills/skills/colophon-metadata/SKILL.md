@@ -13,6 +13,18 @@ rest.
 
 The user wants better SEO/social metadata, a description, or tags on an existing post.
 
+## Requirements
+
+This skill drives the `colophon` CLI. Before the first command, confirm it's installed:
+
+```sh
+command -v colophon || echo "colophon not found"
+```
+
+If it's missing, **stop and offer** the install — don't install it silently:
+`go install github.com/jmylchreest/colophon/cmd/colophon@latest` (or a release binary). Proceed
+only once it's on `PATH`.
+
 ## Workflow
 
 1. **Read the post** and learn the **existing tag vocabulary** (so you reuse tags, keeping tag
@@ -45,6 +57,7 @@ The user wants better SEO/social metadata, a description, or tags on an existing
 
 ## Guardrails
 
+- If `colophon` isn't installed, surface the install command and ask — never install it silently.
 - Suggest-by-default: show the block, don't silently rewrite editorial fields the user owns.
 - Never invent facts. Don't stuff keywords. Prefer the author's existing tags as seeds.
 - `seo.type` is the schema.org type — unrelated to the post's `type:` (post/page).

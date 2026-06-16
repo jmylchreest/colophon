@@ -12,6 +12,18 @@ degrades to plain text). Use them to connect posts instead of inventing URLs.
 
 The user wants to add internal links / related-post references between existing entries.
 
+## Requirements
+
+This skill drives the `colophon` CLI. Before the first command, confirm it's installed:
+
+```sh
+command -v colophon || echo "colophon not found"
+```
+
+If it's missing, **stop and offer** the install — don't install it silently:
+`go install github.com/jmylchreest/colophon/cmd/colophon@latest` (or a release binary). Proceed
+only once it's on `PATH`.
+
 ## Workflow
 
 1. **List the candidate targets** (and their tags, to find relevant ones):
@@ -41,5 +53,6 @@ The user wants to add internal links / related-post references between existing 
 
 ## Guardrails
 
+- If `colophon` isn't installed, surface the install command and ask — never install it silently.
 - Only link to entries that actually exist (from `colophon posts`). Don't invent targets.
 - Don't over-link; relevance over volume. Keep edits minimal and preserve voice.
