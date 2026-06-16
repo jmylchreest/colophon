@@ -89,6 +89,7 @@ type page struct {
 	Description  string    // frontmatter description or derived excerpt
 	URL          string    // base_path-relative, e.g. posts/hello/
 	Out          string    // path under public/, e.g. posts/hello/index.html
+	SourcePath   string    // origin file (for diagnostics, e.g. slug-collision warnings)
 	HTML         string
 	Draft        bool   // included only because this is a preview build
 	Embargoed    bool   // included only because this is a preview build
@@ -202,9 +203,18 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	authorGroups := collectAuthors(cfg, posts, list, basePath)
 	authors := authorStrip(authorGroups)
 
+	// slugSeen guards against two entries resolving to the same slug (URL/output path). A
+	// collision would silently overwrite one post, so it is warned with both source files.
+	slugSeen := map[string]string{}
 	for _, p := range pages {
 		if isEmptyContent(p.HTML) {
 			opts.Log.Step("BUILD", "", "warn", fmt.Sprintf("post %q has no content", strings.TrimSuffix(p.URL, "/")))
+		}
+		if first, dup := slugSeen[p.URL]; dup {
+			opts.Log.Step("BUILD", "", "warn", fmt.Sprintf("slug %q is produced by both %q and %q — only one survives; set a distinct slug:",
+				strings.TrimSuffix(p.URL, "/"), first, p.SourcePath))
+		} else {
+			slugSeen[p.URL] = p.SourcePath
 		}
 		author := resolveAuthor(cfg, p.Author)
 		ctx := map[string]any{
@@ -473,6 +483,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 			Description: desc,
 			URL:         it.slug + "/", // base_path-relative; templates prepend base_path
 			Out:         filepath.Join(filepath.FromSlash(it.slug), "index.html"),
+			SourcePath:  it.c.SourcePath,
 			HTML:        html,
 			Draft:       fm.Draft,
 			Embargoed:   it.embargoed,
