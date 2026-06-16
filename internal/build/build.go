@@ -93,7 +93,8 @@ type page struct {
 	Draft        bool   // included only because this is a preview build
 	Embargoed    bool   // included only because this is a preview build
 	EmbargoUntil string // formatted publish_after, when Embargoed
-	Static       bool   // dateless page (e.g. About): kept out of the chronological list + feeds, surfaced in nav
+	Static       bool   // standing page (e.g. About): kept out of the chronological list + feeds, surfaced in nav
+	Type         string // page type (post|page|custom): selects the template and placement
 
 	Hero       string // hero banner URL: page-relative when co-located, absolute when routed
 	Image      string // preview image href for the index card (rooted path or absolute), or ""
@@ -222,11 +223,12 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"has_math":      p.HasMath,
 			"has_mermaid":   p.HasMermaid,
 			"has_code":      p.HasCode,
+			"page_type":     p.Type,
 		}
 		for k, v := range authorVars(persona) {
 			ctx[k] = v
 		}
-		html, err := eng.Render("page.html", ctx)
+		html, err := eng.Render(templateFor(eng, p.Type), ctx)
 		if err != nil {
 			return Result{}, err
 		}
@@ -237,7 +239,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 
 	list := make([]map[string]any, len(posts))
 	for i, p := range posts {
-		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "tags": tagLinks(p.Tags, basePath)}
+		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "tags": tagLinks(p.Tags, basePath)}
 	}
 	// Authors: one avatar per persona that wrote a post, most-recent-first, for the topbar
 	// widget. The same strip rides along on the archive listings (tags/authors).
@@ -460,6 +462,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		if desc == "" {
 			desc = excerpt(html, 200)
 		}
+		pageType := resolvePageType(fm)
 		p := page{
 			Title:       title,
 			Date:        formatDate(fm.Date),
@@ -470,7 +473,8 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 			HTML:        html,
 			Draft:       fm.Draft,
 			Embargoed:   it.embargoed,
-			Static:      fm.Date.IsZero(), // no date → a standing page (About, Now, …), not a dated post
+			Type:        pageType,
+			Static:      standingType(pageType), // standing types (page) → nav; posts/custom → list
 		}
 		if it.embargoed {
 			p.EmbargoUntil = fm.PublishAfter.Format("2006-01-02 15:04 MST")
@@ -503,6 +507,33 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 
 	sort.SliceStable(pages, func(i, j int) bool { return pages[i].Date > pages[j].Date })
 	return pages, assets, next, nil
+}
+
+// resolvePageType returns a page's type: an explicit frontmatter `type:` wins, else it is
+// derived from the presence of a date — dated → "post", dateless → "page". The date heuristic
+// stays the default and `type:` overrides it.
+func resolvePageType(fm markdown.Frontmatter) string {
+	if t := strings.ToLower(strings.TrimSpace(fm.Type)); t != "" {
+		return t
+	}
+	if fm.Date.IsZero() {
+		return "page"
+	}
+	return "post"
+}
+
+// standingType reports whether a page type is standing chrome (the nav menu) rather than a
+// chronological post (list, feeds, tags). The built-in "page" is standing; "post" and any
+// custom type are listed.
+func standingType(t string) bool { return t == "page" }
+
+// templateFor picks the per-page-type template: the theme's "<type>.html" if it provides one,
+// else the default single-entry template "page.html".
+func templateFor(eng render.Engine, pageType string) string {
+	if name := pageType + ".html"; eng.HasTemplate(name) {
+		return name
+	}
+	return "page.html"
 }
 
 var imageRE = regexp.MustCompile(`!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))`)

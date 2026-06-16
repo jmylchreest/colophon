@@ -3,7 +3,60 @@ package build
 import (
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/jmylchreest/colophon/internal/render"
+	"github.com/jmylchreest/colophon/markdown"
 )
+
+func TestResolvePageType(t *testing.T) {
+	jan1 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	cases := []struct {
+		fm   markdown.Frontmatter
+		want string
+	}{
+		{markdown.Frontmatter{Date: jan1}, "post"},               // dated → post
+		{markdown.Frontmatter{}, "page"},                         // dateless → page
+		{markdown.Frontmatter{Type: "Project"}, "project"},       // explicit, lower-cased
+		{markdown.Frontmatter{Type: "page", Date: jan1}, "page"}, // type overrides the date
+		{markdown.Frontmatter{Type: "post"}, "post"},             // type overrides dateless
+	}
+	for _, c := range cases {
+		if got := resolvePageType(c.fm); got != c.want {
+			t.Errorf("resolvePageType(%+v) = %q, want %q", c.fm, got, c.want)
+		}
+	}
+}
+
+func TestStandingType(t *testing.T) {
+	if !standingType("page") {
+		t.Error("page should be standing (nav)")
+	}
+	for _, listed := range []string{"post", "project", ""} {
+		if standingType(listed) {
+			t.Errorf("%q should be listed, not standing", listed)
+		}
+	}
+}
+
+// fakeEngine reports which templates exist, for templateFor.
+type fakeEngine struct{ have map[string]bool }
+
+func (f fakeEngine) Render(string, map[string]any) (string, error) { return "", nil }
+func (f fakeEngine) HasTemplate(name string) bool                  { return f.have[name] }
+func (f fakeEngine) Asset(string) ([]byte, error)                  { return nil, nil }
+func (f fakeEngine) Assets() ([]string, error)                     { return nil, nil }
+
+func TestTemplateFor(t *testing.T) {
+	eng := fakeEngine{have: map[string]bool{"project.html": true}}
+	var _ render.Engine = eng // fakeEngine satisfies the interface
+	if got := templateFor(eng, "project"); got != "project.html" {
+		t.Errorf("custom type with a template = %q, want project.html", got)
+	}
+	if got := templateFor(eng, "post"); got != "page.html" {
+		t.Errorf("type without a template = %q, want page.html fallback", got)
+	}
+}
 
 func TestReadingTime(t *testing.T) {
 	words := func(n int) string { return strings.Repeat("word ", n) }

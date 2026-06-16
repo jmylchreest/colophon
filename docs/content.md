@@ -24,6 +24,7 @@ All fields are optional unless noted.
 |-------|---------|
 | `title` | Post title. If omitted, falls back to a leading `# heading` or the file name. |
 | `date` | Publish date (`YYYY-MM-DD`). If omitted (Obsidian), the file's modified time is used. |
+| `type` | Page type (`post`, `page`, or a custom value). Overrides the date-based default — see [Page types](#page-types). |
 | `slug` | Overrides the final URL segment (otherwise derived from the file path). |
 | `description` | Summary for feeds, `<meta name="description">` and `og:description`. |
 | `tags`, `categories` | Lists for organisation/feeds. |
@@ -35,6 +36,31 @@ All fields are optional unless noted.
 
 Slugs are normalised: each path segment is lower-cased and non-alphanumerics collapse to
 single hyphens, so `Archive/My Post.md` → `archive/my-post`.
+
+## Page types
+
+Every entry has a **type** that decides how it's placed and which theme template renders it:
+
+- A **`post`** is chronological — listed on the index, included in feeds, and shown on its tag
+  pages.
+- A **`page`** is standing chrome — surfaced in the theme's nav menu instead, and kept out of
+  the list and feeds (e.g. About, Now).
+
+By default the type is inferred: an entry **with a date** is a `post`, one **without** is a
+`page`. Set `type:` in frontmatter to override that, or to use a custom type:
+
+```yaml
+---
+title: Side Projects
+type: project        # a custom type; styled by a theme's project.html if it has one
+---
+```
+
+- `type: page` makes a *dated* entry standing (nav, not feeds); `type: post` makes a *dateless*
+  entry a listed post.
+- A custom type (e.g. `project`) is listed like a post, but a theme can give it its own look —
+  see [Themes → Page types](themes.md#page-types). This `type` is unrelated to `seo.type`
+  (the schema.org type).
 
 ## Markdown support
 

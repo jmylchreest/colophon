@@ -20,6 +20,13 @@ type Frontmatter struct {
 	Tags        []string  `yaml:"tags,omitempty"`
 	Categories  []string  `yaml:"categories,omitempty"`
 
+	// Type selects the page type for templating and placement, e.g. "post" (chronological:
+	// listed, in feeds and tags) or "page" (standing: surfaced in the nav menu). When unset it
+	// is derived from the presence of a date (dated → post, dateless → page). A theme may add a
+	// "<type>.html" template to style a type; otherwise it renders with "page.html". This is
+	// distinct from seo.type (the schema.org type).
+	Type string `yaml:"type,omitempty"`
+
 	// Hero is a banner image shown at the top of the post; Image is the preview/social
 	// card image (Open Graph, index thumbnail). Both are source-relative paths (an
 	// Obsidian [[embed]] is accepted too) that the build copies beside the page.

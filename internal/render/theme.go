@@ -121,6 +121,22 @@ func embeddedLayers(name string) ([]fs.FS, error) {
 	return []fs.FS{def}, nil
 }
 
+// has reports whether the theme provides a file by this name, checking the on-disk override
+// then each embedded layer (overlay → base). Used to resolve optional per-page-type templates.
+func (t *themeSource) has(name string) bool {
+	if t.diskDir != "" {
+		if _, err := os.Stat(filepath.Join(t.diskDir, filepath.FromSlash(name))); err == nil {
+			return true
+		}
+	}
+	for _, layer := range t.layers {
+		if _, err := fs.Stat(layer, name); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (t *themeSource) read(name string) ([]byte, error) {
 	if t.diskDir != "" {
 		if b, err := os.ReadFile(filepath.Join(t.diskDir, filepath.FromSlash(name))); err == nil {

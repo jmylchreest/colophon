@@ -36,6 +36,10 @@ func (e *pongoEngine) Render(name string, ctx map[string]any) (string, error) {
 	return out, nil
 }
 
+func (e *pongoEngine) HasTemplate(name string) bool {
+	return e.src.has(name)
+}
+
 func (e *pongoEngine) Asset(name string) ([]byte, error) {
 	return e.src.read(name)
 }

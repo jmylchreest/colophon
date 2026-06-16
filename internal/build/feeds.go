@@ -85,7 +85,9 @@ func writeFeeds(write func(string, []byte) error, site core.Site, cfg *config.Co
 	for _, p := range pages {
 		abs := base + "/" + p.URL
 		sitemap = append(sitemap, feed.SitemapEntry{URL: abs, LastMod: p.Published})
-		if !p.Published.IsZero() {
+		// Feed items are chronological posts (standing pages like About are nav chrome, not
+		// feed entries) that carry a date to order by.
+		if !p.Static && !p.Published.IsZero() {
 			items = append(items, feed.Item{
 				Title:       p.Title,
 				URL:         abs,

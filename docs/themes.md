@@ -100,13 +100,33 @@ Because on-disk themes inherit `default`, a contrib theme only carries its own t
 
 | File | Role |
 |------|------|
-| `page.html` | Renders a single post. **Required.** |
+| `page.html` | Renders a single entry (post or page). **Required** — the default for every page type. |
 | `index.html` | Renders the site index (post list). |
+| `<type>.html` | *Optional.* Renders entries of page type `<type>` (e.g. `project.html`); falls back to `page.html`. See [Page types](#page-types). |
 | `favicon.svg` | Default site icon (override per-site with `favicon:` pointing at a project file). |
 | *anything else* | Any non-`.html` file is copied verbatim to the output root (CSS, JS, fonts, images). |
 
 Static assets keep their relative path: `themes/mytheme/vendor/app.js` is written to
 `/vendor/app.js` and referenced as `{{ base_path }}vendor/app.js`.
+
+### Page types
+
+Every entry has a **type**. By default it's derived from whether the entry has a date — a
+dated entry is a `post` (chronological: listed on the index, in feeds, on tag pages), a
+dateless one is a `page` (standing chrome: surfaced in the nav menu, not in the list/feeds).
+An author can override this with a `type:` in frontmatter (see
+[Authoring → page types](content.md#page-types)), including custom types like `project`.
+
+A theme can tailor a type two ways — pick whichever suits:
+
+1. **A dedicated template.** Add `themes/<theme>/<type>.html` (e.g. `project.html`); entries of
+   that type render with it. Any type without its own file uses `page.html`.
+2. **Branch inside `page.html`.** The `page_type` variable holds the resolved type, so a shared
+   template can switch on it: `{% if page_type == "project" %}…{% else %}…{% endif %}`.
+
+A custom type is *listed* (post-like) by default; the built-in `page` is the only *standing*
+(nav) type. So `type: page` makes a dated entry standing, and `type: post` makes a dateless
+one listed.
 
 ## The templating language
 
@@ -144,6 +164,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `category` | Primary category string (first category, else first tag, else empty). |
 | `read_time` | Estimated reading time in whole minutes (integer). |
 | `toc` | List of `{level, id, text}` headings, for a table of contents. |
+| `page_type` | The resolved page type (`post`, `page`, or a custom value) — for branching within a shared template. |
 | `draft`, `embargoed`, `embargo_until` | Preview-only flags for not-yet-public posts. |
 | `has_code`, `has_math`, `has_mermaid` | True when the post uses that block type — load the matching library only when set. |
 | `author_name`, `author_initials`, `author_bio`, `author_url`, `author_avatar` | Persona h-card fields (empty when no persona). |
