@@ -24,6 +24,25 @@ func TestReadingTime(t *testing.T) {
 	}
 }
 
+func TestIsEmptyContent(t *testing.T) {
+	cases := []struct {
+		html string
+		want bool
+	}{
+		{"", true},
+		{"   \n\t ", true},
+		{"<p></p>", true},               // markup but no text
+		{`<div class="callout"></div>`, true},
+		{"<p>real content</p>", false},
+		{"plain text", false},
+	}
+	for _, c := range cases {
+		if got := isEmptyContent(c.html); got != c.want {
+			t.Errorf("isEmptyContent(%q) = %v, want %v", c.html, got, c.want)
+		}
+	}
+}
+
 func TestTagLinks(t *testing.T) {
 	got := tagLinks([]string{"Showcase", "tag 2", ""}, "/blog/")
 	if len(got) != 2 { // the empty tag is dropped

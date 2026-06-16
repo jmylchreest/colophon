@@ -36,7 +36,7 @@ func writeVault(t *testing.T) string {
 func TestPublishFilter(t *testing.T) {
 	dir := writeVault(t)
 
-	src, err := New("/", config.SourceConfig{ID: "v", Driver: "obsidian", Settings: map[string]any{"path": dir}})
+	src, err := New("/", config.SourceConfig{ID: "v", Driver: "obsidian", Settings: map[string]any{"vault": dir}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,12 +44,7 @@ func TestPublishFilter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got []string
-	for _, d := range docs {
-		got = append(got, d.SourcePath)
-	}
-	sort.Strings(got)
-	if len(got) != 2 || got[0] != "a.md" || got[1] != "sub/b.md" {
+	if got := docPaths(docs); len(got) != 2 || got[0] != "a.md" || got[1] != "sub/b.md" {
 		t.Errorf("publish-required vault = %v, want [a.md sub/b.md]", got)
 	}
 }
@@ -57,7 +52,7 @@ func TestPublishFilter(t *testing.T) {
 func TestPublishNotRequired(t *testing.T) {
 	dir := writeVault(t)
 	src, err := New("/", config.SourceConfig{ID: "v", Driver: "obsidian",
-		Settings: map[string]any{"path": dir, "publish_required": false}})
+		Settings: map[string]any{"vault": dir, "publish_required": false}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +81,7 @@ func TestResolveEmbeds(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	src, err := New("/", config.SourceConfig{ID: "v", Driver: "obsidian", Settings: map[string]any{"path": dir}})
+	src, err := New("/", config.SourceConfig{ID: "v", Driver: "obsidian", Settings: map[string]any{"vault": dir}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +199,10 @@ func TestTagModeDiscovery(t *testing.T) {
 	}
 }
 
-func TestTagModeStructureWarnings(t *testing.T) {
+// Selection is the source's only filtering concern: a tag-matched note is returned even if
+// it is malformed (no title, empty body). Whether it is well-formed is the build's concern,
+// so the source neither skips nor warns about format.
+func TestTagSelectionIgnoresFormat(t *testing.T) {
 	vault := writeTree(t, map[string]string{
 		"ok.md":      "---\ntitle: Good\ntags: [blog]\n---\nhas a title and body",
 		"notitle.md": "no title or heading here, just body\n\n#blog",
@@ -219,23 +217,11 @@ func TestTagModeStructureWarnings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := docPaths(docs); len(got) != 1 || got[0] != "ok.md" {
-		t.Errorf("only the well-formed note should publish, got %v", got)
+	if got := docPaths(docs); len(got) != 3 {
+		t.Errorf("all 3 tagged notes should be selected regardless of format, got %v", got)
 	}
-	w, ok := src.(core.Warner)
-	if !ok {
-		t.Fatal("obsidian source should implement core.Warner")
-	}
-	warns := w.Warnings()
-	if len(warns) != 2 {
-		t.Fatalf("want 2 structure warnings, got %d: %v", len(warns), warns)
-	}
-	joined := strings.Join(warns, "\n")
-	if !strings.Contains(joined, "notitle.md") || !strings.Contains(joined, "no title") {
-		t.Errorf("expected a no-title warning, got %v", warns)
-	}
-	if !strings.Contains(joined, "empty.md") || !strings.Contains(joined, "no body") {
-		t.Errorf("expected a no-body warning, got %v", warns)
+	if w := src.(core.Warner).Warnings(); len(w) != 0 {
+		t.Errorf("source should not warn about format, got %v", w)
 	}
 }
 
@@ -245,7 +231,7 @@ func TestVaultWithBlogSubfolderResolvesVaultWideEmbeds(t *testing.T) {
 		"blog/post.md":     "---\ntitle: P\npublish: true\n---\n![[pic.png]]",
 		"blog/sub/deep.md": "---\ntitle: D\npublish: true\n---\n![[pic.png]]",
 	})
-	// Folder mode (path=blog) but attachments live outside the blog folder, elsewhere in the vault.
+	// A sub-folder of the vault; attachments live elsewhere in the vault and must still resolve.
 	src, err := New("/", config.SourceConfig{ID: "v", Driver: "obsidian",
 		Settings: map[string]any{"vault": vault, "path": "blog"}})
 	if err != nil {
@@ -267,11 +253,63 @@ func TestVaultWithBlogSubfolderResolvesVaultWideEmbeds(t *testing.T) {
 	}
 }
 
-func TestVaultWithoutSelectorErrors(t *testing.T) {
-	vault := t.TempDir()
-	_, err := New("/", config.SourceConfig{ID: "v", Driver: "obsidian",
-		Settings: map[string]any{"vault": vault}})
-	if err == nil {
-		t.Error("a vault with neither path nor tag should be a config error")
+func TestVaultOnlyScansWholeVault(t *testing.T) {
+	vault := writeTree(t, map[string]string{
+		"a.md":      "---\ntitle: A\npublish: true\n---\nx",
+		"deep/b.md": "---\ntitle: B\n---\nno flag",
+	})
+	src, err := New("/", config.SourceConfig{ID: "v", Driver: "obsidian",
+		Settings: map[string]any{"vault": vault}}) // no path, no tag → whole vault + publish gate
+	if err != nil {
+		t.Fatal(err)
+	}
+	docs, err := src.Documents(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := docPaths(docs); len(got) != 1 || got[0] != "a.md" {
+		t.Errorf("vault-only with publish gate = %v, want [a.md]", got)
+	}
+}
+
+func TestMultiplePathsAndTagsAreOredWithinAndAndedAcross(t *testing.T) {
+	vault := writeTree(t, map[string]string{
+		"essays/x.md": "---\ntitle: X\ntags: [blog]\n---\nin essays, tagged blog",
+		"essays/y.md": "---\ntitle: Y\ntags: [essay]\n---\nin essays, tagged essay",
+		"essays/z.md": "---\ntitle: Z\ntags: [draft]\n---\nin essays, untagged-for-us",
+		"til/t.md":    "---\ntitle: T\ntags: [essay]\n---\nin til, tagged essay",
+		"other/o.md":  "---\ntitle: O\ntags: [blog]\n---\noutside the scanned paths",
+	})
+	src, err := New("/", config.SourceConfig{ID: "v", Driver: "obsidian", Settings: map[string]any{
+		"vault": vault,
+		"path":  []any{"essays", "til"}, // union of paths
+		"tag":   []any{"blog", "essay"}, // a note matches any tag
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	docs, err := src.Documents(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Under essays|til AND tagged blog|essay: x (blog), y (essay), t (essay). z is untagged;
+	// o is tagged but outside the scanned paths. SourcePath is relative to each scanned root,
+	// so slugs stay flat (Obsidian note names are unique vault-wide).
+	if got := docPaths(docs); len(got) != 3 || got[0] != "t.md" || got[1] != "x.md" || got[2] != "y.md" {
+		t.Errorf("multi path×tag = %v, want [t.md x.md y.md]", got)
+	}
+}
+
+func TestTagAndPathAcceptScalarOrList(t *testing.T) {
+	files := map[string]string{"blog/a.md": "---\ntitle: A\ntags: [blog]\n---\nx"}
+	vault := writeTree(t, files)
+	scalar, _ := New("/", config.SourceConfig{ID: "v", Driver: "obsidian",
+		Settings: map[string]any{"vault": vault, "path": "blog", "tag": "blog"}})
+	list, _ := New("/", config.SourceConfig{ID: "v", Driver: "obsidian",
+		Settings: map[string]any{"vault": vault, "path": []any{"blog"}, "tag": []any{"blog"}}})
+	ds, _ := scalar.Documents(context.Background())
+	dl, _ := list.Documents(context.Background())
+	if len(ds) != 1 || len(dl) != 1 {
+		t.Errorf("scalar and list forms should both select a.md, got %d and %d", len(ds), len(dl))
 	}
 }

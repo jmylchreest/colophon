@@ -24,6 +24,14 @@ func readingTime(html string) int {
 	return 1
 }
 
+// isEmptyContent reports whether rendered HTML carries no visible text — a uniform
+// build-level structure check across all sources. A note may be selected for publishing
+// (by a tag or the publish flag) yet still be a stub; the build warns but publishes it
+// anyway (selection decides inclusion; format is only flagged).
+func isEmptyContent(html string) bool {
+	return strings.TrimSpace(tagRE.ReplaceAllString(html, "")) == ""
+}
+
 // tableOfContents extracts the h2/h3 headings (and their ids) from rendered HTML, for a
 // theme's on-page contents sidebar. Each entry is {level, id, text}.
 func tableOfContents(html string) []map[string]any {

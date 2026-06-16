@@ -180,6 +180,9 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	}
 
 	for _, p := range pages {
+		if isEmptyContent(p.HTML) {
+			opts.Log.Step("BUILD", "", "warn", fmt.Sprintf("post %q has no content", strings.TrimSuffix(p.URL, "/")))
+		}
 		persona := resolvePersona(cfg, p.Persona)
 		ctx := map[string]any{
 			"site_title":    site.Title,

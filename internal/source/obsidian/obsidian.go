@@ -1,19 +1,22 @@
-// Package obsidian implements the "obsidian" source: an Obsidian vault folder. It reads
-// the vault in place (no copy). It supports two ways to decide which notes are blog posts:
+// Package obsidian implements the "obsidian" source: one or more Obsidian vault folders,
+// read in place (no copy). Which notes become blog posts is a combination of two filters:
 //
-//   - Folder mode (`path` set): publish a folder of notes, keeping those flagged
-//     `publish: true` (the Obsidian convention; `publish_required: false` keeps all).
-//   - Tag mode (`vault` + `tag`, no `path`): scan the whole vault and publish every note
-//     carrying a chosen Obsidian tag (frontmatter `tags:` or an inline `#tag`), the way the
-//     Forestry/"digital garden" plugins work. Tag-selected notes that don't meet the blog
-//     structure requirements (a title and some body) are warned about and skipped.
+//   - Location — `path` is one folder or a list of folders to scan (the union; OR). When a
+//     `vault` is set, relative paths resolve under it; with no `path`, the vault root is the
+//     single scan location.
+//   - Tag — `tag` is one tag or a list (a note matches any; OR), in frontmatter `tags:` or as
+//     an inline `#tag`, Forestry/"digital garden" style. When both `path` and `tag` are set a
+//     note must satisfy both (a tagged note under one of the paths; AND). With no tags, the
+//     Obsidian `publish: true` whitelist gates instead (`publish_required`, default true;
+//     `false` keeps every note). A tag, when set, replaces that gate, though an explicit
+//     `publish: false` still opts a note out.
 //
-// The vault's folder structure maps onto the site structure, and deletes/renames flow
-// through the normal build reconciliation. Note wikilinks ([[note]]) resolve later in the
-// build (across every source); here the source resolves attachment embeds (![[image.png]])
-// and hero/image frontmatter — which are vault-relative and Obsidian-specific — into paths
-// the build's asset pipeline copies. Attachments resolve vault-wide, so when a `vault` is
-// set the whole vault is indexed even if posts live in a sub-folder.
+// A tag-selected note that lacks the blog structure (a title and some body) is warned about
+// and skipped. The folder structure maps onto the site, and deletes/renames flow through the
+// normal build reconciliation. Wikilinks ([[note]]) resolve later in the build (across every
+// source); here the source resolves attachment embeds (![[image.png]]) and hero/image
+// frontmatter into paths the build's asset pipeline copies. Attachments resolve by name
+// across the vault (or, with no vault, across the union of the scanned paths).
 package obsidian
 
 import (
@@ -30,64 +33,35 @@ import (
 	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/source"
 	"github.com/jmylchreest/colophon/internal/source/mddir"
-	"github.com/jmylchreest/colophon/markdown"
 )
 
 func init() { source.Register("obsidian", New) }
 
-// discovery mode for an obsidian source.
-const (
-	modeOff    = ""       // nothing configured (optional source contributes nothing)
-	modeFolder = "folder" // publish a folder, gated by the `publish:` flag
-	modeTag    = "tag"     // publish vault notes carrying a chosen tag
-)
-
-// New builds an obsidian source. Resolution:
-//
-//   - `path` set            → folder mode over that folder (relative to `vault` if set,
-//     else the project root). Backwards-compatible default.
-//   - `vault` + `tag` only  → tag mode: scan the vault, publish notes carrying `tag`.
-//   - `vault` only          → an error (no way to select notes).
-//   - nothing set           → no documents (an unconfigured optional source).
+// New builds an obsidian source anchored on one `vault`. `path` (scalar or list) selects
+// sub-folder(s) within the vault to scan; with none, the whole vault is scanned. `tag`
+// (scalar or list) selects notes carrying any of those Obsidian tags; with none, the
+// `publish: true` whitelist gates (`publish_required`, default true). An empty `vault` (e.g.
+// an unset `{env:VAR:-}`) yields no documents, so an env-driven optional source stays inert.
 func New(root string, cfg config.SourceConfig) (core.Source, error) {
 	vault := resolveDir(root, str(cfg.Settings["vault"]))
 
-	blog := strings.TrimSpace(str(cfg.Settings["path"]))
-	blogDir := ""
-	if blog != "" {
-		// A blog path is relative to the vault when one is set, else the project root.
-		base := root
-		if vault != "" {
-			base = vault
-		}
-		blogDir = resolveDir(base, blog)
-	}
-
-	tag := normalizeTag(str(cfg.Settings["tag"]))
-
-	publishRequired := true
+	s := &Source{id: cfg.ID, vault: vault, publishRequired: true}
 	if v, ok := cfg.Settings["publish_required"].(bool); ok {
-		publishRequired = v
+		s.publishRequired = v
 	}
-
-	s := &Source{id: cfg.ID, publishRequired: publishRequired}
-	switch {
-	case blogDir != "":
-		s.mode = modeFolder
-		s.notesDir = blogDir
-		s.vaultDir = vault
-		if s.vaultDir == "" {
-			s.vaultDir = blogDir
+	for _, t := range strList(cfg.Settings["tag"]) {
+		if n := normalizeTag(t); n != "" {
+			s.tags = append(s.tags, n)
 		}
-	case vault != "" && tag != "":
-		s.mode = modeTag
-		s.notesDir = vault
-		s.vaultDir = vault
-		s.tag = tag
-	case vault != "":
-		return nil, fmt.Errorf("obsidian source %q: set `path` (a blog folder) or `tag` (an Obsidian tag to publish) when using a vault", cfg.ID)
-	default:
-		s.mode = modeOff
+	}
+	if vault == "" {
+		return s, nil // inert optional source
+	}
+	for _, p := range strList(cfg.Settings["path"]) {
+		s.scanRoots = append(s.scanRoots, resolveDir(vault, p))
+	}
+	if len(s.scanRoots) == 0 {
+		s.scanRoots = []string{vault}
 	}
 	return s, nil
 }
@@ -104,26 +78,34 @@ func resolveDir(base, p string) string {
 
 type Source struct {
 	id              string
-	mode            string
-	notesDir        string // where notes are scanned (blog folder, or vault root in tag mode)
-	vaultDir        string // vault root for attachment resolution (== notesDir when no vault)
-	tag             string // normalized publish tag (tag mode only)
-	publishRequired bool
+	vault           string   // the vault root (absolute); empty → inert source
+	scanRoots       []string // folders within the vault to scan (absolute); union (OR)
+	tags            []string // normalized publish tags; a note matches any (OR). Empty → no tag filter
+	publishRequired bool     // when no tags: keep only `publish: true` notes
 	warnings        []string
 }
 
 func (s *Source) ID() string     { return s.id }
 func (s *Source) Driver() string { return "obsidian" }
 
-// Warnings reports non-fatal problems found during the last Documents call (e.g. tagged
-// notes skipped for failing the structure checks). It satisfies core.Warner.
+// Warnings reports non-fatal problems found during the last Documents call (e.g. a note
+// matched by more than one path). It satisfies core.Warner.
 func (s *Source) Warnings() []string { return s.warnings }
 
+// Open resolves a source-relative ref (a note or an asset path, possibly with "../" reaching
+// elsewhere in the vault) against each scan root and the vault root, returning the first
+// that opens.
 func (s *Source) Open(ctx context.Context, ref string) (io.ReadCloser, error) {
-	if s.notesDir == "" {
-		return nil, os.ErrNotExist
+	roots := append(append([]string{}, s.scanRoots...), s.vault)
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
+		if f, err := os.Open(filepath.Join(root, filepath.FromSlash(ref))); err == nil {
+			return f, nil
+		}
 	}
-	return os.Open(filepath.Join(s.notesDir, filepath.FromSlash(ref)))
+	return nil, os.ErrNotExist
 }
 
 func (s *Source) warnf(format string, args ...any) {
@@ -141,73 +123,106 @@ func expandHome(p string) string {
 
 func str(v any) string { s, _ := v.(string); return s }
 
+// strList reads a config value that may be a scalar string or a list of strings, trimming
+// blanks. `tag: blog` and `tag: [blog, essay]` both work, as do path forms.
+func strList(v any) []string {
+	add := func(out []string, s string) []string {
+		if s = strings.TrimSpace(s); s != "" {
+			return append(out, s)
+		}
+		return out
+	}
+	switch x := v.(type) {
+	case string:
+		return add(nil, x)
+	case []string:
+		var out []string
+		for _, e := range x {
+			out = add(out, e)
+		}
+		return out
+	case []any:
+		var out []string
+		for _, e := range x {
+			if s, ok := e.(string); ok {
+				out = add(out, s)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
 func (s *Source) Documents(ctx context.Context) ([]core.Content, error) {
 	s.warnings = nil
+	if s.vault == "" || len(s.scanRoots) == 0 {
+		return nil, nil // inert optional source
+	}
+	idx := attachments([]string{s.vault})
+	seen := map[string]bool{}
 	var docs []core.Content
-	switch s.mode {
-	case modeFolder:
-		keep := func(fm markdown.Frontmatter) bool {
-			if !s.publishRequired {
-				return true
-			}
-			return fm.Publish != nil && *fm.Publish
-		}
-		d, err := mddir.Walk(s.notesDir, keep)
+	for _, root := range s.scanRoots {
+		walked, err := mddir.Walk(root, nil)
 		if err != nil {
 			return nil, err
 		}
-		docs = d
-	case modeTag:
-		all, err := mddir.Walk(s.notesDir, nil)
-		if err != nil {
-			return nil, err
-		}
-		for _, d := range all {
-			if !noteHasTag(d, s.tag) {
+		for i := range walked {
+			d := walked[i]
+			if !s.selected(d) {
 				continue
 			}
-			if d.Frontmatter.Publish != nil && !*d.Frontmatter.Publish {
-				continue // an explicit `publish: false` opts a tagged note back out
-			}
-			if reason := structureViolation(d); reason != "" {
-				s.warnf("#%s note %q %s — skipping", s.tag, d.SourcePath, reason)
+			if seen[d.SourcePath] {
+				s.warnf("note %q is matched by more than one path — keeping the first", d.SourcePath)
 				continue
 			}
+			seen[d.SourcePath] = true
+			s.fillDefaults(&d, root)
+			s.resolveEmbeds(&d, root, idx)
 			docs = append(docs, d)
 		}
-	default:
-		return nil, nil // unconfigured optional source
-	}
-	idx := attachments(s.vaultDir)
-	for i := range docs {
-		s.fillDefaults(&docs[i])
-		s.resolveEmbeds(&docs[i], idx)
 	}
 	return docs, nil
 }
 
+// selected reports whether a note is intended for the blog — the source's only filtering
+// concern. With tags configured a note must carry one of them (unless opted out with
+// `publish: false`); without tags the `publish: true` whitelist applies per publishRequired.
+// Whether a selected note is well-formed (has content) is the build's concern, not ours.
+func (s *Source) selected(c core.Content) bool {
+	if len(s.tags) > 0 {
+		if !noteHasAnyTag(c, s.tags) {
+			return false
+		}
+		return c.Frontmatter.Publish == nil || *c.Frontmatter.Publish
+	}
+	if s.publishRequired {
+		return c.Frontmatter.Publish != nil && *c.Frontmatter.Publish
+	}
+	return true
+}
+
 var embedRE = regexp.MustCompile(`!\[\[([^\]\n]+)\]\]`)
 
-// attachments indexes every non-markdown file under dir by lower-cased base name. An
-// Obsidian embed resolves vault-wide by name (not relative to the note), so this maps a
-// bare name back to a dir-relative path; first match wins on a name clash.
-func attachments(dir string) map[string]string {
+// attachments indexes every non-markdown file under the given roots by lower-cased base
+// name, mapping it to its absolute path. An Obsidian embed resolves by name (not relative to
+// the note), so this lets a bare name find a concrete file; first match wins on a clash.
+func attachments(roots []string) map[string]string {
 	idx := map[string]string{}
-	if dir == "" {
-		return idx
-	}
-	_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || strings.EqualFold(filepath.Ext(p), ".md") {
-			return nil
+	for _, dir := range roots {
+		if dir == "" {
+			continue
 		}
-		if rel, err := filepath.Rel(dir, p); err == nil {
+		_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() || strings.EqualFold(filepath.Ext(p), ".md") {
+				return nil
+			}
 			key := strings.ToLower(filepath.Base(p))
 			if _, seen := idx[key]; !seen {
-				idx[key] = filepath.ToSlash(rel)
+				idx[key] = p
 			}
-		}
-		return nil
-	})
+			return nil
+		})
+	}
 	return idx
 }
 
@@ -217,18 +232,17 @@ func attachments(dir string) map[string]string {
 // Targets resolve vault-wide by base name; the relative path is computed from the note's
 // real location to the attachment's, so it is correct even when posts live in a vault
 // sub-folder and the attachment lives elsewhere in the vault. Unresolved refs are left as-is.
-func (s *Source) resolveEmbeds(c *core.Content, idx map[string]string) {
+func (s *Source) resolveEmbeds(c *core.Content, root string, idx map[string]string) {
 	rel := func(ref string) (string, bool) {
 		target := stripEmbed(ref)
 		if i := strings.IndexAny(target, "|#"); i >= 0 {
 			target = strings.TrimSpace(target[:i])
 		}
-		vaultRel, ok := idx[strings.ToLower(path.Base(target))]
+		attAbs, ok := idx[strings.ToLower(path.Base(target))]
 		if !ok || target == "" {
 			return "", false
 		}
-		noteAbsDir := filepath.Join(s.notesDir, filepath.FromSlash(path.Dir(c.SourcePath)))
-		attAbs := filepath.Join(s.vaultDir, filepath.FromSlash(vaultRel))
+		noteAbsDir := filepath.Join(root, filepath.FromSlash(path.Dir(c.SourcePath)))
 		r, err := filepath.Rel(noteAbsDir, attAbs)
 		if err != nil {
 			return "", false
@@ -269,12 +283,12 @@ func stripEmbed(v string) string {
 // fillDefaults supplies title/date the Obsidian way when frontmatter omits them: the title
 // from a leading `# heading` (stripped from the body) else the file name, and the date from
 // the file's modification time.
-func (s *Source) fillDefaults(c *core.Content) {
+func (s *Source) fillDefaults(c *core.Content, root string) {
 	if c.Frontmatter.Title == "" {
 		c.Frontmatter.Title, c.Body = titleFromBody(c.Body, c.SourcePath)
 	}
 	if c.Frontmatter.Date.IsZero() {
-		if info, err := os.Stat(filepath.Join(s.notesDir, filepath.FromSlash(c.SourcePath))); err == nil {
+		if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(c.SourcePath))); err == nil {
 			c.Frontmatter.Date = info.ModTime()
 		}
 	}
@@ -335,12 +349,18 @@ func inlineTags(body string) []string {
 	return out
 }
 
-// noteHasTag reports whether a note carries tag in its frontmatter `tags:` or as an inline
-// `#tag`. A configured `blog` also matches a nested `blog/published`.
-func noteHasTag(c core.Content, tag string) bool {
+// noteHasAnyTag reports whether a note carries any of the wanted tags (already normalized),
+// in its frontmatter `tags:` or as an inline `#tag`. A wanted `blog` also matches a nested
+// `blog/published`.
+func noteHasAnyTag(c core.Content, wanted []string) bool {
 	match := func(t string) bool {
 		t = normalizeTag(t)
-		return t == tag || strings.HasPrefix(t, tag+"/")
+		for _, w := range wanted {
+			if t == w || strings.HasPrefix(t, w+"/") {
+				return true
+			}
+		}
+		return false
 	}
 	for _, t := range c.Frontmatter.Tags {
 		if match(t) {
@@ -353,25 +373,4 @@ func noteHasTag(c core.Content, tag string) bool {
 		}
 	}
 	return false
-}
-
-// structureViolation returns a human-readable reason a tag-selected note is not publishable
-// as a blog post, or "" when it is fine. The bar is intentionally low: a title (frontmatter
-// `title:` or a leading `# heading`) and some body content. Date falls back to the file
-// mtime, so it is not required.
-func structureViolation(c core.Content) string {
-	hasTitle := c.Frontmatter.Title != ""
-	content := c.Body
-	if !hasTitle {
-		if h1, rest, ok := leadingH1(c.Body); ok && h1 != "" {
-			hasTitle, content = true, rest
-		}
-	}
-	if !hasTitle {
-		return "has no title (add a frontmatter `title:` or a leading `# heading`)"
-	}
-	if strings.TrimSpace(content) == "" {
-		return "has no body content"
-	}
-	return ""
 }

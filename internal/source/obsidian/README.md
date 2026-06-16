@@ -24,52 +24,54 @@ it with KaTeX, Mermaid and a syntax highlighter, loaded only on pages that use t
 
 ## Config
 
-There are two ways to decide which notes are blog posts.
-
-### Folder mode — a dedicated blog folder
-
-```yaml
-sources:
-  - id: blog
-    driver: obsidian
-    path: "{env:OBSIDIAN_BLOG:-}"
-    publish_required: false   # default true: only notes with `publish: true` ship
-```
-
-- **`path`** — the folder of notes, absolute / `~`-relative / relative to the project root
-  (or relative to `vault` when one is set).
-- **`publish_required`** — `true` (default) honours Obsidian's `publish: true` whitelist;
-  `false` publishes every note (use for a folder dedicated to the blog).
-
-### Tag mode — publish by an Obsidian tag (digital-garden style)
-
-When you don't keep posts in one folder, point at the whole vault and pick a tag. Every note
-carrying that tag — in frontmatter `tags:` **or** as an inline `#tag` — becomes blog-eligible,
-the way the Forestry / "digital garden" plugins work.
+A source is anchored on one **vault**, then narrowed by optional **paths** (where) and
+**tags** (which):
 
 ```yaml
 sources:
   - id: vault
     driver: obsidian
-    vault: "{env:OBSIDIAN_VAULT:-}"
-    tag: blog                 # publishes notes tagged #blog (and nested #blog/*)
+    vault: "{env:OBSIDIAN_VAULT:-}"   # the vault root — the one required setting
+    path: [essays, til]               # optional: sub-folder(s) to scan; omit → whole vault
+    tag: [blog, essay]                # optional: publish notes carrying any of these tags
+    publish_required: true            # default true (used only when no tags are set)
 ```
 
-- **`vault`** — the vault root. Attachments (`![[image.png]]`) resolve across the *whole*
-  vault, so this also works in folder mode when posts sit in a sub-folder.
-- **`tag`** — the Obsidian tag that marks a note for publishing (a leading `#` is optional;
-  matching is case-insensitive; `blog` also matches the nested `#blog/published`). A note may
-  still opt back out with `publish: false`.
+- **`vault`** — the vault root (absolute / `~` / relative to the project root). Attachments
+  (`![[image.png]]`) resolve **across this whole vault**, so posts in a sub-folder still reach
+  assets elsewhere. An empty value (e.g. an unset `{env:VAR:-}`) yields no documents, so an
+  env-driven source whose var is unset just contributes nothing.
+- **`path`** — a folder, or a **list** of folders, within the vault to scan (the union; a note
+  under *any* of them is in scope). Omit it to scan the whole vault. Slugs are relative to the
+  scanned folder, so `path: blog` publishes `blog/hello.md` at `/hello/`.
+- **`tag`** — a tag, or a **list** of tags. A note matches if it carries **any** of them — in
+  frontmatter `tags:` **or** as an inline `#tag`, Forestry / "digital-garden" style (leading
+  `#` optional, case-insensitive; `blog` also matches the nested `#blog/published`). An
+  explicit `publish: false` still opts a note out.
+- **`publish_required`** — applies **only when no tags are set**: `true` (default) honours
+  Obsidian's `publish: true` whitelist; `false` publishes every scanned note.
 
-**Structure requirements.** A tag-selected note must have a **title** (frontmatter `title:`
-or a leading `# heading`) and some **body** content. Notes that match the tag but fail these
-checks are **warned about and skipped** during the build (the warning names the note and the
-reason), so a half-written note never ships by accident.
+When both `path` and `tag` are set a note must satisfy **both** (under a scanned path **and**
+carrying a tag). Tags, when present, replace the publish-flag gate.
 
-Set either `path` or `tag` when a `vault` is configured — a vault with no selector is a
-config error. An empty `path`/`vault` (e.g. an unset `{env:VAR:-}`) yields no documents, so
-an env-driven optional source whose var is unset just contributes nothing — handy for "one
-or more vaults".
+### Selection vs. format
+
+The source only decides **selection** — which notes you *intended* to publish. Whether a
+selected note is **well-formed** is the build's concern: it warns (e.g. `post "x" has no
+content`) but still publishes, so a stub never silently disappears and inclusion is never
+gated on format. Obsidian note names are unique across a vault, so flat slugs rarely collide;
+if two scanned paths surface the same note name, the first wins and the source warns.
+
+### Multiple vaults
+
+One source = one vault. To publish from several vaults, add one source per vault — the build
+merges them:
+
+```yaml
+sources:
+  - { id: work,     driver: obsidian, vault: "{env:WORK_VAULT:-}",     tag: blog }
+  - { id: personal, driver: obsidian, vault: "{env:PERSONAL_VAULT:-}", path: posts }
+```
 
 ## Paths and `$HOME`
 

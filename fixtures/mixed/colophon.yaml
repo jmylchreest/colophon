@@ -18,19 +18,18 @@ sites:
       - match: "**/assets/**"
         publisher: r2
 
-# Set OBSIDIAN_BLOG to a vault folder; unset → that source contributes nothing.
+# Set OBSIDIAN_BLOG to an Obsidian vault; unset → that source contributes nothing.
 sources:
   - id: content
     driver: md-dir
     path: ./content
   - id: vault
     driver: obsidian
-    path: "{env:OBSIDIAN_BLOG:-}"
-    publish_required: false    # publish every note (dedicated blog folder)
-    # Tag mode alternative: drop `path` and instead point at the whole vault and pick a tag,
-    # digital-garden style (notes tagged #blog, in frontmatter or inline, become eligible):
-    #   vault: "{env:OBSIDIAN_VAULT:-}"
-    #   tag: blog
+    vault: "{env:OBSIDIAN_BLOG:-}"   # the vault root
+    publish_required: false          # no tags set → publish every scanned note
+    # Narrow it: scan only sub-folders, and/or publish by tag (scalar or list), e.g.
+    #   path: [blog, essays]
+    #   tag: blog                     # notes tagged #blog (frontmatter or inline) become eligible
 
 # Publishers are pure mechanism (how to deploy). Environments decide what/where.
 publishers:
