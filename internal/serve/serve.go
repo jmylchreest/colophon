@@ -11,7 +11,9 @@ import (
 	"html"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -104,8 +106,10 @@ func targetsFor(cfg *config.Config) (string, []target, error) {
 	return site.ID, targets, nil
 }
 
-// ListenAndServe builds every environment once, starts the file watcher, then serves.
-func (s *Server) ListenAndServe(addr string) error {
+// ListenAndServe builds every environment once, starts the file watcher, then serves. When
+// openTarget is non-empty it opens that well-known location (latest|home|sitemap|feeds|…) of
+// the first environment in the browser once the server is up.
+func (s *Server) ListenAndServe(addr, openTarget string) error {
 	s.addr = addr // set before any build so each env gets its local base_url
 	s.mu.RLock()
 	targets := s.targets
@@ -125,11 +129,105 @@ func (s *Server) ListenAndServe(addr string) error {
 		}
 		fmt.Printf("  http://localhost%s%s%s\n", port(addr), t.prefix, drafts)
 	}
+	if len(targets) > 0 {
+		s.printWellKnown(addr, targets[0])
+		if openTarget != "" {
+			if u, ok := s.resolveURL(addr, targets[0], openTarget); ok {
+				fmt.Printf("opening %s\n", u)
+				go func() { time.Sleep(300 * time.Millisecond); openBrowser(u) }()
+			} else {
+				fmt.Printf("  (unknown --open target %q)\n", openTarget)
+			}
+		}
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc(reloadPath, s.handleReload)
 	mux.HandleFunc("/", s.route)
 	return http.ListenAndServe(addr, mux)
+}
+
+// printWellKnown lists the home/latest/sitemap/feed URLs for a target, so a person or an
+// agent (which can't open a browser) can copy them straight from serve's output.
+func (s *Server) printWellKnown(addr string, t target) {
+	base := "http://localhost" + port(addr) + t.prefix
+	fmt.Printf("  home     %s\n", base)
+	if slug, ok := s.latestSlug(); ok {
+		fmt.Printf("  latest   %s%s/\n", base, slug)
+	}
+	fmt.Printf("  sitemap  %ssitemap.xml\n", base)
+	fmt.Printf("  feeds    atom %satom.xml · rss %srss.xml · json %sfeed.json\n", base, base, base)
+}
+
+// resolveURL maps an --open target name to a full URL under the given environment.
+func (s *Server) resolveURL(addr string, t target, target_ string) (string, bool) {
+	base := "http://localhost" + port(addr) + t.prefix
+	var path string
+	switch target_ {
+	case "home":
+		path = ""
+	case "latest":
+		slug, ok := s.latestSlug()
+		if !ok {
+			return "", false
+		}
+		path = slug + "/"
+	case "sitemap":
+		path = "sitemap.xml"
+	case "atom":
+		path = "atom.xml"
+	case "rss":
+		path = "rss.xml"
+	case "json":
+		path = "feed.json"
+	case "robots":
+		path = "robots.txt"
+	default:
+		path = strings.Trim(target_, "/")
+		if path != "" && !strings.Contains(path, ".") {
+			path += "/" // looks like a slug, not a file
+		}
+	}
+	return base + path, true
+}
+
+// latestSlug is the slug of the newest dated post, for the `latest` target.
+func (s *Server) latestSlug() (string, bool) {
+	s.mu.RLock()
+	cfg := s.cfg
+	s.mu.RUnlock()
+	entries, err := build.Entries(cfg)
+	if err != nil {
+		return "", false
+	}
+	best := ""
+	var bestDate time.Time
+	for _, e := range entries {
+		if e.Date.IsZero() {
+			continue
+		}
+		if best == "" || e.Date.After(bestDate) {
+			best, bestDate = e.Slug, e.Date
+		}
+	}
+	return best, best != ""
+}
+
+// openBrowser best-effort launches the OS browser at url; failure is ignored (the URL was
+// already printed).
+func openBrowser(url string) {
+	var name string
+	var args []string
+	switch runtime.GOOS {
+	case "darwin":
+		name = "open"
+	case "windows":
+		name, args = "rundll32", []string{"url.dll,FileProtocolHandler"}
+	default:
+		name = "xdg-open"
+	}
+	args = append(args, url)
+	_ = exec.Command(name, args...).Start()
 }
 
 func (s *Server) rebuild(t target) error {

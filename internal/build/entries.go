@@ -53,6 +53,10 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 	return out, nil
 }
 
+// Slugify turns arbitrary text (e.g. a post title) into a slug segment, using the same
+// normalisation the build applies to paths — for `colophon new` to derive a slug.
+func Slugify(s string) string { return normalizeSlug(s) }
+
 // Slugs returns the set of slugs already in use across all content, for uniqueness checks.
 func Slugs(cfg *config.Config) (map[string]bool, error) {
 	entries, err := Entries(cfg)

@@ -16,6 +16,7 @@ var version = "dev"
 // CLI is the root command tree.
 type CLI struct {
 	Init          InitCmd          `cmd:"" help:"Scaffold a new colophon project"`
+	New           NewCmd           `cmd:"" help:"Scaffold a new post or page (validated author/persona, unique slug)"`
 	Build         BuildCmd         `cmd:"" help:"Build the site into public/ (prints next pending embargo)"`
 	NextBuildTime NextBuildTimeCmd `cmd:"" help:"Print the next pending publish_after timestamp (for CI scheduling)"`
 	Serve         ServeCmd         `cmd:"" help:"Serve every environment locally with live reload"`

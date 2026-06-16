@@ -9,6 +9,7 @@ import (
 // /<site>/<env>/, with an index at the root. Includes drafts where the environment does.
 type ServeCmd struct {
 	Addr string `help:"Address to listen on" default:":8080"`
+	Open string `help:"Open a target in the browser: latest | home | sitemap | atom | rss | json | robots | <slug>"`
 }
 
 func (c *ServeCmd) Run() error {
@@ -24,5 +25,5 @@ func (c *ServeCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	return srv.ListenAndServe(c.Addr)
+	return srv.ListenAndServe(c.Addr, c.Open)
 }

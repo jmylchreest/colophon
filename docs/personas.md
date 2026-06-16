@@ -83,6 +83,34 @@ colophon posts                 # existing entries: slug, title, type, author, pe
 colophon posts --tag go --author ada   # filter, e.g. to find cross-reference targets
 ```
 
+## Creating & previewing
+
+`colophon new post|page` validates the author and persona, derives a **unique pinned slug**,
+writes a frontmatter skeleton to the right source, and reports the disk path and URL — then a
+person *or* an agent fills the body (colophon never generates prose):
+
+```sh
+colophon new post "Raft leader election" --author ada --persona technical --tag distributed
+# wrote:  content/posts/raft-leader-election.md
+# slug:   posts/raft-leader-election
+# url:    /posts/raft-leader-election/   (preview: colophon serve)
+```
+
+- `--author` / `--persona` are validated against `authors/*.yaml` / `personas/*.yaml` (errors
+  list the valid ids); both are optional.
+- the slug derives from the title and is made unique — `--unique=hash` (default) appends a
+  short id on a collision, `--unique=counter` appends `-2`; `--slug` sets it explicitly.
+- `--in <source>` chooses the source to write into; `--print` emits to stdout instead of writing.
+
+Preview, and jump straight to a page:
+
+```sh
+colophon serve --open=latest     # opens the newest post in the browser
+colophon serve --open=sitemap    # also: home | atom | rss | json | robots | <slug>
+```
+`serve` also prints the home/latest/sitemap/feed URLs at startup, so an agent can read them
+without a browser.
+
 This is the core of the agent write-as flow: an agent picks a **voice** (persona) for style
 and an **author** for the byline, fetches the write-as context, drafts in that voice, previews,
 and publishes — all through the CLI, with deploy secrets resolved server-side and never passed
