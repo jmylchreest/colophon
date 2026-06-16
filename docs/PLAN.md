@@ -61,6 +61,14 @@ Hugo themes depend on Hugo's function set/page model/lookup rules, not just Go
 
 ## 3. Domain model
 
+> **Superseded (implemented model).** The persona/operator scheme below was simplified.
+> What ships: an **Author** is the byline shown to readers (an identity — person or brand);
+> a **Persona** is a *hidden* writing voice, shareable across authors (just `style`). A post
+> sets `author:` (shown) and optional `persona:` (the voice). Dropped: persona `kind`
+> (individual/brand), the `operators[]` authorization list, and `Publication` bindings — all
+> unneeded for the common case. See [personas.md](personas.md). The text below is the
+> original design, kept for context.
+
 Persona ≈ a blog identity. Content is written once and bound to one-or-many
 personas/sites via a **Publication** — so the same article can be published under
 different personas (different voice/byline) and/or to different sites.

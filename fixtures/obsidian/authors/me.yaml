@@ -1,0 +1,7 @@
+# An author is the byline shown to readers. A post's `author:` names one of these (by file
+# stem or `id`); with none, the first author here is the default, else "Anonymous".
+id: me
+name: "Me"
+bio: "Writes things."
+# avatar: avatar.png
+# urls: ["https://example.com"]

@@ -1,46 +1,64 @@
-# Personas
+# Authors & personas
 
-A **persona** is a blog identity. In colophon, content is attributed to a persona — not to a
-human — so the byline, h-card and (optional) writing style all attach to the persona. A single
-person can own several personas, and a *brand* persona can be shared by several operators.
+colophon separates **who is shown** from **how it's written**:
 
-Personas live in `personas/<id>.yaml`:
+- An **author** is the **byline readers see** — an identity (a person, or a brand name).
+- A **persona** is a **hidden writing voice** the agent writes in — never shown, and
+  **shareable across authors**.
+
+A post carries up to two fields: `author:` (the byline) and `persona:` (the voice). The
+voice is purely an authoring aid; nothing about a persona is rendered.
+
+## Authors
+
+Authors live in `authors/<id>.yaml` and supply the byline, author page, feed author and
+JSON-LD `author`:
+
+```yaml
+id: ada                       # the id (defaults to the file stem, e.g. authors/ada.yaml)
+name: "Ada Lovelace"          # the byline shown to readers
+bio: "Writes about distributed systems."
+avatar: avatar.png            # project-relative image
+urls: ["https://example.com"]
+email: ada@example.com
+```
+
+A post names one with `author: ada`. If a post sets no `author:`, the **first configured
+author** is the default; with no authors at all, the byline is **"Anonymous"** (a post
+without an author still builds — it's just unattributed).
+
+```sh
+colophon persona list --json   # personas (voices); authors are read from authors/*.yaml
+```
+
+## Personas (the writing voice)
+
+Personas live in `personas/<id>.yaml` and are **only** a voice — a style/character the agent
+writes in, plus the references it may draw on:
 
 ```yaml
 id: technical
-display_name: "A. Researcher"
-byline: "by A. Researcher"
-kind: individual            # individual (one operator) | brand (shared byline)
-hcard:                       # IndieWeb identity → byline, author meta, JSON-LD
-  name: "A. Researcher"
-  bio: "Writes about distributed systems."
-  avatar: avatar.png
-  urls: ["https://example.com"]
-style:                       # optional — only used for AI-assisted writing
-  guide: "Plain, precise, technical. Short sentences. No hype."
+name: "Senior engineer"        # a human label (not shown)
+style:
+  guide: "Plain, precise, technical. Short sentences. No hype. Senior-engineer perspective."
   references:
     - "https://example.com/glossary"
-sites: [main]                # sites this persona may publish to
-operators: []                # humans/agents allowed to write as this persona
 ```
 
-A post selects its persona in frontmatter with `persona: technical` (shorthand for a single
-publication). The persona drives the on-page byline/h-card, the feed author, and the JSON-LD
-`author` (a `Person` for `individual`, an `Organization` for `brand`). Publishing content
-as-is needs none of the `style` block — that is consulted only for AI-assisted writing.
-
-## Listing personas
+The same persona can be used by **different authors** — Ada and Grace can both publish in the
+`technical` voice under their own bylines. A persona's *corpus* is every post written in it,
+regardless of author, so the voice stays consistent and the exemplar pool grows.
 
 ```sh
-colophon persona list            # id, name, kind, and whether a style guide is set
+colophon persona list            # id, label, and whether a style guide is set
 colophon persona list --json     # machine-readable (for a skill/agent)
 ```
 
 ## Write-as context
 
 colophon does **not** generate prose. It emits *context* and the calling agent does the
-writing. `persona context` returns the persona's style guide and references plus the most
-relevant **exemplars** drawn from that persona's own published content:
+writing. `persona context` returns a voice's style guide and references plus the most relevant
+**exemplars** drawn from the posts written in that voice:
 
 ```sh
 colophon persona context technical --topic "raft leader election"
@@ -52,9 +70,10 @@ colophon persona context technical --topic "raft" --top-k 5 --json
 - `--top-k` sets how many exemplars to emit (default 3).
 - The persona id is optional when there is a single persona (or one named `default`).
 
-This is the core of the agent write-as flow: an agent lists personas, fetches the write-as
-context for one, writes a draft in that voice, previews it, and publishes — all through the
-CLI, with deploy secrets resolved server-side and never passed to the agent.
+This is the core of the agent write-as flow: an agent picks a **voice** (persona) for style
+and an **author** for the byline, fetches the write-as context, drafts in that voice, previews,
+and publishes — all through the CLI, with deploy secrets resolved server-side and never passed
+to the agent.
 
 > Retrieval is built in memory on each call (zero state). A persisted/​semantic index is a
 > future option; the command shape stays the same.

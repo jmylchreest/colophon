@@ -28,6 +28,8 @@ All fields are optional unless noted.
 | `slug` | Overrides the final URL segment (otherwise derived from the file path). |
 | `description` | Summary for feeds, `<meta name="description">` and `og:description`. |
 | `tags`, `categories` | Lists for organisation/feeds. |
+| `author` | The byline — an `authors/<id>.yaml` id. Defaults to the first author, else "Anonymous". See [Authors & personas](personas.md). |
+| `persona` | The hidden writing *voice* (a `personas/<id>.yaml` id) used by the agent; never shown. |
 | `hero` | Banner image shown at the top of the post. A path or an Obsidian `"[[image.png]]"`. |
 | `image` | Preview/social-card image (`og:image` + index thumbnail). |
 | `draft` | `true` keeps the post out of production builds (shown in preview/serve). |

@@ -8,8 +8,9 @@ End-user guides for authoring, theming and publishing a colophon site.
   overriding a theme, the template variables, and progressive enhancement.
 - **[SEO & social](seo.md)** — the `seo:` frontmatter block and the canonical / Open Graph /
   Twitter / JSON-LD metadata colophon emits.
-- **[Personas](personas.md)** — blog identities, bylines and h-cards, and the `persona`
-  commands that emit write-as context (style guide + relevant exemplars) for an AI author.
+- **[Authors & personas](personas.md)** — the **author** (the shown byline + h-card) vs the
+  **persona** (a hidden, shareable writing voice), and the `persona context` command that emits
+  write-as context (style guide + relevant exemplars) for an AI author.
 - **[Publishing](publishing.md)** — environments vs publishers, credentials, and routing
   assets to an object store.
 - **[Agent skills](skills.md)** *(design)* — the planned authoring skills (seo, draft, tag,

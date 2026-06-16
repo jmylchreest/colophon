@@ -33,15 +33,11 @@ func (c *PersonaListCmd) Run() error {
 		return nil
 	}
 	for _, p := range cfg.Personas {
-		name := p.DisplayName
-		if name == "" {
-			name = p.HCard.Name
-		}
 		styled := ""
 		if p.Style.Guide != "" || len(p.Style.References) > 0 {
 			styled = " (styled)"
 		}
-		fmt.Printf("%-16s %s [%s]%s\n", p.ID, name, p.Kind, styled)
+		fmt.Printf("%-16s %s%s\n", p.ID, p.Name, styled)
 	}
 	return nil
 }
@@ -83,17 +79,11 @@ func (c *PersonaContextCmd) Run() error {
 
 func printContext(ctx *persona.Context) {
 	p := ctx.Persona
-	name := p.DisplayName
-	if name == "" {
-		name = p.HCard.Name
+	label := p.Name
+	if label == "" {
+		label = p.ID
 	}
-	fmt.Printf("# Write as %s (%s)\n", name, p.ID)
-	if p.Byline != "" {
-		fmt.Printf("Byline: %s\n", p.Byline)
-	}
-	if p.HCard.Bio != "" {
-		fmt.Printf("Bio: %s\n", p.HCard.Bio)
-	}
+	fmt.Printf("# Write in the %q voice (%s)\n", label, p.ID)
 	fmt.Println()
 	fmt.Println("## Style guide")
 	if ctx.Guide != "" {

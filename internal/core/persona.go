@@ -4,75 +4,32 @@
 // it stays a clean library that other layers (and a future MCP wrapper) build on.
 package core
 
-// PersonaKind distinguishes a personal/individual identity from a shared brand.
-//
-// An individual persona maps to exactly one operator. A brand persona is the one
-// sanctioned case where multiple operators may write as the same identity (e.g. a
-// company PR team sharing one byline).
-type PersonaKind string
-
-const (
-	PersonaIndividual PersonaKind = "individual"
-	PersonaBrand      PersonaKind = "brand"
-)
-
-// HCard is the IndieWeb h-card identity for a persona. It drives bylines, author
-// pages, feeds, and (later) microformats2 / fediverse federation.
-type HCard struct {
-	Name   string   `yaml:"name" json:"name"`
-	Bio    string   `yaml:"bio,omitempty" json:"bio,omitempty"`
-	Avatar string   `yaml:"avatar,omitempty" json:"avatar,omitempty"`
-	Email  string   `yaml:"email,omitempty" json:"email,omitempty"`
-	URLs   []string `yaml:"urls,omitempty" json:"urls,omitempty"`
-}
-
-// Style is the optional voice/style profile for a persona. It is only consulted
-// when content is generated with AI assistance; publishing content as-is needs
-// none of it. The calling agent does the writing — colophon merely supplies this
-// guide plus retrieved exemplars from the persona's own corpus.
+// Style is a persona's writing voice. It is only consulted when content is generated with
+// AI assistance; publishing as-is needs none of it. The calling agent does the writing —
+// colophon merely supplies this guide plus retrieved exemplars from the persona's corpus.
 type Style struct {
-	// Guide is the freeform style/system prompt: tone, formatting rules, do/don'ts.
+	// Guide is the freeform style/character prompt: who the voice is and how it writes
+	// (tone, formatting rules, do/don'ts) — e.g. "Senior engineer, lots of experience".
 	Guide string `yaml:"guide,omitempty" json:"guide,omitempty"`
-	// References are links/glossaries/source docs the author may draw on.
+	// References are links/glossaries/source docs the voice may draw on.
 	References []string `yaml:"references,omitempty" json:"references,omitempty"`
 }
 
-// Persona is a blog identity. Content is attributed to a persona, not to a human;
-// the byline and the style corpus both attach here. A single human may own many
-// personas (1:many); a persona normally maps to one human operator, except brand
-// personas which may have several.
+// Persona is a hidden writing VOICE — a character/style the agent writes in. It is never
+// shown to readers (the byline is the Author); it exists to keep a consistent voice and to
+// retrieve in-voice exemplars. Personas live in personas/*.yaml and can be shared across
+// authors: a persona's corpus is every post written in it, regardless of who authored it.
 type Persona struct {
-	ID          string      `yaml:"id" json:"id"`
-	DisplayName string      `yaml:"display_name" json:"display_name"`
-	Byline      string      `yaml:"byline,omitempty" json:"byline,omitempty"`
-	Kind        PersonaKind `yaml:"kind" json:"kind"`
-	HCard       HCard       `yaml:"hcard" json:"hcard"`
-	Style       Style       `yaml:"style,omitempty" json:"style,omitempty"`
-
-	// Sites lists the site IDs this persona is allowed to publish to. A site also
-	// declares which personas it accepts; a publication must satisfy both.
-	Sites []string `yaml:"sites" json:"sites"`
-	// Operators are the human/agent identifiers permitted to write as this persona.
-	// individual ⇒ exactly one; brand ⇒ one or more.
-	Operators []string `yaml:"operators,omitempty" json:"operators,omitempty"`
+	ID    string `yaml:"id" json:"id"`
+	// Name is a human label for the voice (not shown), e.g. "Senior engineer".
+	Name  string `yaml:"name,omitempty" json:"name,omitempty"`
+	Style Style  `yaml:"style,omitempty" json:"style,omitempty"`
 }
 
 // Validate checks the persona's internal consistency.
 func (p Persona) Validate() error {
 	if p.ID == "" {
 		return &ValidationError{Field: "id", Msg: "persona id is required"}
-	}
-	switch p.Kind {
-	case PersonaIndividual:
-		if len(p.Operators) > 1 {
-			return &ValidationError{Field: "operators", Msg: "individual persona may have at most one operator (use kind: brand for shared)"}
-		}
-	case PersonaBrand:
-		// any number of operators is fine
-	case "":
-		return &ValidationError{Field: "kind", Msg: "persona kind is required (individual|brand)"}
-	default:
-		return &ValidationError{Field: "kind", Msg: "unknown persona kind: " + string(p.Kind)}
 	}
 	return nil
 }

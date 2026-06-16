@@ -11,18 +11,19 @@ import (
 	"github.com/jmylchreest/colophon/markdown"
 )
 
-// resolvePersona returns the page's persona — the one named in frontmatter, else the first
-// configured persona, else nil.
-func resolvePersona(cfg *config.Config, id string) *core.Persona {
-	for i := range cfg.Personas {
-		if cfg.Personas[i].ID == id {
-			return &cfg.Personas[i]
+// resolveAuthor returns the page's byline author — the one named in frontmatter, else the
+// first configured author, else "Anonymous". (Persona, the hidden voice, is resolved
+// separately and only by the agent/corpus, never for rendering.)
+func resolveAuthor(cfg *config.Config, id string) core.Author {
+	if id != "" {
+		if a := cfg.Author(id); a != nil {
+			return *a
 		}
 	}
-	if len(cfg.Personas) > 0 {
-		return &cfg.Personas[0]
+	if len(cfg.Authors) > 0 {
+		return cfg.Authors[0]
 	}
-	return nil
+	return core.AnonymousAuthor()
 }
 
 // metaTitle is the <title>/og:title for a page: an explicit seo.title, else the page title.
@@ -36,7 +37,7 @@ func metaTitle(p page) string {
 // seoHead renders the SEO <head> block for a post: canonical, robots, description, Open
 // Graph, Twitter card and a JSON-LD BlogPosting. Every value comes from the page's resolved
 // fields and its seo: overrides, so the markup mirrors the frontmatter exactly.
-func seoHead(site core.Site, p page, persona *core.Persona) string {
+func seoHead(site core.Site, p page, author core.Author) string {
 	var s markdown.SEO
 	if p.SEO != nil {
 		s = *p.SEO
@@ -83,8 +84,8 @@ func seoHead(site core.Site, p page, persona *core.Persona) string {
 	for _, t := range p.Tags {
 		meta("property", "article:tag", t)
 	}
-	if a := personaName(persona); a != "" {
-		meta("property", "article:author", a)
+	if author.Name != "" {
+		meta("property", "article:author", author.Name)
 	}
 
 	card := "summary"
@@ -96,13 +97,13 @@ func seoHead(site core.Site, p page, persona *core.Persona) string {
 	meta("name", "twitter:description", ogDesc)
 	meta("name", "twitter:image", image)
 
-	b.WriteString(jsonLD(site, p, persona, canonical, desc, image, kw))
+	b.WriteString(jsonLD(site, p, author, canonical, desc, image, kw))
 	return b.String()
 }
 
 // jsonLD renders the schema.org BlogPosting for a post. json.Marshal HTML-escapes <, > and
 // &, so the result is safe to embed directly in a <script> element.
-func jsonLD(site core.Site, p page, persona *core.Persona, canonical, desc, image, kw string) string {
+func jsonLD(site core.Site, p page, author core.Author, canonical, desc, image, kw string) string {
 	typ := "BlogPosting"
 	if p.SEO != nil && p.SEO.Type != "" {
 		typ = p.SEO.Type
@@ -128,16 +129,12 @@ func jsonLD(site core.Site, p page, persona *core.Persona, canonical, desc, imag
 		doc["datePublished"] = iso
 		doc["dateModified"] = iso
 	}
-	if persona != nil {
-		atype := "Person"
-		if persona.Kind == core.PersonaBrand {
-			atype = "Organization"
+	if author.Name != "" {
+		a := map[string]any{"@type": "Person", "name": author.Name}
+		if len(author.URLs) > 0 {
+			a["url"] = author.URLs[0]
 		}
-		author := map[string]any{"@type": atype, "name": personaName(persona)}
-		if len(persona.HCard.URLs) > 0 {
-			author["url"] = persona.HCard.URLs[0]
-		}
-		doc["author"] = author
+		doc["author"] = a
 	}
 	if site.Title != "" {
 		doc["publisher"] = map[string]any{"@type": "Organization", "name": site.Title}
@@ -147,13 +144,6 @@ func jsonLD(site core.Site, p page, persona *core.Persona, canonical, desc, imag
 		return ""
 	}
 	return `<script type="application/ld+json">` + string(out) + "</script>\n"
-}
-
-func personaName(p *core.Persona) string {
-	if p == nil {
-		return ""
-	}
-	return firstNonEmpty(p.Byline, p.DisplayName)
 }
 
 // socialField returns the seo.social title (titleField true) or description override.

@@ -1,14 +1,7 @@
-# A persona is a blog identity. Content is attributed to a persona, not a human.
+# A persona is a hidden writing VOICE the agent writes in (never shown — the byline is the
+# author). Personas are shareable across authors; the corpus is every post written in this voice.
 id: default
-display_name: "Me"
-byline: "Me"
-kind: individual               # individual (one operator) | brand (shared)
-hcard:
-  name: "Me"
-  bio: "Writes things."
-  urls: []
-# style:                       # optional — only used for AI-assisted writing
-#   guide: "Conversational, concise, technical when needed."
-#   references: []
-sites: [main]                  # sites this persona may publish to
-operators: []                  # humans/agents allowed to write as this persona
+name: "House voice"
+style:
+  guide: "Conversational, concise, technical when needed."
+  # references: ["https://example.com/glossary"]

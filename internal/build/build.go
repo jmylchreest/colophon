@@ -101,7 +101,8 @@ type page struct {
 	ImageAbs   string // absolute preview image URL for og:image, or ""
 	Tags       []string
 	Categories []string
-	Persona    string        // persona id from frontmatter (for author attribution)
+	Author     string        // author id from frontmatter (the byline)
+	Persona    string        // persona id from frontmatter (the hidden writing voice)
 	SEO        *markdown.SEO // optional search/social overrides
 
 	HasMath    bool // page uses math — theme loads KaTeX only when true
@@ -205,7 +206,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		if isEmptyContent(p.HTML) {
 			opts.Log.Step("BUILD", "", "warn", fmt.Sprintf("post %q has no content", strings.TrimSuffix(p.URL, "/")))
 		}
-		persona := resolvePersona(cfg, p.Persona)
+		author := resolveAuthor(cfg, p.Author)
 		ctx := map[string]any{
 			"nav_pages":     navPages,
 			"authors":       authors,
@@ -213,7 +214,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"base_url":      site.BaseURL,
 			"base_path":     basePath,
 			"feed_head":     feedHead,
-			"seo_head":      seoHead(site, p, persona),
+			"seo_head":      seoHead(site, p, author),
 			"meta_title":    metaTitle(p),
 			"favicon":       favicon,
 			"title":         p.Title,
@@ -235,7 +236,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"has_code":      p.HasCode,
 			"page_type":     p.Type,
 		}
-		for k, v := range authorVars(persona) {
+		for k, v := range authorVars(author) {
 			ctx[k] = v
 		}
 		html, err := eng.Render(templateFor(eng, p.Type), ctx)
@@ -502,6 +503,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		p.HasCode = strings.Contains(html, "<pre><code")
 		p.Tags = fm.Tags
 		p.Categories = fm.Categories
+		p.Author = fm.Author
 		p.Persona = fm.Persona
 		p.SEO = fm.SEO
 		pages = append(pages, p)

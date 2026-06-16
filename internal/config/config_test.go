@@ -26,10 +26,9 @@ func writeProject(t *testing.T, cfg, persona string) string {
 
 const validPersona = `
 id: default
-display_name: Me
-kind: individual
-hcard: {name: Me}
-sites: [main]
+name: House voice
+style:
+  guide: Plain and concise.
 `
 
 func TestLoadValid(t *testing.T) {
@@ -102,18 +101,13 @@ publishers:
 `,
 		},
 		{
-			name: "individual persona with two operators",
+			name: "persona missing id",
 			cfg: `
 sites: []
 publishers: []
 `,
 			persona: `
-id: default
-display_name: Me
-kind: individual
-hcard: {name: Me}
-sites: [main]
-operators: [a, b]
+name: Voice with no id
 `,
 		},
 	}

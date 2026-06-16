@@ -22,9 +22,9 @@ func navLinks(pages []page, basePath string) []map[string]any {
 	return out
 }
 
-// authorGroup is one persona that authored at least one published page, together with the
-// index-item maps for its posts. Groups are returned most-recent-first (the order a
-// persona first appears while scanning the newest-first pages slice).
+// authorGroup is one author that wrote at least one published page, together with the
+// index-item maps for its posts. Groups are returned most-recent-first (the order an author
+// first appears while scanning the newest-first pages slice).
 type authorGroup struct {
 	id       string
 	name     string
@@ -34,30 +34,26 @@ type authorGroup struct {
 	items    []map[string]any
 }
 
-// collectAuthors groups pages by their resolved persona, preserving the newest-first order
-// of pages so the result is ordered by each author's most recent post. list[i] is the
-// index-item map for pages[i]. Personas are resolved through resolvePersona, so pages with
-// no explicit persona fall in under the site's default persona (matching byline behaviour).
+// collectAuthors groups pages by their resolved byline author, preserving the newest-first
+// order of pages so the result is ordered by each author's most recent post. list[i] is the
+// index-item map for pages[i]. Authors are resolved through resolveAuthor, so a page with no
+// explicit author falls under the default (first configured) author, matching the byline.
 func collectAuthors(cfg *config.Config, pages []page, list []map[string]any, basePath string) []authorGroup {
 	byID := map[string]*authorGroup{}
 	var order []*authorGroup
 	for i, p := range pages {
-		persona := resolvePersona(cfg, p.Persona)
-		if persona == nil {
-			continue
-		}
-		id := normalizeSlug(persona.ID)
+		author := resolveAuthor(cfg, p.Author)
+		id := normalizeSlug(author.ID)
 		if id == "" {
 			continue
 		}
 		g := byID[id]
 		if g == nil {
-			name := personaName(persona)
 			g = &authorGroup{
 				id:       id,
-				name:     name,
-				avatar:   persona.HCard.Avatar,
-				initials: initials(name),
+				name:     author.Name,
+				avatar:   author.Avatar,
+				initials: initials(author.Name),
 				url:      basePath + "authors/" + id + "/",
 			}
 			byID[id] = g

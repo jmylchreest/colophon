@@ -11,13 +11,13 @@ import (
 
 func TestSEOHeadDefaults(t *testing.T) {
 	site := core.Site{Title: "My Blog", BaseURL: "https://example.com"}
-	persona := &core.Persona{DisplayName: "Ada", Kind: core.PersonaIndividual, HCard: core.HCard{URLs: []string{"https://ada.example"}}}
+	author := core.Author{ID: "ada", Name: "Ada", URLs: []string{"https://ada.example"}}
 	p := page{
 		Title: "Hello", Description: "A greeting", URL: "posts/hello/",
 		Published: time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC),
 		Tags:      []string{"go"}, ImageAbs: "https://example.com/posts/hello/og.png",
 	}
-	out := seoHead(site, p, persona)
+	out := seoHead(site, p, author)
 	for _, want := range []string{
 		`<link rel="canonical" href="https://example.com/posts/hello/">`,
 		`<meta property="og:type" content="article">`,
@@ -49,7 +49,7 @@ func TestSEOOverridesAndNoindex(t *testing.T) {
 			Social: &markdown.SEOSocial{Title: "Punchy social"},
 		},
 	}
-	out := seoHead(site, p, nil)
+	out := seoHead(site, p, core.Author{})
 	for _, want := range []string{
 		`<meta property="og:title" content="Punchy social">`, // social title wins for OG
 		`href="https://canon.example/x"`,                     // canonical override
@@ -71,10 +71,10 @@ func TestSEOOverridesAndNoindex(t *testing.T) {
 	}
 }
 
-func TestSEOBrandPersonaIsOrganization(t *testing.T) {
+func TestSEOAuthorIsPerson(t *testing.T) {
 	out := seoHead(core.Site{Title: "B", BaseURL: "https://e.com"}, page{Title: "T", URL: "x/"},
-		&core.Persona{DisplayName: "Acme", Kind: core.PersonaBrand})
-	if !strings.Contains(out, `"author":{"@type":"Organization","name":"Acme"}`) {
-		t.Errorf("brand persona should map to Organization\n%s", out)
+		core.Author{ID: "acme", Name: "Acme"})
+	if !strings.Contains(out, `"author":{"@type":"Person","name":"Acme"}`) {
+		t.Errorf("author should map to a Person\n%s", out)
 	}
 }

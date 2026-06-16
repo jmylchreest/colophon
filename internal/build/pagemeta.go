@@ -58,21 +58,17 @@ func pageCategory(p page) string {
 }
 
 // authorVars builds the byline/h-card template fields from a persona (nil → empty).
-func authorVars(p *core.Persona) map[string]any {
-	if p == nil {
-		return map[string]any{}
-	}
-	name := personaName(p)
+func authorVars(a core.Author) map[string]any {
 	url := ""
-	if len(p.HCard.URLs) > 0 {
-		url = p.HCard.URLs[0]
+	if len(a.URLs) > 0 {
+		url = a.URLs[0]
 	}
 	return map[string]any{
-		"author_name":     name,
-		"author_initials": initials(name),
-		"author_bio":      p.HCard.Bio,
+		"author_name":     a.Name,
+		"author_initials": initials(a.Name),
+		"author_bio":      a.Bio,
 		"author_url":      url,
-		"author_avatar":   p.HCard.Avatar,
+		"author_avatar":   a.Avatar,
 	}
 }
 

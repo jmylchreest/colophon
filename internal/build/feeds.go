@@ -131,14 +131,10 @@ func writeFeeds(write func(string, []byte) error, site core.Site, cfg *config.Co
 
 // feedAuthor derives a byline from the first configured persona, if any.
 func feedAuthor(cfg *config.Config) string {
-	if len(cfg.Personas) == 0 {
+	if len(cfg.Authors) == 0 {
 		return ""
 	}
-	p := cfg.Personas[0]
-	if p.Byline != "" {
-		return p.Byline
-	}
-	return p.DisplayName
+	return cfg.Authors[0].Name
 }
 
 var tagRE = regexp.MustCompile(`<[^>]*>`)

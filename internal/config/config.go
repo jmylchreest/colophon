@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/rawbytes"
@@ -86,8 +87,10 @@ type Config struct {
 	Publishers   []PublisherConfig `yaml:"publishers"`
 	Environments []Environment     `yaml:"environments"`
 
-	// Personas is populated from personas/*.yaml, not from colophon.yaml.
+	// Personas (the hidden writing voices) and Authors (the shown bylines) are populated
+	// from personas/*.yaml and authors/*.yaml, not from colophon.yaml.
 	Personas []core.Persona `yaml:"-"`
+	Authors  []core.Author  `yaml:"-"`
 
 	// Root is the project directory the config was loaded from.
 	Root string `yaml:"-"`
@@ -153,6 +156,12 @@ func Load(root string) (*Config, error) {
 	}
 	cfg.Personas = personas
 
+	authors, err := loadAuthors(filepath.Join(root, "authors"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.Authors = authors
+
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -192,6 +201,52 @@ func loadPersonas(dir string) ([]core.Persona, error) {
 	return personas, nil
 }
 
+func loadAuthors(dir string) ([]core.Author, error) {
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read authors dir %s: %w", dir, err)
+	}
+	var authors []core.Author
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".yaml" {
+			continue
+		}
+		p := filepath.Join(dir, e.Name())
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			return nil, fmt.Errorf("read author %s: %w", p, err)
+		}
+		k := koanf.New(".")
+		if err := k.Load(rawbytes.Provider(interpolateEnv(raw)), yaml.Parser()); err != nil {
+			return nil, fmt.Errorf("parse author %s: %w", p, err)
+		}
+		var author core.Author
+		if err := k.UnmarshalWithConf("", &author, unmarshalConf); err != nil {
+			return nil, fmt.Errorf("decode author %s: %w", p, err)
+		}
+		// Default the id to the file stem (so authors/john.yaml → id "john").
+		if author.ID == "" {
+			author.ID = strings.TrimSuffix(e.Name(), ".yaml")
+		}
+		authors = append(authors, author)
+	}
+	sort.Slice(authors, func(i, j int) bool { return authors[i].ID < authors[j].ID })
+	return authors, nil
+}
+
+// Author returns the author with the given id, or nil.
+func (c *Config) Author(id string) *core.Author {
+	for i := range c.Authors {
+		if c.Authors[i].ID == id {
+			return &c.Authors[i]
+		}
+	}
+	return nil
+}
+
 // Validate checks cross-references between sites, publishers, and personas.
 func (c *Config) Validate() error {
 	pubIDs := make(map[string]bool, len(c.Publishers))
@@ -225,6 +280,17 @@ func (c *Config) Validate() error {
 			return err
 		}
 		personaIDs[p.ID] = true
+	}
+
+	authorIDs := make(map[string]bool, len(c.Authors))
+	for _, a := range c.Authors {
+		if err := a.Validate(); err != nil {
+			return err
+		}
+		if authorIDs[a.ID] {
+			return &core.ValidationError{Field: "authors", Msg: "duplicate author: " + a.ID}
+		}
+		authorIDs[a.ID] = true
 	}
 
 	for _, s := range c.Sites {

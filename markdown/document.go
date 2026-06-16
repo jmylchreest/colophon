@@ -33,8 +33,13 @@ type Frontmatter struct {
 	Hero  string `yaml:"hero,omitempty"`
 	Image string `yaml:"image,omitempty"`
 
-	// Persona is shorthand for a single publication as that persona, mutually
-	// exclusive with Publications; if both are set, Publications wins.
+	// Author is the byline shown to readers — the id of an authors/*.yaml entry. Empty
+	// falls back to the first configured author, else "Anonymous".
+	Author string `yaml:"author,omitempty"`
+
+	// Persona is the hidden writing voice (a personas/*.yaml id) used by the agent to write
+	// in a consistent style; it is never shown. Mutually exclusive with Publications; if both
+	// are set, Publications wins.
 	Persona      string            `yaml:"persona,omitempty"`
 	Publications []PublicationSpec `yaml:"publications,omitempty"`
 
