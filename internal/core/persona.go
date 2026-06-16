@@ -20,7 +20,7 @@ type Style struct {
 // retrieve in-voice exemplars. Personas live in personas/*.yaml and can be shared across
 // authors: a persona's corpus is every post written in it, regardless of who authored it.
 type Persona struct {
-	ID    string `yaml:"id" json:"id"`
+	ID string `yaml:"id" json:"id"`
 	// Name is a human label for the voice (not shown), e.g. "Senior engineer".
 	Name  string `yaml:"name,omitempty" json:"name,omitempty"`
 	Style Style  `yaml:"style,omitempty" json:"style,omitempty"`

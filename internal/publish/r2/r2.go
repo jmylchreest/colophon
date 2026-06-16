@@ -173,7 +173,13 @@ func (p *Publisher) Commit(ctx context.Context, tree fs.FS, plan *core.Plan) (co
 	if err := p.ensureCreds(); err != nil {
 		return core.Result{}, err
 	}
-	return publish.CommitFiles(ctx, tree, p, plan, p.deleteOrphaned)
+	res, err := publish.CommitFiles(ctx, tree, p, plan, p.deleteOrphaned)
+	if err == nil {
+		// An aggregate closing line so --verbose isn't only the per-object put/delete noise.
+		p.log.Detail("PUBLISH", p.id, "committed",
+			"uploaded", res.Uploaded, "deleted", res.Deleted, "bytes", res.Bytes)
+	}
+	return res, err
 }
 
 func (p *Publisher) Invalidate(ctx context.Context, paths []string) error { return nil }

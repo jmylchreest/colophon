@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jmylchreest/colophon/internal/clog"
@@ -455,7 +456,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		addAsset(it, it.c.Frontmatter.Image) // preview/OG image
 	}
 
-	md := newMarkdown()
+	md := sharedMarkdown
 
 	pages := make([]page, 0, len(items))
 	for _, it := range items {
@@ -836,12 +837,46 @@ func sweep(root string, keep map[string]struct{}) error {
 	if err != nil {
 		return err
 	}
-	for _, f := range stale {
-		if err := os.Remove(f); err != nil {
-			return err
-		}
+	if err := removeFiles(stale); err != nil {
+		return err
 	}
 	return removeEmptyDirs(root)
+}
+
+// removeFiles unlinks paths with bounded parallelism. A cold rebuild that renamed a slug on
+// a large site can orphan thousands of files; overlapping the unlinks hides per-call I/O
+// latency. A small batch stays sequential to avoid goroutine overhead. The first error wins.
+func removeFiles(paths []string) error {
+	const workers = 8
+	if len(paths) < 2*workers {
+		for _, p := range paths {
+			if err := os.Remove(p); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	sem := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
+	for _, p := range paths {
+		sem <- struct{}{}
+		wg.Add(1)
+		go func(p string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if err := os.Remove(p); err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				mu.Unlock()
+			}
+		}(p)
+	}
+	wg.Wait()
+	return firstErr
 }
 
 // ReconcileDirs removes any immediate subdirectory of base whose name is not in keep.

@@ -17,6 +17,11 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
+// sharedMarkdown is the process-wide goldmark renderer. A goldmark.Markdown is immutable
+// once built and its Convert is safe for concurrent use, so it is constructed once instead
+// of per build — every Extend (registering parser/renderer pairs) runs a single time.
+var sharedMarkdown = newMarkdown()
+
 // newMarkdown builds the shared goldmark renderer. colophon emits progressive-enhancement
 // HTML: special blocks become semantic elements that carry their raw source as text and
 // are tagged by type, so a no-JS theme shows readable raw text while a theme that knows

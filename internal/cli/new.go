@@ -125,9 +125,9 @@ func runNew(o newOpts, kind string) error {
 type writeTarget struct {
 	sourceID string
 	driver   string
-	dir      string   // base writable directory
-	tagMark  string   // obsidian: add this tag to publish (else "")
-	flagMark bool     // obsidian: needs `publish: true`
+	dir      string // base writable directory
+	tagMark  string // obsidian: add this tag to publish (else "")
+	flagMark bool   // obsidian: needs `publish: true`
 }
 
 func pickWriteTarget(cfg *config.Config, inID string) writeTarget {

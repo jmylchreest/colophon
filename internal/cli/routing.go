@@ -34,12 +34,17 @@ type selectFS struct {
 }
 
 func (s selectFS) Open(name string) (fs.File, error) {
-	if name != "." {
-		if info, err := fs.Stat(s.base, name); err == nil && !info.IsDir() && !s.keep(name) {
-			return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
-		}
+	f, err := s.base.Open(name)
+	if err != nil || name == "." {
+		return f, err
 	}
-	return s.base.Open(name)
+	// Open first, then stat the open file: one fewer path resolution than a separate
+	// fs.Stat for the common (kept) case. A non-kept file is hidden as if it didn't exist.
+	if info, statErr := f.Stat(); statErr == nil && !info.IsDir() && !s.keep(name) {
+		_ = f.Close()
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	}
+	return f, nil
 }
 
 func (s selectFS) ReadDir(name string) ([]fs.DirEntry, error) {

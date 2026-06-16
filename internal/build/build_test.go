@@ -84,7 +84,7 @@ func TestIsEmptyContent(t *testing.T) {
 	}{
 		{"", true},
 		{"   \n\t ", true},
-		{"<p></p>", true},               // markup but no text
+		{"<p></p>", true}, // markup but no text
 		{`<div class="callout"></div>`, true},
 		{"<p>real content</p>", false},
 		{"plain text", false},
