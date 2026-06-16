@@ -108,32 +108,54 @@ Because on-disk themes inherit `default`, a contrib theme only carries its own t
 Static assets keep their relative path: `themes/mytheme/vendor/app.js` is written to
 `/vendor/app.js` and referenced as `{{ base_path }}vendor/app.js`.
 
+## The templating language
+
+Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django syntax:
+
+- `{{ value }}` prints a value (HTML-escaped by default).
+- `{{ value|safe }}` prints pre-rendered HTML **without** escaping — required for `content`,
+  `feed_head` and `seo_head`.
+- `{% if x %}…{% elif y %}…{% else %}…{% endif %}` and `{% for item in list %}…{% endfor %}`.
+- Filters chain with `|`, e.g. `{{ title|default:site_title }}`, `{{ tags|length }}`.
+- `{# comment #}` (keep it on one line — pongo2 rejects a newline inside `{# … #}`).
+
+> **Always prefix internal links with `{{ base_path }}`** (`{{ base_path }}style.css`,
+> `{{ base_path }}{{ p.url }}`). `base_path` makes the theme work whether the site is served
+> from `/` or a sub-path.
+
 ## Template variables
 
-### `page.html`
+### `page.html` (a single post)
 
 | Variable | Description |
 |----------|-------------|
 | `site_title` | The site title. |
-| `title`, `date`, `description` | Post metadata (`date` is `YYYY-MM-DD`; may be empty). |
-| `content` | The rendered post HTML. Output with `{{ content|safe }}`. |
-| `base_path` | URL prefix for internal links (always starts and ends with `/`). Prefix every internal href/src with it. |
+| `title`, `date`, `description` | Post metadata (`date` is a date; may be empty). |
+| `meta_title` | Pre-resolved `<title>` text (SEO title → title → site title). |
+| `content` | The rendered post HTML. Output with `{{ content\|safe }}`. |
+| `base_path` | URL prefix for internal links (always starts and ends with `/`). |
 | `base_url` | Absolute site root, for canonical/social URLs. |
-| `feed_head` | `<link rel="alternate">` feed-discovery tags. Output with `{{ feed_head|safe }}`. |
+| `feed_head` | `<link rel="alternate">` feed-discovery tags. Output with `{{ feed_head\|safe }}`. |
+| `seo_head` | Full SEO `<head>`: canonical, robots, Open Graph, Twitter, JSON-LD. `{{ seo_head\|safe }}`. |
 | `favicon` | Favicon filename, or empty. |
 | `hero` | Hero banner URL (page-relative, or absolute when routed), or empty. |
-| `image` | Preview image href, or empty. |
-| `image_abs` | Absolute preview image URL for `og:image`, or empty. |
+| `image`, `image_abs` | Preview image href; absolute preview URL for `og:image`. |
+| `tags` | List of `{name, url}` — linked tag chips. Prefix nothing; `url` is ready to use. |
+| `category` | Primary category string (first category, else first tag, else empty). |
+| `read_time` | Estimated reading time in whole minutes (integer). |
+| `toc` | List of `{level, id, text}` headings, for a table of contents. |
 | `draft`, `embargoed`, `embargo_until` | Preview-only flags for not-yet-public posts. |
 | `has_code`, `has_math`, `has_mermaid` | True when the post uses that block type — load the matching library only when set. |
+| `author_name`, `author_initials`, `author_bio`, `author_url`, `author_avatar` | Persona h-card fields (empty when no persona). |
 
-### `index.html`
+### `index.html` (the post list, and per-tag pages)
 
 | Variable | Description |
 |----------|-------------|
 | `site_title`, `base_path`, `base_url`, `feed_head`, `favicon` | As above. |
+| `heading` | Page heading — the site title on the home page, or `Tagged “<name>”` on a tag page. |
 | `feeds` | List of `{label, href}` for subscribe links. |
-| `pages` | List of posts: `{title, url, date, draft, embargoed, embargo_until, image}`. Prefix `url` with `base_path`. |
+| `pages` | List of posts: `{title, url, date, draft, embargoed, embargo_until, image, tags}`. Prefix `url` with `base_path`. |
 
 ## Enhancing rich blocks
 
@@ -153,3 +175,104 @@ Your theme is free to do something else with the same markup: load the libraries
 swap in a different highlighter, or — like the `minimal` theme — do nothing and let the raw
 text stand. The markup contract (`<pre class="mermaid">`, `<span class="math …">`,
 `<pre><code class="language-…">`, `<div class="callout …">`) does not change.
+
+## Build a theme — step by step
+
+The fastest route is to start from a built-in and change only what you want. A new theme
+inherits `default`, so you can ship as little as one CSS file.
+
+**1. Create the theme directory** in your project and point a build at it:
+
+```sh
+mkdir -p themes/mytheme
+```
+```yaml
+# colophon.yaml
+sites:
+  - id: main
+    theme: mytheme          # or set it on one environment to preview first
+```
+
+**2. Add a stylesheet.** With nothing else present, `mytheme` uses the `default` templates
+and your CSS:
+
+```css
+/* themes/mytheme/style.css */
+body { font-family: Georgia, serif; max-width: 42rem; margin: 2rem auto; }
+```
+
+```sh
+colophon serve            # open the printed URL; edits live-reload
+```
+
+That alone is a working theme. Everything below is optional, added when you want more control.
+
+**3. Take over the post template.** Copy a built-in as a starting point, then edit it:
+
+```sh
+colophon themes eject default   # writes themes/default/ — copy what you need into mytheme/
+```
+
+A minimal `themes/mytheme/page.html`:
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ meta_title }}</title>
+  <link rel="stylesheet" href="{{ base_path }}style.css">
+  {{ feed_head|safe }}
+  {{ seo_head|safe }}
+</head>
+<body>
+  <header><a href="{{ base_path }}">{{ site_title }}</a></header>
+  <article>
+    <h1>{{ title }}</h1>
+    {% if date %}<time>{{ date }}</time>{% endif %}
+    {% if read_time %}<span>· {{ read_time }} min read</span>{% endif %}
+    {{ content|safe }}
+    {% if tags %}<footer>{% for t in tags %}<a href="{{ t.url }}">{{ t.name }}</a> {% endfor %}</footer>{% endif %}
+  </article>
+</body>
+</html>
+```
+
+**4. Add the index** (`themes/mytheme/index.html`) — the post list and per-tag pages:
+
+```html
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>{{ heading }}</title>
+  <link rel="stylesheet" href="{{ base_path }}style.css">{{ feed_head|safe }}</head>
+<body>
+  <h1>{{ heading }}</h1>
+  <ul>
+  {% for p in pages %}
+    <li><a href="{{ base_path }}{{ p.url }}">{{ p.title }}</a>
+        {% if p.date %}<small>{{ p.date }}</small>{% endif %}</li>
+  {% endfor %}
+  </ul>
+</body>
+</html>
+```
+
+**5. Decide how rich blocks render.** Do nothing (raw text shows, like `minimal`), or enhance
+them with the `has_*` gates as shown in [Enhancing rich blocks](#enhancing-rich-blocks). The
+vendored libraries are inherited from `default`, so `{{ base_path }}vendor/katex/…` resolves
+with no extra files in your theme.
+
+**6. Add your own assets.** Any non-`.html` file under `themes/mytheme/` is copied to the
+output root, keeping its path: `themes/mytheme/logo.svg` → `/logo.svg`, referenced as
+`{{ base_path }}logo.svg`. Self-host fonts the same way and `@import` them from your CSS.
+
+**7. Build and ship:**
+
+```sh
+colophon build --env production    # writes public/ with your theme
+```
+
+Checklist: every internal `href`/`src` starts with `{{ base_path }}`; `content`, `feed_head`
+and `seo_head` use `|safe`; `{# comments #}` stay on one line. To contribute a theme back, drop
+it in [`contrib/themes/`](#community-themes-contribthemes) following the existing ones.
