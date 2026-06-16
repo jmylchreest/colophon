@@ -17,6 +17,19 @@
   <div class="topbar-in">
     <a class="brand" href="{{ base_path }}">{{ site_title }}</a>
     <div class="topbar-right">
+      {% if authors %}
+      <nav class="authors" aria-label="Authors">
+        <button class="auth-chev prev" type="button" aria-label="Scroll authors left" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="auth-track">
+          {% for a in authors %}
+          <a class="auth" href="{{ a.url }}" data-tip="{{ a.name }}" aria-label="{{ a.name }}">
+            {% if a.avatar %}<img src="{{ a.avatar }}" alt="{{ a.name }}" loading="lazy">{% else %}<span class="auth-fb">{{ a.initials }}</span>{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        <button class="auth-chev next" type="button" aria-label="Scroll authors right" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </nav>
+      {% endif %}
       <div class="feeds" data-open="false">
         <div class="feeds-track"><div class="feeds-inner" id="feedsTrack">
           <a class="feed" href="{{ base_path }}rss.xml" data-tip="RSS" aria-label="RSS feed"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83C19.56 11.41 12.59 4.44 4 4.44zM4 10.1v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83C13.9 14.53 9.47 10.1 4 10.1z"/></svg></a>

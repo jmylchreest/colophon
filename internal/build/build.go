@@ -192,6 +192,15 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		}
 	}
 
+	// Index-item maps for posts and the author strip (one avatar per persona that wrote a
+	// post, most-recent-first) are built up front so every page's header can show the strip.
+	list := make([]map[string]any, len(posts))
+	for i, p := range posts {
+		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "tags": tagLinks(p.Tags, basePath)}
+	}
+	authorGroups := collectAuthors(cfg, posts, list, basePath)
+	authors := authorStrip(authorGroups)
+
 	for _, p := range pages {
 		if isEmptyContent(p.HTML) {
 			opts.Log.Step("BUILD", "", "warn", fmt.Sprintf("post %q has no content", strings.TrimSuffix(p.URL, "/")))
@@ -199,6 +208,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		persona := resolvePersona(cfg, p.Persona)
 		ctx := map[string]any{
 			"nav_pages":     navPages,
+			"authors":       authors,
 			"site_title":    site.Title,
 			"base_url":      site.BaseURL,
 			"base_path":     basePath,
@@ -237,14 +247,6 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		}
 	}
 
-	list := make([]map[string]any, len(posts))
-	for i, p := range posts {
-		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "tags": tagLinks(p.Tags, basePath)}
-	}
-	// Authors: one avatar per persona that wrote a post, most-recent-first, for the topbar
-	// widget. The same strip rides along on the archive listings (tags/authors).
-	authorGroups := collectAuthors(cfg, posts, list, basePath)
-	authors := authorStrip(authorGroups)
 	index, err := eng.Render("index.html", map[string]any{
 		"site_title": site.Title,
 		"base_url":   site.BaseURL,

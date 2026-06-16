@@ -37,11 +37,13 @@
     var prev = nav.querySelector('.auth-chev.prev');
     var next = nav.querySelector('.auth-chev.next');
     if (!track) return;
+    var MIN = 5; // only offer the carousel past this many avatars (and only if they overflow)
     function update() {
-      var overflow = track.scrollWidth > track.clientWidth + 1;
-      if (prev) prev.hidden = !overflow;
-      if (next) next.hidden = !overflow;
-      if (overflow) {
+      var show = track.children.length > MIN && track.scrollWidth > track.clientWidth + 1;
+      if (prev) prev.hidden = !show;
+      if (next) next.hidden = !show;
+      if (show) {
+        // dim a chevron when that edge is exhausted, full when there's more to reveal
         if (prev) prev.disabled = track.scrollLeft <= 0;
         if (next) next.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
       }
