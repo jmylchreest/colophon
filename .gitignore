@@ -11,9 +11,13 @@ public/
 dist/
 dist-*/
 
-# Local agent tooling (machine-specific runtime state); shared/ IS committable
+# Local agent tooling (machine-specific runtime state). Only shared/ and the
+# project config (config/aide.json) are committable; everything else is local.
 .aide/*
 !.aide/shared/
+!.aide/config
+.aide/config/*
+!.aide/config/aide.json
 
 # Editors / OS
 .DS_Store
