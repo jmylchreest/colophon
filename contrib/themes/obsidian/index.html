@@ -13,6 +13,7 @@
   <div class="topbar-inner">
     <a class="logo" href="{{ base_path }}">{{ site_title }}</a>
     <div class="nav">
+      {% if nav_pages %}{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% endfor %}{% endif %}
       <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
     </div>
   </div>

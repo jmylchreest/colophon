@@ -15,6 +15,7 @@
 <header class="site">
   <div class="site-bar">
     <a class="site-logo" href="{{ base_path }}">{{ site_title }}</a>
+    {% if nav_pages %}<nav class="site-nav" aria-label="Pages">{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% endfor %}</nav>{% endif %}
     <div class="bar-right">
       <div class="breadcrumb">
         <a href="{{ base_path }}">home</a><span class="sep">/</span>

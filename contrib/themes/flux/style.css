@@ -24,6 +24,16 @@ body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', 
 .header-feeds a:hover { color: var(--accent); }
 .site-header > .header-feeds { justify-content: flex-end; margin-top: 0.85rem; }
 .header-feeds:empty { display: none; }
+.site-nav { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; margin-top: 0.85rem; font-size: 0.85rem; }
+.site-nav a { color: var(--text2); text-decoration: none; }
+.site-nav a:hover { color: var(--accent); }
+
+@media (max-width: 600px) {
+  .site-header { padding: 1.1rem 1.25rem; }
+  .site-name { font-size: 1.6rem; }
+  .header-right { gap: 1rem; }
+  .article-container { padding: 2rem 1.25rem; }
+}
 
 /* theme toggle — original single-knob switch with a spring-overshoot ease */
 .toggle { appearance: none; -webkit-appearance: none; position: relative; width: 46px; height: 24px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--toggle-bg); cursor: pointer; transition: background 0.3s; }

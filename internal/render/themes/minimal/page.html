@@ -10,7 +10,7 @@
 {{ feed_head|safe }}
 </head>
 <body>
-<header><a href="{{ base_path }}">{{ site_title }}</a></header>
+<header><a href="{{ base_path }}">{{ site_title }}</a>{% if nav_pages %} · <nav>{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% if not forloop.Last %} · {% endif %}{% endfor %}</nav>{% endif %}</header>
 <main>
 <article>
 {% if draft %}<p class="note">[draft — not published]</p>{% endif %}

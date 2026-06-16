@@ -9,6 +9,7 @@ body {
 }
 a { color: inherit; }
 header { margin-bottom: 2rem; font-weight: 600; }
+header nav { display: inline; font-weight: 400; }
 footer { margin-top: 3rem; font-size: .85rem; opacity: .6; }
 h1 { line-height: 1.2; }
 .meta { font-size: .85rem; opacity: .65; }

@@ -31,7 +31,11 @@ body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono',
 #progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--green); z-index: 999; width: 0; }
 
 header.site { border-bottom: 1px solid var(--border); }
-.site-bar { max-width: 1100px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+.site-bar { max-width: 1100px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem 1rem; }
+.site-nav { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.8rem; }
+.site-nav a { color: var(--text-muted); text-decoration: none; }
+.site-nav a::before { content: '/'; color: var(--border); margin-right: 0.15em; }
+.site-nav a:hover { color: var(--cyan); }
 .site-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--green); text-decoration: none; letter-spacing: -0.03em; }
 .breadcrumb { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--text-muted); flex-wrap: wrap; }
 .breadcrumb a { color: var(--text-muted); text-decoration: none; }

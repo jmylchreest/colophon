@@ -16,6 +16,7 @@
       <input id="theme-switch" class="toggle" type="checkbox" role="switch" checked><label for="theme-switch" class="sr">Dark mode</label>
     </div>
   </div>
+  {% if nav_pages %}<nav class="site-nav" aria-label="Pages">{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% endfor %}</nav>{% endif %}
   <div class="header-feeds">{% if feeds %}{% for f in feeds %}<a href="{{ f.href }}">{{ f.label }}</a>{% endfor %}{% endif %}</div>
 </div>
 

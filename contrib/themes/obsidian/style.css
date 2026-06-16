@@ -32,7 +32,7 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 .topbar { position: sticky; top: 0; z-index: 100; background: var(--topbar-bg); -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border-bottom: 1px solid var(--border); }
 .topbar-inner { max-width: 1280px; margin: 0 auto; padding: 0 2.5rem; height: 58px; display: flex; align-items: center; justify-content: space-between; }
 .logo { font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: var(--strong); text-decoration: none; letter-spacing: -0.02em; }
-.nav { display: flex; align-items: center; gap: 0.25rem; }
+.nav { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 0.25rem; }
 .nav > a { color: var(--muted); text-decoration: none; font-size: 0.85rem; padding: 0.4rem 0.8rem; border-radius: 6px; transition: all 0.15s; }
 .nav > a:hover { color: var(--strong); background: var(--surface-2); }
 .subscribe-btn { background: var(--accent); color: var(--on-accent); padding: 0.4rem 1rem; border-radius: 6px; font-size: 0.82rem; font-weight: 500; cursor: pointer; border: none; font-family: inherit; margin-left: 0.5rem; text-decoration: none; }
@@ -68,6 +68,11 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 
 .article-wrap { max-width: 1180px; margin: 0 auto; padding: 4rem 2.5rem; display: grid; grid-template-columns: 1fr 320px; gap: 3.5rem; align-items: start; }
 @media (max-width: 1024px) { .article-wrap { grid-template-columns: 1fr; } .side-col { display: none; } }
+@media (max-width: 600px) {
+  .topbar-inner, .hero-content, .article-wrap { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .nav > a { padding: 0.4rem 0.55rem; font-size: 0.8rem; }
+  .hero-full { min-height: 340px; }
+}
 
 .prose { max-width: 680px; }
 .prose > p:first-of-type { font-size: 1.2rem; font-weight: 300; color: var(--lead); }

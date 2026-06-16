@@ -14,8 +14,10 @@ body {
 }
 a { color: #0a58ca; text-decoration: none; }
 a:hover { text-decoration: underline; }
-.site-header { font-weight: 600; margin-bottom: 2.5rem; }
+.site-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1rem; font-weight: 600; margin-bottom: 2.5rem; }
 .site-header a { color: inherit; }
+.site-nav { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; font-weight: 400; font-size: 0.95rem; }
+.site-nav a { color: #0a58ca; }
 .site-footer { margin-top: 4rem; font-size: .85rem; opacity: .6; }
 h1 { line-height: 1.2; }
 .meta { font-size: .85rem; opacity: .65; }

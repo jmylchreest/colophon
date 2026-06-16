@@ -9,7 +9,7 @@
 {{ feed_head|safe }}
 </head>
 <body>
-<header><a href="{{ base_path }}">{{ site_title }}</a></header>
+<header><a href="{{ base_path }}">{{ site_title }}</a>{% if nav_pages %} · <nav>{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% if not forloop.Last %} · {% endif %}{% endfor %}</nav>{% endif %}</header>
 <main>
 <h1>{{ heading|default:site_title }}</h1>
 <ul>
