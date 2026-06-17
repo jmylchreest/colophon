@@ -81,7 +81,8 @@ func writeFeeds(write func(string, []byte) error, site core.Site, cfg *config.Co
 	base := strings.TrimRight(site.BaseURL, "/")
 
 	var items []feed.Item
-	sitemap := []feed.SitemapEntry{{URL: base + "/"}}
+	sitemap := make([]feed.SitemapEntry, 0, 1+len(pages))
+	sitemap = append(sitemap, feed.SitemapEntry{URL: base + "/"})
 	for _, p := range pages {
 		abs := base + "/" + p.URL
 		sitemap = append(sitemap, feed.SitemapEntry{URL: abs, LastMod: p.Published})

@@ -1,0 +1,48 @@
+# golangci-lint configuration
+# https://golangci-lint.run/usage/configuration/
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck # unchecked errors
+    - govet # suspicious constructs
+    - ineffassign # ineffectual assignments
+    - staticcheck # static analysis (includes gosimple/stylecheck in v2)
+    - unused # unused constants, vars, funcs, types
+    - unconvert # unnecessary type conversions
+    - unparam # unused function parameters/results
+    - prealloc # slices that could be preallocated
+  # misspell is intentionally omitted: the prose is British English while the code carries
+  # spec-mandated American tokens (schema.org "Organization", the CSS color property,
+  # goldmark's util.Prioritized), so no single locale is clean and it only yields noise.
+  settings:
+    staticcheck:
+      checks:
+        - all
+  exclusions:
+    rules:
+      # Test files exercise edge cases and helpers where these add noise, not value.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - unparam
+          - prealloc
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/jmylchreest/colophon
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

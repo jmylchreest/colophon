@@ -273,15 +273,14 @@ func openBrowserAfter(ctx context.Context, delay time.Duration, url string) {
 // openBrowser best-effort launches the OS browser at url; failure is ignored (the URL was
 // already printed).
 func openBrowser(url string) {
-	var name string
-	var args []string
+	name := "xdg-open"
+	args := make([]string, 0, 2)
 	switch runtime.GOOS {
 	case "darwin":
 		name = "open"
 	case "windows":
-		name, args = "rundll32", []string{"url.dll,FileProtocolHandler"}
-	default:
-		name = "xdg-open"
+		name = "rundll32"
+		args = append(args, "url.dll,FileProtocolHandler")
 	}
 	args = append(args, url)
 	_ = exec.Command(name, args...).Start()

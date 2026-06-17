@@ -108,7 +108,9 @@ func apiErr(env envelope) string {
 	return strings.Join(parts, "; ")
 }
 
-func (c *apiClient) jsonDo(ctx context.Context, method, url, bearer string, in, out any) error {
+// jsonDo POSTs a JSON body and decodes a JSON response. Every Cloudflare control-plane call
+// colophon makes is a POST; a GET (e.g. projectExists) builds its request directly.
+func (c *apiClient) jsonDo(ctx context.Context, url, bearer string, in, out any) error {
 	var body io.Reader
 	if in != nil {
 		b, err := json.Marshal(in)
@@ -117,7 +119,7 @@ func (c *apiClient) jsonDo(ctx context.Context, method, url, bearer string, in, 
 		}
 		body = bytes.NewReader(b)
 	}
-	return c.do(ctx, method, url, bearer, "application/json", body, out)
+	return c.do(ctx, http.MethodPost, url, bearer, "application/json", body, out)
 }
 
 func (c *apiClient) projectExists(ctx context.Context, accountID, project string) (bool, error) {
@@ -189,7 +191,7 @@ func (c *apiClient) getProject(ctx context.Context, accountID, project string) (
 
 func (c *apiClient) createProject(ctx context.Context, accountID, project, branch string) error {
 	url := fmt.Sprintf("%s/accounts/%s/pages/projects", apiBase, accountID)
-	return c.jsonDo(ctx, http.MethodPost, url, c.token,
+	return c.jsonDo(ctx, url, c.token,
 		map[string]string{"name": project, "production_branch": branch}, nil)
 }
 
@@ -209,17 +211,17 @@ func (c *apiClient) uploadToken(ctx context.Context, accountID, project string) 
 
 func (c *apiClient) checkMissing(ctx context.Context, jwt string, hashes []string) ([]string, error) {
 	var missing []string
-	err := c.jsonDo(ctx, http.MethodPost, apiBase+"/pages/assets/check-missing", jwt,
+	err := c.jsonDo(ctx, apiBase+"/pages/assets/check-missing", jwt,
 		map[string][]string{"hashes": hashes}, &missing)
 	return missing, err
 }
 
 func (c *apiClient) upload(ctx context.Context, jwt string, items []uploadItem) error {
-	return c.jsonDo(ctx, http.MethodPost, apiBase+"/pages/assets/upload", jwt, items, nil)
+	return c.jsonDo(ctx, apiBase+"/pages/assets/upload", jwt, items, nil)
 }
 
 func (c *apiClient) upsertHashes(ctx context.Context, jwt string, hashes []string) error {
-	return c.jsonDo(ctx, http.MethodPost, apiBase+"/pages/assets/upsert-hashes", jwt,
+	return c.jsonDo(ctx, apiBase+"/pages/assets/upsert-hashes", jwt,
 		map[string][]string{"hashes": hashes}, nil)
 }
 

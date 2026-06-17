@@ -42,7 +42,7 @@ func describeSources(cfg *config.Config) []sourceInfo {
 	if len(srcs) == 0 {
 		srcs = []config.SourceConfig{{ID: "content", Driver: "md-dir"}}
 	}
-	var out []sourceInfo
+	out := make([]sourceInfo, 0, len(srcs))
 	for _, s := range srcs {
 		get := func(k string) string { v, _ := s.Settings[k].(string); return strings.TrimSpace(v) }
 		info := sourceInfo{ID: s.ID, Driver: s.Driver}

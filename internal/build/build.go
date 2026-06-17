@@ -558,8 +558,9 @@ var imageRE = regexp.MustCompile(`!\[[^\]]*\]\(\s*(?:<([^>]+)>|([^)\s]+))`)
 // <…> destination form is recognised so refs with spaces survive. Obsidian ![[embed]] is
 // rewritten to this form by the obsidian source before the build sees it.
 func imageRefs(body string) []string {
-	var refs []string
-	for _, m := range imageRE.FindAllStringSubmatch(body, -1) {
+	matches := imageRE.FindAllStringSubmatch(body, -1)
+	refs := make([]string, 0, len(matches))
+	for _, m := range matches {
 		ref := m[1]
 		if ref == "" {
 			ref = m[2]

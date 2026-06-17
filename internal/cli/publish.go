@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -303,7 +302,7 @@ func deployAll(ctx context.Context, env *config.Environment, name string, target
 			*summary = append(*summary, summaryRow{env: name, publisher: t.id, status: "skipped"})
 			continue
 		}
-		tree := fs.FS(base)
+		tree := base
 		if router.Active() {
 			id := t.id
 			tree = selectFS{base: base, keep: func(p string) bool { return router.Keep(id, p) }}
