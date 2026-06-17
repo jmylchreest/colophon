@@ -116,6 +116,7 @@
 {% if has_mermaid %}
 <script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:(document.documentElement.dataset.theme==='light'?'default':'dark')})"></script>
 {% endif %}
+{% if glossary_head %}{{ glossary_head|safe }}{% endif %}
 {% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>

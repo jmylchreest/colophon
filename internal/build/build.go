@@ -209,6 +209,12 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		return Result{}, err
 	}
 
+	// Publish the optional glossary + its decorator; glossaryHead is "" when none is configured.
+	glossaryHead, err := emitGlossary(write, cfg, basePath)
+	if err != nil {
+		return Result{}, err
+	}
+
 	// Dateless pages (About, Now, …) are standing chrome, not dated posts: they surface in
 	// the nav menu rather than the chronological list/feeds. Posts drive the list, tags,
 	// authors and feeds; every page (post or static) still renders its own document.
@@ -256,6 +262,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"base_path":      basePath,
 			"feed_head":      feedHead,
 			"analytics_head": analyticsHead(site.Analytics, basePath, &p),
+			"glossary_head":  glossaryHead,
 			"seo_head":       seoHead(site, p, author),
 			"meta_title":     metaTitle(p),
 			"favicon":        favicon,

@@ -78,3 +78,15 @@ pre.mermaid { text-align: center; background: none; }
   .embargo { background: #3a3000; color: #f0d97a; }
   .draft { background: #2a2d30; color: #b6bcc2; }
 }
+
+/* Glossary terms (decorated by glossary.js): dotted underline + a dictionary-stanza popover
+   (serif/sans per theme) on hover/focus. */
+abbr.gloss { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+.gloss-tip { background: var(--elevated, var(--surface, #1c1c24)); color: var(--text, #ededf1);
+  border: 1px solid var(--border, #333); border-radius: 10px; padding: 0.65rem 0.8rem;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.3); }
+.gloss-tip .gloss-term { display: block; font-family: var(--serif, inherit); font-weight: 600;
+  font-size: 0.95rem; margin-bottom: 0.3rem; color: var(--text, #ededf1); }
+.gloss-tip .gloss-def { display: block; font-family: var(--sans, inherit); font-size: 0.82rem;
+  line-height: 1.5; color: var(--muted, #9aa3b2); }
+.gloss-tip[hidden] { display: none; }

@@ -303,3 +303,20 @@ pre.mermaid { background: none; border: 0; text-align: center; }
   *, body::before { animation: none !important; transition: none !important; }
   .home-hero h1 { filter: none; } .home-hero h1::before { display: none; }
 }
+
+/* Glossary terms (decorated by glossary.js): a light, semi-transparent wavy underline, with a
+   styled popover (.gloss-tip) on hover/focus. The accessible name + description ride on the
+   native <abbr> and aria-describedby set by the script. */
+abbr.gloss { text-decoration: underline wavy;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-decoration-thickness: 1px; text-underline-offset: 3px; cursor: help; }
+abbr.gloss:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+/* The popover reads like a dictionary stanza: a serif headword over a muted sans definition. */
+.gloss-tip { background: var(--elevated); color: var(--text); border: 1px solid var(--border);
+  border-radius: 12px; padding: 0.7rem 0.85rem 0.75rem; box-shadow: 0 10px 30px rgba(0,0,0,0.34); }
+.gloss-tip .gloss-term { display: block; font-family: var(--serif); font-weight: 600;
+  font-size: 1rem; letter-spacing: -0.01em; color: var(--text);
+  padding-bottom: 0.35rem; margin-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+.gloss-tip .gloss-def { display: block; font-family: var(--sans); font-size: 0.82rem;
+  line-height: 1.5; color: var(--muted); }
+.gloss-tip[hidden] { display: none; }

@@ -96,6 +96,10 @@ type Config struct {
 	Personas []core.Persona `yaml:"-"`
 	Authors  []core.Author  `yaml:"-"`
 
+	// Glossary maps a term/acronym to its definition, loaded from glossary.yaml. It is never
+	// rendered as a page; the build publishes it as glossary.json for a theme's decorator.
+	Glossary map[string]string `yaml:"-"`
+
 	// Root is the project directory the config was loaded from.
 	Root string `yaml:"-"`
 
@@ -171,6 +175,12 @@ func Load(root string) (*Config, error) {
 	}
 	cfg.Authors = authors
 
+	glossary, err := loadGlossary(filepath.Join(root, "glossary.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	cfg.Glossary = glossary
+
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -244,6 +254,27 @@ func loadAuthors(dir string) ([]core.Author, error) {
 	}
 	sort.Slice(authors, func(i, j int) bool { return authors[i].ID < authors[j].ID })
 	return authors, nil
+}
+
+// loadGlossary reads a flat term→definition map from glossary.yaml (with {env:VAR}
+// interpolation). A missing file yields nil, so the glossary is purely optional.
+func loadGlossary(path string) (map[string]string, error) {
+	raw, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read glossary %s: %w", path, err)
+	}
+	k := koanf.New(".")
+	if err := k.Load(rawbytes.Provider(interpolateEnv(raw)), yaml.Parser()); err != nil {
+		return nil, fmt.Errorf("parse glossary %s: %w", path, err)
+	}
+	out := map[string]string{}
+	for _, key := range k.Keys() {
+		out[key] = k.String(key)
+	}
+	return out, nil
 }
 
 // Author returns the author with the given id, or nil.
