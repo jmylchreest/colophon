@@ -11,10 +11,16 @@ import (
 //go:embed assets/glossary.js
 var glossaryJS []byte
 
-// Output paths of the glossary data + decorator, relative to the site root.
+//go:embed assets/glossary.css
+var glossaryCSS []byte
+
+// Output paths of the glossary data + engine-provided decorator/styles, relative to the site
+// root. The CSS is engine-owned so every theme gets a working popover without copying styles;
+// a theme can still override .gloss/.gloss-tip.
 const (
 	glossaryData  = "glossary.json"
 	glossaryAsset = "glossary.js"
+	glossaryStyle = "glossary.css"
 )
 
 // emitGlossary writes the glossary data + decorator to the site root when the project ships a
@@ -36,6 +42,10 @@ func emitGlossary(write func(string, []byte) error, cfg *config.Config, basePath
 	if err := write(glossaryAsset, glossaryJS); err != nil {
 		return "", err
 	}
-	return `<script defer src="` + html.EscapeString(basePath+glossaryAsset) +
+	if err := write(glossaryStyle, glossaryCSS); err != nil {
+		return "", err
+	}
+	return `<link rel="stylesheet" href="` + html.EscapeString(basePath+glossaryStyle) +
+		`"><script defer src="` + html.EscapeString(basePath+glossaryAsset) +
 		`" data-glossary="` + html.EscapeString(basePath+glossaryData) + `"></script>`, nil
 }

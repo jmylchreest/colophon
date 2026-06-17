@@ -1,0 +1,47 @@
+/* colophon glossary styling — engine-provided, so every theme gets a working, good-looking
+   glossary popover for free. It adapts to the active theme through that theme's CSS custom
+   properties (with neutral fallbacks for token-less themes). A theme may override .gloss or
+   .gloss-tip in its own stylesheet for a bespoke look. */
+
+/* The in-text term: a light, semi-transparent wavy underline in the theme accent. */
+abbr.gloss {
+  text-decoration: underline wavy;
+  text-decoration-color: color-mix(in srgb, var(--accent, currentColor) 45%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+abbr.gloss:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The popover reads like a dictionary stanza: a (serif) headword over a muted definition. */
+.gloss-tip {
+  background: var(--elevated, var(--surface, #1c1c24));
+  color: var(--text, #ededf1);
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem 0.75rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
+}
+.gloss-tip .gloss-term {
+  display: block;
+  font-family: var(--serif, inherit);
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  color: var(--text, inherit);
+  padding-bottom: 0.35rem;
+  margin-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+}
+.gloss-tip .gloss-def {
+  display: block;
+  font-family: var(--sans, inherit);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--muted, inherit);
+}
+.gloss-tip[hidden] { display: none; }

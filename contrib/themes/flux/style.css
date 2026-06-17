@@ -92,15 +92,3 @@ body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', 
 .callout-body > p:first-of-type { font-size: inherit; font-family: inherit; color: inherit; }
 .math-display { display: block; overflow-x: auto; margin: 1.25rem 0; text-align: center; }
 pre.mermaid { background: none; border: none; text-align: center; }
-
-/* Glossary terms (decorated by glossary.js): dotted underline + a dictionary-stanza popover
-   (serif/sans per theme) on hover/focus. */
-abbr.gloss { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
-.gloss-tip { background: var(--elevated, var(--surface, #1c1c24)); color: var(--text, #ededf1);
-  border: 1px solid var(--border, #333); border-radius: 10px; padding: 0.65rem 0.8rem;
-  box-shadow: 0 8px 26px rgba(0,0,0,0.3); }
-.gloss-tip .gloss-term { display: block; font-family: var(--serif, inherit); font-weight: 600;
-  font-size: 0.95rem; margin-bottom: 0.3rem; color: var(--text, #ededf1); }
-.gloss-tip .gloss-def { display: block; font-family: var(--sans, inherit); font-size: 0.82rem;
-  line-height: 1.5; color: var(--muted, #9aa3b2); }
-.gloss-tip[hidden] { display: none; }
