@@ -16,8 +16,34 @@ import (
 //go:embed assets/analytics.js
 var analyticsJS []byte
 
-// analyticsAsset is the output path of the beacon, relative to the site root.
-const analyticsAsset = "analytics.js"
+//go:embed assets/analytics-ga.js
+var analyticsGAJS []byte
+
+// Output paths of the per-provider client assets, relative to the site root.
+const (
+	analyticsAsset   = "analytics.js"
+	analyticsGAAsset = "analytics-ga.js"
+)
+
+// emitAnalyticsAssets writes each enabled provider's client asset to the site root — and only
+// that provider's. statsfactory ships its cookieless beacon; Google Analytics ships its gtag
+// loader. Nothing is written when the master switch is off or no provider is configured.
+func emitAnalyticsAssets(write func(string, []byte) error, master bool, a core.Analytics) error {
+	if !master {
+		return nil
+	}
+	if a.Statsfactory.Configured() {
+		if err := write(analyticsAsset, analyticsJS); err != nil {
+			return err
+		}
+	}
+	if a.GoogleAnalytics.Configured() {
+		if err := write(analyticsGAAsset, analyticsGAJS); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // analyticsHead returns the per-page analytics markup for one page: a statsfactory beacon
 // script and/or a Google Analytics tag, for whichever providers the site configures. It
@@ -33,7 +59,7 @@ func analyticsHead(master bool, a core.Analytics, basePath string, p *page) stri
 		b.WriteString(statsfactoryBeacon(a.Statsfactory, basePath, p))
 	}
 	if a.GoogleAnalytics.Configured() {
-		b.WriteString(googleAnalyticsTag(a.GoogleAnalytics.MeasurementID))
+		b.WriteString(googleAnalyticsTag(a.GoogleAnalytics.MeasurementID, basePath))
 	}
 	return b.String()
 }
@@ -67,13 +93,12 @@ func statsfactoryBeacon(cfg core.AnalyticsStatsfactory, basePath string, p *page
 	return b.String()
 }
 
-// googleAnalyticsTag is the standard GA4 gtag.js snippet. Unlike the statsfactory beacon, GA
-// sets cookies and carries its own consent obligations — that is the site owner's call.
-func googleAnalyticsTag(id string) string {
-	id = html.EscapeString(id)
-	return `<script async src="https://www.googletagmanager.com/gtag/js?id=` + id + `"></script>` +
-		`<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}` +
-		`gtag('js',new Date());gtag('config','` + id + `');</script>`
+// googleAnalyticsTag references the bundled GA loader (analytics-ga.js), passing the
+// measurement id as a data attribute. The loader injects Google's gtag.js. Unlike the
+// statsfactory beacon, GA sets cookies and carries its own consent obligations.
+func googleAnalyticsTag(id, basePath string) string {
+	return `<script defer src="` + html.EscapeString(basePath+analyticsGAAsset) +
+		`" data-ga-id="` + html.EscapeString(id) + `"></script>`
 }
 
 // emitBuildTelemetry sends colophon's own build events — the overall build and the document

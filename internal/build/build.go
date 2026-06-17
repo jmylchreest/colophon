@@ -196,13 +196,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	telemetryOn := cfg.Telemetry.On()
 	analyticsListing := analyticsHead(telemetryOn, site.Analytics, basePath, nil)
 
-	// The statsfactory beacon is a single colophon-owned asset, written once and referenced by
-	// every page. Only emitted when the master switch is on and the beacon is configured (GA
-	// loads from Google's CDN and needs no local asset).
-	if telemetryOn && site.Analytics.Statsfactory.Configured() {
-		if err := write(analyticsAsset, analyticsJS); err != nil {
-			return Result{}, err
-		}
+	// Bundle each enabled analytics provider's client asset to the site root — and only the
+	// enabled one(s). Nothing is written when the master switch is off.
+	if err := emitAnalyticsAssets(write, telemetryOn, site.Analytics); err != nil {
+		return Result{}, err
 	}
 
 	// Dateless pages (About, Now, …) are standing chrome, not dated posts: they surface in

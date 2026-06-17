@@ -155,11 +155,11 @@ on:
   workflow_dispatch:
 
 # Configure under Settings → Secrets and variables → Actions:
-#   Variables (public):  STATSFACTORY_SERVER_URL, STATSFACTORY_APP_KEY
+#   Variables (public):  STATSFACTORY_SERVER_URL, STATSFACTORY_APP_KEY, GA_MEASUREMENT_ID
 #   Secrets (private):   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
 #                        R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
-# These override .env.defaults at build time (real env wins). The analytics key is a
-# public sf_live_ key embedded in pages; the deploy credentials never leave colophon.
+# These override .env.defaults at build time (real env wins). The analytics values are
+# public (embedded in pages); the deploy credentials never leave colophon.
 
 permissions:
   contents: read
@@ -171,6 +171,7 @@ jobs:
       # Public analytics config — baked into the built site.
       STATSFACTORY_SERVER_URL: ${{ vars.STATSFACTORY_SERVER_URL }}
       STATSFACTORY_APP_KEY: ${{ vars.STATSFACTORY_APP_KEY }}
+      GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
       # Deploy credentials — used by colophon to publish, never embedded in output.
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
