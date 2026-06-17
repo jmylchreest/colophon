@@ -15,15 +15,12 @@
   --serif: Georgia, 'Times New Roman', serif;
   --sans: system-ui, -apple-system, sans-serif;
   --maxw: 720px;
-  --foot-h: 40px; /* fixed-footer height; body reserves this much so content clears it */
 }
 
 html { scroll-behavior: smooth; }
 body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 17px;
   line-height: 1.7; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
-  overflow-x: hidden; transition: background 0.4s, color 0.4s;
-  /* reserve the fixed footer + the home-indicator inset (only non-zero under viewport-fit=cover) */
-  padding-bottom: calc(var(--foot-h) + env(safe-area-inset-bottom, 0px)); }
+  overflow-x: hidden; transition: background 0.4s, color 0.4s; }
 
 /* ambient glow — driven by --glow-1/--glow-2 (transparent by default, so it's opt-in).
    The 160% oversize keeps the gradient edges off-screen as the slow drift wanders. */
@@ -273,13 +270,12 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 .reveal-sentinel { height: 1px; }
 
 /* ---------- footer: slim bar pinned to the viewport bottom ---------- */
-.foot { position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
-  height: calc(var(--foot-h) + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-  color: var(--faint); font-size: 0.78rem; letter-spacing: 0.01em;
-  background: var(--bg); background: color-mix(in srgb, var(--bg) 72%, transparent);
-  backdrop-filter: saturate(140%) blur(8px); border-top: 1px solid var(--border); }
+/* In-flow attribution footer (not pinned chrome): it sits at the natural end of the content
+   on every viewport, so it never eats the viewport, needs no blur, and carries no overlap or
+   safe-area concerns. The sticky topbar still provides the editorial chrome. */
+.foot { display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  margin-top: 2rem; padding: 1rem; border-top: 1px solid var(--border);
+  color: var(--faint); font-size: 0.78rem; letter-spacing: 0.01em; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .post-hero, .cover { animation: rise 0.7s ease both; }
@@ -295,12 +291,6 @@ pre.mermaid { background: none; border: 0; text-align: center; }
   .home-hero { padding: 4rem 1.1rem 2.4rem; }
   .home-hero h1 { font-size: clamp(2.2rem, 11vw, 3rem); }
   .wrap, .post-wrap { padding-left: 1.1rem; padding-right: 1.1rem; }
-  /* The attribution footer flows after the content on phones instead of being pinned: it
-     no longer eats ~40px of the viewport, drops the GPU-costly blur, and keeps attribution
-     on both the home and post pages (the home page has no in-content card for it). */
-  body { padding-bottom: 0; }
-  .foot { position: static; height: auto; padding: 1.5rem 1rem;
-    background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
