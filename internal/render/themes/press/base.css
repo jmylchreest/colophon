@@ -342,3 +342,11 @@ html.js .search-toggle {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .search-empty { margin: 0.4rem 0.2rem 0.2rem; color: var(--muted); font-size: 0.9em; }
+@media (max-width: 600px) {
+  /* Full-width search on mobile. The toggle sits mid-topbar (feeds/menu are to its right), so a
+     right-anchored panel overflowed off the left. Make .search non-positioning so the panel
+     anchors to the sticky .topbar instead, and span it across the viewport just below the bar
+     (top: 100% tracks the bar height even when the brand wraps to two lines). */
+  .search { position: static; }
+  .search-panel { left: 0.5rem; right: 0.5rem; width: auto; }
+}
