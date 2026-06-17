@@ -54,10 +54,11 @@ type posting struct {
 }
 
 type docMeta struct {
-	id    string
-	url   string
-	title string
-	meta  map[string]string
+	id      string
+	url     string
+	title   string
+	excerpt string
+	meta    map[string]string
 }
 
 // Index is an in-memory inverted index with BM25 statistics — the shared core behind both the
@@ -89,7 +90,10 @@ func NewIndex(docs []Doc, opts BuildOptions) (*Index, error) {
 		if n > 0 && sorted[n-1].ID == d.ID {
 			return nil, fmt.Errorf("search: duplicate document ID %q", d.ID)
 		}
-		ix.docs = append(ix.docs, docMeta{id: d.ID, url: d.URL, title: d.Title, meta: d.Meta})
+		ix.docs = append(ix.docs, docMeta{
+			id: d.ID, url: d.URL, title: d.Title,
+			excerpt: makeExcerpt(d.Body, excerptRunes), meta: d.Meta,
+		})
 
 		tokens := opts.Analyzer(d.Title + " " + d.Body)
 		ix.docLen = append(ix.docLen, len(tokens))
@@ -115,11 +119,12 @@ func (ix *Index) Len() int { return len(ix.docs) }
 
 // Result is one ranked hit.
 type Result struct {
-	ID    string
-	URL   string
-	Title string
-	Score float64
-	Meta  map[string]string
+	ID      string
+	URL     string
+	Title   string
+	Excerpt string
+	Score   float64
+	Meta    map[string]string
 }
 
 // Search ranks documents against the query with BM25 and returns the top limit (all, if limit <=
@@ -151,7 +156,9 @@ func (ix *Index) Search(query string, limit int) []Result {
 	results := make([]Result, 0, len(scores))
 	for doc, score := range scores {
 		m := ix.docs[doc]
-		results = append(results, Result{ID: m.id, URL: m.url, Title: m.title, Score: score, Meta: m.meta})
+		results = append(results, Result{
+			ID: m.id, URL: m.url, Title: m.title, Excerpt: m.excerpt, Score: score, Meta: m.meta,
+		})
 	}
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].Score != results[j].Score {
