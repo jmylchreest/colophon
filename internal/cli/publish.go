@@ -12,6 +12,7 @@ import (
 	"github.com/jmylchreest/colophon/internal/config"
 	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/publish"
+	"github.com/jmylchreest/colophon/internal/telemetry"
 )
 
 // PublishCmd builds and deploys one or more environments. Each --env is built with its
@@ -116,6 +117,9 @@ func (c *PublishCmd) publishEnv(ctx context.Context, root string, cfg *config.Co
 	}
 	log.Step("ENV", name, "publish", strings.Join(env.Publish, ","), "drafts", env.IncludeDrafts)
 
+	tel := telemetryFor(cfg, name, root)
+	defer tel.Flush()
+
 	targets, err := openTargets(root, cfg, env, name, log)
 	if err != nil {
 		return err
@@ -141,6 +145,8 @@ func (c *PublishCmd) publishEnv(ctx context.Context, root string, cfg *config.Co
 		Publishers:    env.Publish,
 		Routes:        routes,
 		Log:           log,
+		Env:           name,
+		Telemetry:     tel,
 	}); err != nil {
 		return err
 	}
@@ -160,7 +166,7 @@ func (c *PublishCmd) publishEnv(ctx context.Context, root string, cfg *config.Co
 		log.Step("PUBLISH", "", "env", name, "warning", "base_url is local; feeds/sitemap will be non-public")
 	}
 
-	if err := deployAll(ctx, env, name, targets, routes, outDir, siteURL, log, summary); err != nil {
+	if err := deployAll(ctx, env, name, targets, routes, outDir, siteURL, log, summary, tel); err != nil {
 		return err
 	}
 	writeManifests(ctx, cfg, targets, name, siteURL, log)
@@ -284,7 +290,7 @@ func resolveBaseURLs(ctx context.Context, cfg *config.Config, env *config.Enviro
 // deployAll deploys the built tree to each target, applying routing so each publisher sees
 // only the files it owns, then prunes old deployments where supported. It appends a summary
 // row per target.
-func deployAll(ctx context.Context, env *config.Environment, name string, targets []deployTarget, routes []core.RouteRule, outDir, siteURL string, log *clog.Logger, summary *[]summaryRow) error {
+func deployAll(ctx context.Context, env *config.Environment, name string, targets []deployTarget, routes []core.RouteRule, outDir, siteURL string, log *clog.Logger, summary *[]summaryRow, tel *telemetry.Client) error {
 	base := os.DirFS(outDir)
 	router := core.NewRouter(routes, env.Publish)
 	routeTargets := map[string]bool{}
@@ -300,6 +306,7 @@ func deployAll(ctx context.Context, env *config.Environment, name string, target
 			log.Step("PUBLISH", t.id, "env", name, "skipped",
 				"no public URL resolved for routed assets; they remain co-located on the other publisher(s)")
 			*summary = append(*summary, summaryRow{env: name, publisher: t.id, status: "skipped"})
+			tel.Publish(t.driver, t.id, "skipped", 0, 0)
 			continue
 		}
 		tree := base
@@ -322,6 +329,7 @@ func deployAll(ctx context.Context, env *config.Environment, name string, target
 			env: name, publisher: t.id, status: "deployed",
 			url: siteURL, files: result.Total, uploaded: result.Uploaded,
 		})
+		tel.Publish(t.driver, t.id, "deployed", result.Uploaded, result.Total)
 		if pruner, ok := t.pub.(core.Pruner); ok {
 			// Best-effort: the deploy already succeeded, so a prune error only warns.
 			if removed, err := pruner.Prune(ctx); err != nil {

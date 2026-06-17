@@ -26,7 +26,9 @@ func (c *BuildCmd) Run() error {
 	}
 
 	log := newLogger(cfg, c.Verbose)
-	opts := build.Options{OutDir: filepath.Join(root, "public"), Log: log}
+	tel := telemetryFor(cfg, c.Env, root)
+	defer tel.Flush()
+	opts := build.Options{OutDir: filepath.Join(root, "public"), Log: log, Env: c.Env, Telemetry: tel}
 	if c.Env != "" {
 		env := cfg.Environment(c.Env)
 		if env == nil {

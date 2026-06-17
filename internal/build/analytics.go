@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/jmylchreest/colophon/internal/core"
+	"github.com/jmylchreest/colophon/internal/telemetry"
 )
 
 // analyticsJS is the colophon-owned web beacon, written once to the output root when web
@@ -50,6 +51,42 @@ func analyticsHead(site core.Site, basePath string, p *page) string {
 	}
 	b.WriteString(`></script>`)
 	return b.String()
+}
+
+// emitBuildTelemetry sends the server-side build events: the overall build, the document
+// count per source (by driver type), and the post count per persona voice. It is a no-op when
+// t is nil (e.g. a serve preview rebuild) or disabled, so preview builds never emit anything.
+func emitBuildTelemetry(t *telemetry.Client, site core.Site, docs []sourceDoc, pages []page) {
+	if t == nil {
+		return
+	}
+	t.Build(site.Theme, len(pages))
+
+	srcCount := map[string]int{}
+	srcDriver := map[string]string{}
+	for _, d := range docs {
+		id := d.src.ID()
+		srcCount[id]++
+		srcDriver[id] = d.src.Driver()
+	}
+	for id, n := range srcCount {
+		t.Source(srcDriver[id], id, n)
+	}
+
+	personaCount := map[string]int{}
+	for _, p := range pages {
+		if p.Static {
+			continue
+		}
+		persona := p.Persona
+		if persona == "" {
+			persona = "(none)"
+		}
+		personaCount[persona]++
+	}
+	for persona, n := range personaCount {
+		t.Persona(persona, n)
+	}
 }
 
 // slugFromURL extracts the trailing path segment of a base_path-relative URL ("posts/hello/"

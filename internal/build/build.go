@@ -26,6 +26,7 @@ import (
 	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/render"
 	"github.com/jmylchreest/colophon/internal/source"
+	"github.com/jmylchreest/colophon/internal/telemetry"
 	"github.com/jmylchreest/colophon/markdown"
 )
 
@@ -65,6 +66,11 @@ type Options struct {
 	Routes []core.RouteRule
 	// Log receives SOURCE/BUILD progress lines; nil silences them.
 	Log *clog.Logger
+	// Env is the environment name, used only as a telemetry label (may be "").
+	Env string
+	// Telemetry receives build/source/persona events. Nil (e.g. from serve) sends nothing,
+	// so preview rebuilds never emit telemetry.
+	Telemetry *telemetry.Client
 }
 
 // resolveBasePath picks the base path: an explicit value wins, else the path component
@@ -343,6 +349,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	if err := sweep(outDir, written); err != nil {
 		return Result{}, err
 	}
+	emitBuildTelemetry(opts.Telemetry, site, docs, pages)
 	return Result{Pages: len(pages), OutDir: outDir, NextEmbargo: nextEmbargo}, nil
 }
 
