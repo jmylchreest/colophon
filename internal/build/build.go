@@ -210,12 +210,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		return Result{}, err
 	}
 
-	// Publish the optional glossary + its decorator; per-page markup is built below so a post
-	// can opt out of auto-matching.
-	hasGlossary, err := emitGlossary(write, cfg)
-	if err != nil {
-		return Result{}, err
-	}
+	// The glossary ships only where it's used: each page is scanned for terms below, and the
+	// data + decorator are emitted after the loop only if some page actually references one.
+	glossRE := glossaryMatcher(cfg.Glossary)
+	anyGlossary := false
 
 	// Dateless pages (About, Now, …) are standing chrome, not dated posts: they surface in
 	// the nav menu rather than the chronological list/feeds. Posts drive the list, tags,
@@ -256,7 +254,8 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			pageLang = siteLang
 		}
 		pageGlossary := ""
-		if hasGlossary {
+		if pageNeedsGlossary(p.HTML, p.GlossaryOff, glossRE) {
+			anyGlossary = true
 			// glossary: false → still load the decorator (so <dfn> can force a term) but
 			// with auto-matching off.
 			pageGlossary = glossaryHeadTag(basePath, !p.GlossaryOff)
@@ -305,6 +304,14 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			return Result{}, err
 		}
 		if err := write(p.Out, []byte(html)); err != nil {
+			return Result{}, err
+		}
+	}
+
+	// Emit the glossary data + decorator only if some page actually referenced a term, so a
+	// glossary.yaml with no matching content (or no glossary at all) ships nothing.
+	if anyGlossary {
+		if _, err := emitGlossary(write, cfg); err != nil {
 			return Result{}, err
 		}
 	}

@@ -4,9 +4,41 @@ import (
 	_ "embed"
 	"encoding/json"
 	"html"
+	"regexp"
+	"sort"
+	"strings"
 
 	"github.com/jmylchreest/colophon/internal/config"
 )
+
+// glossaryMatcher compiles a case-insensitive, word-boundary regex over all glossary terms,
+// or nil when the glossary is empty. It is used to decide which pages actually reference a
+// term, so the decorator + assets ship only where they're needed.
+func glossaryMatcher(gloss map[string]string) *regexp.Regexp {
+	if len(gloss) == 0 {
+		return nil
+	}
+	terms := make([]string, 0, len(gloss))
+	for t := range gloss {
+		terms = append(terms, regexp.QuoteMeta(t))
+	}
+	// Longest first keeps a multi-word term from being masked by a contained shorter one.
+	sort.Slice(terms, func(i, j int) bool { return len(terms[i]) > len(terms[j]) })
+	return regexp.MustCompile(`(?i)\b(` + strings.Join(terms, "|") + `)\b`)
+}
+
+// pageNeedsGlossary reports whether a rendered page actually uses the glossary: a term appears
+// in its HTML (auto-matchable), or — when the post opted out of auto-matching — it carries an
+// explicit <dfn> force. A page with no terms never loads the decorator.
+func pageNeedsGlossary(htmlBody string, optedOut bool, re *regexp.Regexp) bool {
+	if re == nil || !re.MatchString(htmlBody) {
+		return false
+	}
+	if optedOut {
+		return strings.Contains(htmlBody, "<dfn")
+	}
+	return true
+}
 
 //go:embed assets/glossary.js
 var glossaryJS []byte

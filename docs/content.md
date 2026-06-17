@@ -32,6 +32,11 @@ All fields are optional unless noted.
 | `persona` | The hidden writing *voice* (a `personas/<id>.yaml` id) used by the agent; never shown. |
 | `hero` | Banner image shown at the top of the post. A path or an Obsidian `"[[image.png]]"`. |
 | `image` | Preview/social-card image (`og:image` + index thumbnail). |
+| `hero_alt`, `image_alt` | Alt text for those images. Empty = decorative (`alt=""`); set it when the image carries meaning. |
+| `hero_fit`, `image_fit` | How the image fills its box — CSS `object-fit`: `cover` (crop, default), `contain` (letterbox), `fill`, `scale-down`, `none`. |
+| `hero_position`, `image_position` | Which part shows when cropping — CSS `object-position`, e.g. `top` or `50% 20%`. |
+| `lang` | Per-post language (BCP-47, e.g. `fr`), overriding the site `lang`. Emitted as `<html lang>`. |
+| `glossary` | `false` turns off automatic [glossary](#glossary) decoration for this post; an explicit `<dfn>` still works. |
 | `draft` | `true` keeps the post out of production builds (shown in preview/serve). |
 | `publish` | Obsidian whitelist flag, honoured when a source sets `publish_required: true`. |
 | `publish_after` | Embargo: not published until this time (ISO 8601, e.g. `2026-07-01T09:00:00Z`). |
@@ -117,6 +122,32 @@ images (or any path glob) to an object store (e.g. Cloudflare R2) instead — se
 configuration. When routing is active the build rewrites those image URLs to the store's
 public base, so the page references `https://assets.example.com/…` while the bytes are
 uploaded to the store rather than your HTML host.
+
+## Glossary
+
+Drop a `glossary.yaml` (term → definition) at the project root and colophon publishes it as
+`glossary.json`; a JS-enabled theme then **automatically** decorates the first occurrence of
+each term in your prose with an accessible pop-over (a "dictionary stanza" with the term and
+its definition). It is never rendered as a page, and it degrades gracefully — the text-only
+theme just shows the words plain.
+
+```yaml
+# glossary.yaml
+API: "Application Programming Interface — the contract one program exposes for another to call."
+SSG: "Static Site Generator — renders content into static HTML served as-is."
+```
+
+You write naturally — no markup needed. When you *do* want control over a specific word, three
+controls are available (the syntactic sugar):
+
+| You want… | Write… | Effect |
+|-----------|--------|--------|
+| Turn the whole post off | `glossary: false` in frontmatter | No automatic matching. Explicit forces below still work. |
+| **Force** a specific word | `<dfn>API</dfn>` | Always decorated, even mid-post or in an opted-out post. `<dfn>` is the semantic "defining instance". |
+| **Suppress** one word | `<span class="no-gloss">Go</span>` | That occurrence is left alone (use it when a term is also a common word). |
+
+Decoration always skips code, links, headings and existing abbreviations, and only the **first**
+occurrence of a term is auto-decorated, so a post is never peppered with repeats.
 
 ## Sources
 
