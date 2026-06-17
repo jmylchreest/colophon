@@ -163,6 +163,9 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		routes = resolveRoutesFromConfig(site.Routing, cfg)
 	}
 	router := core.NewRouter(routes, opts.Publishers)
+	// Where the browser reader loads the search index from: the routed object-store URL when
+	// _search/ is routed, else the local base_path. Site-global, threaded into every template.
+	searchURL := searchBaseURL(router, basePath)
 	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router)
 	if err != nil {
 		return Result{}, err
@@ -296,6 +299,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"has_code":       p.HasCode,
 			"page_type":      p.Type,
 			"search":         searchEnabled(site),
+			"search_base":    searchURL,
 		}
 		for k, v := range authorVars(author) {
 			ctx[k] = v
@@ -331,6 +335,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		"nav_pages":      navPages,
 		"pages":          list,
 		"search":         searchEnabled(site),
+		"search_base":    searchURL,
 	})
 	if err != nil {
 		return Result{}, err
@@ -341,13 +346,13 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 
 	// Tag pages: one post listing per tag, reusing the index template with a heading. Tag
 	// chips on each post (page.html) link here, so tags become cross-entry navigation.
-	if err := writeTagPages(write, eng, site, basePath, feedHead, favicon, analyticsListing, authors, navPages, posts, list); err != nil {
+	if err := writeTagPages(write, eng, site, basePath, searchURL, feedHead, favicon, analyticsListing, authors, navPages, posts, list); err != nil {
 		return Result{}, err
 	}
 
 	// Author pages: one post listing per persona at authors/<id>/, reached from the avatar
 	// widget. Same index template + heading, mirroring tag pages.
-	if err := writeAuthorPages(write, eng, site, basePath, feedHead, favicon, analyticsListing, authors, navPages, authorGroups); err != nil {
+	if err := writeAuthorPages(write, eng, site, basePath, searchURL, feedHead, favicon, analyticsListing, authors, navPages, authorGroups); err != nil {
 		return Result{}, err
 	}
 
@@ -777,7 +782,7 @@ func tagLinks(tags []string, basePath string) []map[string]any {
 
 // writeTagPages renders a listing page per tag at tags/<slug>/, reusing the index template
 // (with a heading and the tag's posts). list[i] is the index-item map for pages[i].
-func writeTagPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, feedHead, favicon, analyticsListing string, authors, navPages []map[string]any, pages []page, list []map[string]any) error {
+func writeTagPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, searchURL, feedHead, favicon, analyticsListing string, authors, navPages []map[string]any, pages []page, list []map[string]any) error {
 	type group struct {
 		name  string
 		items []map[string]any
@@ -815,6 +820,7 @@ func writeTagPages(write func(string, []byte) error, eng render.Engine, site cor
 			"nav_pages":      navPages,
 			"pages":          g.items,
 			"search":         searchEnabled(site),
+			"search_base":    searchURL,
 		})
 		if err != nil {
 			return err

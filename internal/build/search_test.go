@@ -3,7 +3,24 @@ package build
 import (
 	"os"
 	"testing"
+
+	"github.com/jmylchreest/colophon/internal/core"
 )
+
+func TestSearchBaseURL(t *testing.T) {
+	// Unrouted: the reader loads the index from the local base_path.
+	if got := searchBaseURL(core.NewRouter(nil, nil), "/"); got != "/_search/" {
+		t.Errorf("unrouted = %q, want /_search/", got)
+	}
+	// Routed to an object store: the reader loads it cross-origin from the store's URL.
+	r := core.NewRouter(
+		[]core.RouteRule{{Match: "_search/**", Publisher: "r2", BaseURL: "https://cdn.example.com"}},
+		[]string{"r2"},
+	)
+	if got := searchBaseURL(r, "/"); got != "https://cdn.example.com/_search/" {
+		t.Errorf("routed = %q, want https://cdn.example.com/_search/", got)
+	}
+}
 
 // TestEmbeddedReaderMatchesSource guards against drift: the reader colophon emits
 // (assets/search.js) must stay byte-identical to the engine's canonical source so the build

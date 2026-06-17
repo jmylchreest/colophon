@@ -53,6 +53,18 @@ func writeSearchIndex(write func(string, []byte) error, pages []page, site core.
 	return nil
 }
 
+// searchBaseURL is where the browser reader loads the index from. When _search/ is routed to an
+// object store (so the index stays off a Pages-style file budget), it's that store's absolute URL;
+// otherwise it's the local base_path. Because the reader fetches the manifest/shards/fragments
+// *and* imports search.js from here, a routed (cross-origin) base requires the store to allow CORS
+// GET from the site's origin — unlike routed <img> tags, fetch() and import() are not CORS-exempt.
+func searchBaseURL(router *core.Router, basePath string) string {
+	if routed := router.AssetURL(searchBase + "/manifest.json"); routed != "" {
+		return strings.TrimSuffix(routed, "manifest.json")
+	}
+	return basePath + searchBase + "/"
+}
+
 // searchWriter adapts the build's write closure to search.Writer, rooting every file under
 // _search/.
 type searchWriter struct {
