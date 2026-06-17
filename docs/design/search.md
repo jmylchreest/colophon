@@ -1,7 +1,9 @@
 # Design: static search
 
-> Status: **design** · relates to PLAN §8 (search), §9 (publishers). Supersedes the
-> `SearchCmd`/`SyncCmd` stubs (`internal/cli/stubs.go`).
+> Status: **v1 implemented** · relates to PLAN §8 (search), §9 (publishers). The lexical engine
+> (module `github.com/jmylchreest/colophon/search`), the browser reader, the build emit, the
+> `colophon search` CLI, and the press theme box are built; fuzzy and semantic remain designed
+> seams. Replaced the `SearchCmd` stub (`SyncCmd` still stubbed).
 
 Goal: public-site search that is **fully static** (no server, no external service), **low
 bandwidth** (never load the whole index into the browser), and **incremental-friendly** (a
