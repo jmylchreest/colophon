@@ -93,6 +93,19 @@ type Pruner interface {
 	Prune(ctx context.Context) (removed int, err error)
 }
 
+// GitPublisher is an alternative Publisher shape for destinations best described as "a git
+// branch": the whole built tree is the desired state, and the driver reconciles by writing the
+// tree onto a nominated branch of a remote and pushing it. There is no incremental plan — the
+// push replaces the branch — so the publish orchestrator dispatches a driver implementing this
+// to Push instead of the incremental publish.Run.
+//
+// A GitPublisher must still satisfy Publisher (for driver listing / capability checks); its
+// Commit should return an error explaining that the driver uses Push, and Deployed/Hash may
+// return safe zero values.
+type GitPublisher interface {
+	Push(ctx context.Context, tree fs.FS) (Result, error)
+}
+
 // CanonicalURLer is an optional Publisher capability: report the stable public base URL
 // the deploy is reachable at — a custom domain, or the platform's stable alias (e.g.
 // Cloudflare's <project>.pages.dev for production, <branch>.<project>.pages.dev for a

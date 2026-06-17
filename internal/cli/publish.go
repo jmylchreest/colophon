@@ -315,7 +315,15 @@ func deployAll(ctx context.Context, env *config.Environment, name string, target
 			tree = selectFS{base: base, keep: func(p string) bool { return router.Keep(id, p) }}
 			log.Detail("PUBLISH", t.id, "env", name, "routed", router.Owns(t.id))
 		}
-		result, err := publish.Run(ctx, tree, t.pub)
+		// A git-shaped destination (github-pages, …) deploys by pushing the whole tree to a
+		// branch — no incremental plan — so it is dispatched to Push instead of publish.Run.
+		var result core.Result
+		var err error
+		if gp, ok := t.pub.(core.GitPublisher); ok {
+			result, err = gp.Push(ctx, tree)
+		} else {
+			result, err = publish.Run(ctx, tree, t.pub)
+		}
 		if err != nil {
 			return fmt.Errorf("deploy %s: %w", t.id, err)
 		}

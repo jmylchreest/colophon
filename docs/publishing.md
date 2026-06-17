@@ -30,6 +30,8 @@ colophon publish --env production --allow-publish
 | `local` | Copy the built tree to a directory (offline preview / diffing). |
 | `cloudflare-pages` | Deploy the site to Cloudflare Pages (direct upload). |
 | `cloudflare-r2` | Upload files to an S3-compatible object store (R2, S3, MinIO). |
+| `git` | Force-push the built tree to a branch of any git remote (GitHub/GitLab/Codeberg Pages, mirrors, self-hosted). |
+| `github-pages` | The `git` driver with GitHub-friendly defaults (branch `gh-pages`). |
 
 ### Secrets and permissions
 
@@ -40,6 +42,7 @@ never pass through the agent or the YAML:
 |-----------|-----------------|------------------|
 | `cloudflare-pages` | `CLOUDFLARE_API_TOKEN` | Account → Cloudflare Pages → **Edit** |
 | `cloudflare-r2` | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` (or `AWS_*`) | R2 → **Object Read & Write** (+ bucket-create for `--create`) |
+| `git` / `github-pages` | `GITHUB_TOKEN` / `GH_TOKEN` / `GIT_TOKEN` (HTTPS remotes only) | Repo contents → **write** (e.g. a GitHub fine-grained PAT or `GITHUB_TOKEN` in Actions). SSH remotes use the agent — no token. |
 
 Non-secret settings (account id, bucket, project) may use `{env:VAR}` interpolation in config.
 Per-publisher detail lives in each driver's README
@@ -66,6 +69,98 @@ publishers:
     region: us-east-1
     public_url: "https://my-assets.s3.us-east-1.amazonaws.com"
 ```
+
+## Git-based hosting (GitHub / GitLab / Codeberg Pages)
+
+The `git` driver publishes by **force-pushing the built tree as a single orphan commit** to a
+nominated branch of a git remote. Whatever serves that branch — GitHub Pages, GitLab Pages,
+Codeberg Pages, a mirror, a self-hosted bare repo — then serves the site. It uses
+[go-git](https://github.com/go-git/go-git) (pure Go), so **no `git` binary is required**.
+
+Because each publish is a fresh orphan commit, the branch always mirrors exactly the current
+build — there's no history to drift and no stale files to prune. It never touches your working
+tree: the build is staged in a temp repo and pushed from there.
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `repo` | *(required)* | Remote URL (`https://…`, `git@host:owner/repo`, `ssh://…`) or local path. |
+| `branch` | `main` (`gh-pages` for `github-pages`) | The branch to force-push. |
+| `public_url` | *(provider-derived)* | The site's canonical URL. Auto-derived for known hosts (below); set it for a custom domain. |
+| `commit_author` / `commit_email` | `colophon` / `colophon@users.noreply.github.com` | Author of the publish commit. |
+| `commit_message` | `colophon: publish <timestamp>` | Commit message. |
+
+`public_url` is auto-derived from the remote for known hosts, so you usually don't set it:
+
+| Host | Repo | Derived URL |
+|------|------|-------------|
+| `github.com` | `me/blog` | `https://me.github.io/blog/` |
+| `github.com` | `me/me.github.io` | `https://me.github.io/` (user/org site) |
+| `gitlab.com` | `me/site` | `https://me.gitlab.io/site/` |
+| `codeberg.org` | `me/pages` | `https://me.codeberg.page/` |
+
+Anything else (a self-hosted host, a custom domain via a `CNAME`) resolves no URL — set
+`public_url` explicitly.
+
+### GitHub Pages
+
+```yaml
+publishers:
+  - id: pages
+    driver: github-pages              # branch defaults to gh-pages
+    repo: "git@github.com:me/blog.git"   # SSH: pushes via your ssh-agent
+
+environments:
+  - name: production
+    publish: [pages]
+    allow_publish: true
+```
+
+In GitHub Actions, use an HTTPS remote and the workflow token instead of SSH:
+
+```yaml
+  - id: pages
+    driver: github-pages
+    repo: "https://github.com/me/blog.git"   # GITHUB_TOKEN → push over HTTPS
+```
+
+Then point the repo's **Settings → Pages** at the `gh-pages` branch.
+
+### GitLab Pages
+
+```yaml
+  - id: pages
+    driver: git
+    repo: "git@gitlab.com:me/site.git"
+    branch: pages                      # match your .gitlab-ci.yml `pages` job source
+```
+
+GitLab serves Pages from a CI job, so the branch is whatever your `pages:` job builds from.
+
+### Codeberg Pages
+
+```yaml
+  - id: pages
+    driver: git
+    repo: "git@codeberg.org:me/pages.git"
+    branch: pages                      # Codeberg serves the `pages` branch
+```
+
+### Any git remote
+
+`git` is not GitHub-specific — push to a mirror, a self-hosted Forgejo/Gitea, or a local bare
+repo (handy for tests). Set `public_url` since the host is unknown:
+
+```yaml
+  - id: mirror
+    driver: git
+    repo: "git@git.example.com:web/site.git"
+    branch: deploy
+    public_url: "https://www.example.com"
+```
+
+**Authentication** follows the remote scheme: an `https://` remote uses a token from
+`GITHUB_TOKEN` / `GH_TOKEN` / `GIT_TOKEN`; an `git@…` / `ssh://` remote uses your SSH agent; a
+local path needs neither.
 
 ## Per-environment overrides
 
