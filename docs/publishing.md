@@ -34,6 +34,7 @@ colophon publish --env production --allow-publish
 | `tigris` | The `s3` driver with Tigris (Fly.io) defaults — needs only a bucket. |
 | `git` | Force-push the built tree to a branch of any git remote (GitHub/GitLab/Codeberg Pages, mirrors, self-hosted). |
 | `github-pages` | The `git` driver with GitHub-friendly defaults (branch `gh-pages`). |
+| `command` | Run any CLI against the built tree (surge, Netlify, Vercel, rsync, …) — the escape hatch. |
 
 ### Secrets and permissions
 
@@ -195,6 +196,51 @@ repo (handy for tests). Set `public_url` since the host is unknown:
 **Authentication** follows the remote scheme: an `https://` remote uses a token from
 `GITHUB_TOKEN` / `GH_TOKEN` / `GIT_TOKEN`; an `git@…` / `ssh://` remote uses your SSH agent; a
 local path needs neither.
+
+## Run any CLI: the `command` publisher
+
+When no built-in driver fits, the `command` driver runs an arbitrary CLI against the built tree
+— so any deploy tool that takes a directory (surge, Netlify, Vercel, Wrangler, exe.dev, Azure
+SWA, `rsync`, `scp`, `aws s3 sync`, a bespoke script) is a publisher with no driver of its own.
+
+colophon materialises the (routed) tree to a temp directory and runs your command there, with
+the directory as its working dir, the parent environment inherited (so the tool's own token var
+flows through), `COLOPHON_*` context injected, and `CI=true`. A non-zero exit fails the publish.
+
+```yaml
+publishers:
+  - id: surge
+    driver: command
+    command: ["surge", "{dir}", "myblog.surge.sh"]   # argv list — never a shell
+    public_url: "https://myblog.surge.sh"            # SURGE_TOKEN comes from the env
+
+  - id: rsync
+    driver: command
+    host: "deploy@example.com:/var/www/blog"          # any custom setting → {host}
+    command: ["rsync", "-az", "--delete", "{dir}/", "{host}"]
+    public_url: "https://www.example.com"
+```
+
+The command is an **argv list executed directly — never through a shell**, so there's no shell
+injection surface. For a one-liner with pipes or `&&`, make the shell explicit:
+`["sh", "-c", "aws s3 sync {dir} s3://bucket --cache-control max-age=3600"]`.
+
+**Interpolation.** Every argument is interpolated with `{placeholder}` tokens drawn from your own
+publisher settings plus colophon runtime values (which win on a clash): `{dir}` / `{output_dir}`
+(the materialised tree, also the CWD), `{manifest}` (a JSON file classifying each path as
+page/asset/feed/… with content-type and size, written *beside* the tree so it isn't published
+unless you reference it), `{public_url}`, `{id}`, `{file_count}`, and any setting you declare
+(`{host}`, `{domain}`, `{project}`, …). Unknown placeholders error, so a typo fails loudly.
+Per-environment `overrides` vary any setting, so one `command` publisher can target staging vs
+production. The same values are exposed as `COLOPHON_OUTPUT_DIR` / `COLOPHON_MANIFEST` /
+`COLOPHON_PUBLIC_URL` / … env vars.
+
+> **Secrets stay in the environment.** colophon never injects a token into the command line — the
+> child inherits the environment and the target tool reads its own `$SURGE_TOKEN` / `$VERCEL_TOKEN`
+> there, matching colophon's env-only rule and the deploy-CLI best practice of keeping credentials
+> out of argv (where they'd leak into process listings and shell history). The command runs with
+> your privileges from your own config — same trust as a Makefile — and is gated behind
+> `--allow-publish` like every deploy.
 
 ## Per-environment overrides
 

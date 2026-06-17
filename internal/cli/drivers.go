@@ -5,6 +5,7 @@ package cli
 // next-build-time) can resolve them. Adding a driver = add its package + a line here.
 import (
 	_ "github.com/jmylchreest/colophon/internal/publish/cloudflare"
+	_ "github.com/jmylchreest/colophon/internal/publish/command"
 	_ "github.com/jmylchreest/colophon/internal/publish/git"
 	_ "github.com/jmylchreest/colophon/internal/publish/local"
 	_ "github.com/jmylchreest/colophon/internal/publish/r2"

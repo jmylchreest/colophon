@@ -101,7 +101,7 @@ func (p *publisher) Driver() string {
 
 // --- the core.Publisher methods that don't apply to a git push ---
 
-var errUsePush = errors.New("git: this driver deploys via GitPublisher.Push, not Publisher.Commit")
+var errUsePush = errors.New("git: this driver deploys via TreePublisher.Push, not Publisher.Commit")
 
 func (p *publisher) Hash(string, []byte) string { return "" }
 func (p *publisher) Protected(string) bool      { return false }
@@ -115,7 +115,7 @@ func (p *publisher) Invalidate(context.Context, []string) error { return nil }
 
 // Push writes the built tree into a fresh repo, commits it, and force-pushes it to the
 // configured branch of the remote — so the branch becomes an orphan commit holding exactly the
-// build. Implements core.GitPublisher.
+// build. Implements core.TreePublisher.
 func (p *publisher) Push(ctx context.Context, tree fs.FS) (core.Result, error) {
 	dir, err := os.MkdirTemp("", "colophon-git-*")
 	if err != nil {

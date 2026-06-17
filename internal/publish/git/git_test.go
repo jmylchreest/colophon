@@ -24,9 +24,9 @@ func TestPushToLocalBareRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gp, ok := pub.(core.GitPublisher)
+	gp, ok := pub.(core.TreePublisher)
 	if !ok {
-		t.Fatal("git driver does not implement core.GitPublisher")
+		t.Fatal("git driver does not implement core.TreePublisher")
 	}
 
 	tree := fstest.MapFS{
