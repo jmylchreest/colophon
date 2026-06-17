@@ -87,14 +87,14 @@ func authorStrip(groups []authorGroup) []map[string]any {
 // writeAuthorPages renders a listing page per persona at authors/<id>/, reusing the index
 // template (with a heading and that author's posts). Avatar links in the topbar point here,
 // so personas become cross-entry navigation, mirroring writeTagPages.
-func writeAuthorPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, feedHead, favicon string, authors, navPages []map[string]any, groups []authorGroup) error {
+func writeAuthorPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, feedHead, favicon, analyticsListing string, authors, navPages []map[string]any, groups []authorGroup) error {
 	for _, g := range groups {
 		html, err := eng.Render("index.html", map[string]any{
 			"site_title":     site.Title,
 			"base_url":       site.BaseURL,
 			"base_path":      basePath,
 			"feed_head":      feedHead,
-			"analytics_head": analyticsHead(site, basePath, nil),
+			"analytics_head": analyticsListing,
 			"favicon":        favicon,
 			"heading":        "By " + g.name,
 			"authors":        authors,

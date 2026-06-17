@@ -1,109 +1,122 @@
-# Analytics
+# Analytics & telemetry
 
-colophon has optional, privacy-respecting analytics powered by
-[statsfactory](https://github.com/jmylchreest/statsfactory). It is **inert until keyed** — an
-unconfigured project ships nothing — and splits into two surfaces:
+colophon has two distinct, privacy-respecting telemetry surfaces with **different owners**:
 
-- a **reader-facing web beacon** embedded in pages (page views + engagement time), and
-- the **binary's own build/publish events** (document counts by source type, deploys by
-  publisher type).
+| | **Site analytics** | **Tool telemetry** |
+|---|---|---|
+| Answers | "how is *my blog* doing?" | "how is *colophon* used?" |
+| Owner | the **site owner** | the colophon **maintainer** |
+| Surface | a web beacon in deployed pages | the binary reporting its own runs |
+| Destination | the site owner's statsfactory | the maintainer's (release-baked) statsfactory |
+| Config | `sites[].analytics` (per site) | `telemetry` (top level) |
 
-Both feed the same statsfactory app, as different event types.
+Both are off unless configured, and a single master switch (`telemetry.enabled`) governs
+everything.
 
-## Configuration
+## The master switch
 
-Analytics is a per-site block in `colophon.yaml`:
+```yaml
+telemetry:
+  enabled: true        # master switch over ALL telemetry — this and every site's analytics
+```
+
+`telemetry.enabled: false` disables the tool telemetry **and** every site's reader beacon. The
+environment variable `COLOPHON_TELEMETRY=off` additionally force-disables the tool telemetry
+(`off`, `false`, `0`, `no`).
+
+## Site analytics (reader beacon)
+
+Per-site, one block per provider — your data, your instance:
 
 ```yaml
 sites:
   - id: main
-    # …
     analytics:
-      provider: statsfactory
-      server_url: "{env:STATSFACTORY_SERVER_URL:-}"
-      app_key: "{env:STATSFACTORY_APP_KEY:-}"
-      # enabled: true   # master switch (default true when keyed)
-      # web: true       # the reader-facing beacon
-      # server: true    # the binary's build/publish events
+      statsfactory:                       # cookieless, DNT-respecting
+        server_url: "{env:STATSFACTORY_SERVER_URL:-}"
+        app_key: "{env:STATSFACTORY_APP_KEY:-}"
+      google_analytics:                   # GA4 — sets cookies, brings its own consent duties
+        measurement_id: "{env:GA_MEASUREMENT_ID:-}"
 ```
 
-It activates only when both `server_url` and `app_key` resolve. The statsfactory ingest key
-is a **public `sf_live_` key**, explicitly safe to embed in page HTML — it is not a secret.
+Each provider is independent and inert until configured. The **statsfactory** beacon is a
+~2 KB dependency-free `analytics.js` written once to the site root and referenced by every
+page. It:
 
-### Injecting the credentials
+- sends `page_view` on load and `page_engagement` (active milliseconds, as the metric value)
+  on hide/unload;
+- is **cookieless** (session id in `sessionStorage`, per tab);
+- **honours Do-Not-Track / Global Privacy Control** — sends nothing when either is set.
+
+Its public per-page dimensions are `post.slug`, `post.type`, `post.author`, `post.tags`, plus
+`page.path` and `referrer`. The statsfactory ingest key is a **public `sf_live_` key**, safe to
+embed in pages. The **hidden persona is never sent to the beacon**.
+
+Both surfaces are wired into the **default** and **minimal (text)** themes; a custom theme opts
+in by rendering `{{ analytics_head|safe }}` before `</body>`.
+
+> Google Analytics sets cookies and carries consent obligations the cookieless beacon does
+> not — enable it only if that fits your privacy posture.
+
+### Injecting site credentials
 
 Values usually come from `{env:VAR}` placeholders. colophon loads two dot-env files from the
-project root before interpolation, and **never overrides a variable already set in the real
-environment**. The precedence is:
+project root before interpolation and **never overrides a variable already set in the real
+environment**:
 
 ```
 real environment (e.g. CI secrets)  >  .env (local, gitignored)  >  .env.defaults (committed)
 ```
 
-So the common setup is: commit your statsfactory endpoint + public key as defaults in
-`.env.defaults`, override per-machine in a local `.env`, and override in CI by setting
-`STATSFACTORY_SERVER_URL` / `STATSFACTORY_APP_KEY` as repository secrets/variables.
+So: commit your statsfactory endpoint + public key in `.env.defaults`, override per-machine in
+a local `.env`, and override in CI via repository Variables/Secrets.
+
+**GitHub Actions** — `colophon init` scaffolds `.github/workflows/deploy.yml`. Set under
+*Settings → Secrets and variables → Actions*:
+
+- **Variables** (public): `STATSFACTORY_SERVER_URL`, `STATSFACTORY_APP_KEY` — the ingest key is
+  public, so a Variable (not a Secret) is right.
+- **Secrets** (private): deploy credentials — `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
+  `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+
+## Tool telemetry (colophon's own usage)
+
+`colophon build` and `colophon publish` report colophon's *own* operation — never your content
+— to the maintainer, so usage is understood. It is anonymous (a `distinct_id` that is a SHA-256
+hash cached at `.colophon/telemetry.id`; the raw value is never stored or sent), and
+fire-and-forget — it never blocks or fails a command, and `colophon serve` previews emit
+nothing.
+
+Credentials default to values **baked into the binary at release**, so a released colophon
+reports by default (opt-out); a source/dev build has no baked creds and reports nothing. To
+build a release with telemetry:
 
 ```sh
-# .env.defaults  (committed; PUBLIC values only — never deploy secrets)
-STATSFACTORY_SERVER_URL=https://stats.example.com
-STATSFACTORY_APP_KEY=sf_live_xxxxxxxxxxxxxxxx
+go build -ldflags "\
+  -X github.com/jmylchreest/colophon/internal/telemetry.DefaultServerURL=https://stats.example.com \
+  -X github.com/jmylchreest/colophon/internal/telemetry.DefaultAppKey=sf_live_xxxxxxxx" \
+  ./cmd/colophon
 ```
 
-### GitHub Actions
+A project may override the destination (e.g. to self-host the maintainer role) under
+`telemetry.statsfactory`.
 
-`colophon init` scaffolds `.github/workflows/deploy.yml`, which builds (and, once a cloud
-publisher is configured, publishes) the site with the credentials sourced from the repository's
-Actions config. Set them under **Settings → Secrets and variables → Actions**:
+## Event model
 
-- **Variables** (public): `STATSFACTORY_SERVER_URL`, `STATSFACTORY_APP_KEY` — the ingest key
-  is a public `sf_live_` key, so a Variable (not a Secret) is appropriate.
-- **Secrets** (private): your deploy credentials — `CLOUDFLARE_API_TOKEN`,
-  `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+statsfactory dimensions are arbitrary and defined at ingest time, so these compose into pivot
+and breakdown views.
 
-These override `.env.defaults` at build time (real environment wins), so the same repo builds
-with the right analytics endpoint locally and in CI.
+| Surface | Event | Value | Key dimensions | Answers |
+|---------|-------|-------|----------------|---------|
+| Site | `page_view` | — | `post.slug`, `post.type`, `post.tags`, `post.author` | most popular posts |
+| Site | `page_engagement` | active ms | `post.slug` | engagement time per post |
+| Tool | `build` | page count | `theme`, `env` | builds over time |
+| Tool | `source_indexed` | doc count | `source.type`, `source.id`, `env` | document count × source type |
+| Tool | `publish` | uploaded | `publisher.type`, `publisher.id`, `status`, `env` | published docs/executions × publisher type |
 
-## The web beacon
+## Opting out — summary
 
-When `web` analytics is active, the build writes a single ~2 KB dependency-free
-`analytics.js` to the site root and references it from every page. It:
-
-- sends a `page_view` on load and a `page_engagement` event (active milliseconds, as the
-  metric value) when the page is hidden or unloaded;
-- is **cookieless** — the session id lives in `sessionStorage`, scoped to the tab;
-- **honours Do-Not-Track and Global Privacy Control** — it sends nothing when either is set.
-
-It is wired into the **default** and **minimal (text)** themes. A custom theme opts in by
-rendering `{{ analytics_head|safe }}` before `</body>`.
-
-Per-page dimensions carried on the beacon: `post.slug`, `post.type`, `post.author`,
-`post.tags`, plus `page.path` and `referrer`. The **hidden persona is never sent to the web
-beacon** — it is server-side only (see below).
-
-## Server-side events
-
-When `server` analytics is active, `colophon build` and `colophon publish` emit events with a
-stable, anonymous install id (a SHA-256 hash cached at `.colophon/telemetry.id`; the raw value
-is never stored or sent). Delivery is fire-and-forget — it never blocks or fails a command, and
-`colophon serve` previews emit nothing.
-
-| Event | Value | Key dimensions | Answers |
-|-------|-------|----------------|---------|
-| `page_view` (web) | — | `post.slug`, `post.type`, `post.tags` | most popular posts |
-| `page_engagement` (web) | active ms | `post.slug` | engagement time per post |
-| `build` | page count | `theme`, `env` | builds over time |
-| `source_indexed` | doc count | `source.type`, `source.id`, `env` | document count × source type |
-| `content_persona` | post count | `persona`, `env` | output per writing voice |
-| `publish` | uploaded | `publisher.type`, `publisher.id`, `status`, `env` | published docs/executions × publisher type |
-
-statsfactory dimensions are arbitrary and defined at ingest time, so these compose into the
-pivot/breakdown views in its dashboard.
-
-## Opting out
-
-- Leave the `analytics` block unset (or `provider:` empty) — nothing is emitted.
-- Set `enabled: false` (or `web: false` / `server: false`) to disable a surface.
-- Set `COLOPHON_TELEMETRY=off` in the environment to force the server-side events off even when
-  keyed (`off`, `false`, `0`, `no` all work).
-- Readers' browsers opt out automatically via Do-Not-Track / Global Privacy Control.
+- **Everything:** `telemetry.enabled: false`.
+- **Tool telemetry only:** `COLOPHON_TELEMETRY=off`, or `telemetry.statsfactory.enabled: false`.
+- **A site provider:** omit it, or set its `enabled: false`.
+- **Readers** opt out of the beacon automatically via Do-Not-Track / Global Privacy Control.

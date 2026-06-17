@@ -50,14 +50,16 @@ sites:
     federation:
       feeds: [rss, atom, json]       # always emit at least one feed
     search: lexical            # on-site visitor search: lexical | semantic | off
-    # Privacy-respecting analytics via statsfactory (cookieless; honours Do-Not-Track).
-    # Inert until both server_url and app_key resolve. The ingest key is a public
-    # "sf_live_" key, safe to embed in pages. Values flow from .env.defaults / .env / the
-    # real environment (CI secrets override the files). See docs/analytics.md.
+    # Reader analytics for THIS site (page views, engagement) — your data, your instance.
+    # One block per provider; inert until configured. The statsfactory beacon is cookieless
+    # and honours Do-Not-Track; its ingest key is a public "sf_live_" key, safe to embed in
+    # pages. Values flow from .env.defaults / .env / the real environment. See docs/analytics.md.
     analytics:
-      provider: statsfactory
-      server_url: "{env:STATSFACTORY_SERVER_URL:-}"
-      app_key: "{env:STATSFACTORY_APP_KEY:-}"
+      statsfactory:
+        server_url: "{env:STATSFACTORY_SERVER_URL:-}"
+        app_key: "{env:STATSFACTORY_APP_KEY:-}"
+      # google_analytics:            # GA4 — note: sets cookies, brings its own consent duties
+      #   measurement_id: "{env:GA_MEASUREMENT_ID:-}"
 
 # Publishers are pure mechanism (how to deploy). Environments decide what/where.
 publishers:
@@ -81,6 +83,16 @@ environments:
   #   title: "My Blog (preview)"
   #   overrides:
   #     cf: { branch: preview }  # Cloudflare: non-production branch → Preview env
+
+# Telemetry is colophon's own anonymous usage reporting (builds, source types, publisher
+# types — never your content), sent to the colophon maintainer. "enabled" is the MASTER
+# switch over ALL telemetry: set it false to disable this AND every site's analytics above.
+# You can also disable just this with the COLOPHON_TELEMETRY=off environment variable.
+telemetry:
+  enabled: true
+  # statsfactory:                # override the maintainer's default to point at your own
+  #   server_url: "{env:COLOPHON_TELEMETRY_URL:-}"
+  #   app_key: "{env:COLOPHON_TELEMETRY_KEY:-}"
 `
 
 const authorYAML = `# An author is the byline shown to readers. A post's "author:" names one of these (by file

@@ -11,16 +11,24 @@ import (
 // TestDisabledClientIsNoop checks that an unconfigured or opted-out client never panics and
 // emits nothing — call sites rely on being able to use it unconditionally.
 func TestDisabledClientIsNoop(t *testing.T) {
+	off := false
 	tests := []struct {
 		name      string
-		analytics core.Analytics
+		telemetry core.Telemetry
 		optOut    string
 	}{
-		{"no credentials", core.Analytics{Provider: "statsfactory"}, ""},
-		{"not active", core.Analytics{}, ""},
+		{"no credentials", core.Telemetry{}, ""},
 		{
-			"opted out",
-			core.Analytics{Provider: "statsfactory", ServerURL: "https://s", AppKey: "sf_live_x"},
+			"master switch off",
+			core.Telemetry{
+				Enabled:      &off,
+				Statsfactory: core.TelemetryStatsfactory{ServerURL: "https://s", AppKey: "sf_live_x"},
+			},
+			"",
+		},
+		{
+			"opted out via env",
+			core.Telemetry{Statsfactory: core.TelemetryStatsfactory{ServerURL: "https://s", AppKey: "sf_live_x"}},
 			"off",
 		},
 	}
@@ -29,17 +37,36 @@ func TestDisabledClientIsNoop(t *testing.T) {
 			if tt.optOut != "" {
 				t.Setenv(envOptOut, tt.optOut)
 			}
-			c := New(tt.analytics, "production", "test", t.TempDir())
+			c := New(tt.telemetry, "production", "test", t.TempDir())
 			if c.enabled() {
 				t.Fatalf("expected disabled client")
 			}
 			// None of these should panic or do anything observable.
 			c.Build("default", 3)
 			c.Source("md-dir", "content", 2)
-			c.Persona("default", 1)
 			c.Publish("local", "local", "deployed", 5, 10)
 			c.Flush()
 		})
+	}
+}
+
+// TestBakedDefaultEnablesClient checks that release-baked credentials enable the client even
+// when the config leaves them empty (config values fall back to the baked defaults).
+func TestBakedDefaultEnablesClient(t *testing.T) {
+	DefaultServerURL = "https://baked.example.com"
+	DefaultAppKey = "sf_live_baked"
+	t.Cleanup(func() { DefaultServerURL, DefaultAppKey = "", "" })
+
+	c := New(core.Telemetry{}, "production", "test", t.TempDir())
+	if !c.enabled() {
+		t.Fatal("expected an enabled client from baked defaults")
+	}
+	c.Flush()
+
+	// The master switch still overrides baked defaults.
+	off := false
+	if New(core.Telemetry{Enabled: &off}, "production", "test", t.TempDir()).enabled() {
+		t.Fatal("master switch off should disable even with baked defaults")
 	}
 }
 

@@ -87,6 +87,10 @@ type Config struct {
 	Publishers   []PublisherConfig `yaml:"publishers"`
 	Environments []Environment     `yaml:"environments"`
 
+	// Telemetry is colophon's own usage reporting plus the master switch over all telemetry
+	// (the tool's events and every site's reader analytics).
+	Telemetry core.Telemetry `yaml:"telemetry,omitempty"`
+
 	// Personas (the hidden writing voices) and Authors (the shown bylines) are populated
 	// from personas/*.yaml and authors/*.yaml, not from colophon.yaml.
 	Personas []core.Persona `yaml:"-"`

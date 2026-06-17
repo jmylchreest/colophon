@@ -27,6 +27,14 @@ const (
 	httpTimeout  = 5 * time.Second
 )
 
+// DefaultServerURL and DefaultAppKey are the tool-telemetry credentials baked into the binary
+// at release via -ldflags "-X .../internal/telemetry.DefaultServerURL=…". They are empty in
+// source and dev builds, so an un-baked, unconfigured colophon reports nothing.
+var (
+	DefaultServerURL string
+	DefaultAppKey    string
+)
+
 // Client sends server-side events. A nil or disabled Client is a safe no-op, so call sites
 // need no guards.
 type Client struct {
@@ -35,18 +43,22 @@ type Client struct {
 	env        string
 }
 
-// New builds a telemetry client from a site's analytics config. It returns a disabled no-op
-// when server-side analytics is off, credentials are missing, or COLOPHON_TELEMETRY opts out.
-// env is the environment name (label dimension, may be ""); version and root identify the
-// build and locate the anonymous install id.
-func New(a core.Analytics, env, version, root string) *Client {
+// New builds the tool-telemetry client from colophon's Telemetry config. It returns a disabled
+// no-op when the master switch is off, COLOPHON_TELEMETRY opts out, or no credentials resolve
+// (config values fall back to the release-baked defaults). env is the environment-name label
+// (may be ""); version and root identify the build and locate the anonymous install id.
+func New(t core.Telemetry, env, version, root string) *Client {
 	c := &Client{env: env}
-	if optedOut() || !a.ServerEnabled() {
+	if optedOut() || !t.On() {
+		return c
+	}
+	url, key := t.Statsfactory.Resolve(DefaultServerURL, DefaultAppKey)
+	if url == "" || key == "" {
 		return c
 	}
 	c.sf = statsfactory.New(statsfactory.Config{
-		ServerURL:     a.ServerURL,
-		AppKey:        a.AppKey,
+		ServerURL:     url,
+		AppKey:        key,
 		ClientName:    "colophon",
 		ClientVersion: version,
 		FlushInterval: 30 * time.Second,
@@ -67,12 +79,6 @@ func (c *Client) Build(theme string, pages int) {
 // this drives the "document count × source type" breakdown.
 func (c *Client) Source(driver, id string, docs int) {
 	c.track("source_indexed", statsfactory.Dims{"source.type": driver, "source.id": id}, docs)
-}
-
-// Persona records how many posts were written in one persona voice. Server-side only: the
-// hidden persona is never sent to the public web beacon.
-func (c *Client) Persona(persona string, posts int) {
-	c.track("content_persona", statsfactory.Dims{"persona": persona}, posts)
 }
 
 // Publish records one publisher's deploy — its driver type, id and outcome, with the uploaded

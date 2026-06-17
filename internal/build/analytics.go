@@ -19,14 +19,28 @@ var analyticsJS []byte
 // analyticsAsset is the output path of the beacon, relative to the site root.
 const analyticsAsset = "analytics.js"
 
-// analyticsHead returns the <script> tag that loads the beacon for one page, carrying the
-// statsfactory endpoint/key and the page's public dimensions as data-* attributes. It returns
-// "" when web analytics is disabled. p is nil for non-post pages (index, tag, author), which
-// then carry no post dimensions. The hidden persona is deliberately never emitted here.
-func analyticsHead(site core.Site, basePath string, p *page) string {
-	if !site.Analytics.WebEnabled() {
+// analyticsHead returns the per-page analytics markup for one page: a statsfactory beacon
+// script and/or a Google Analytics tag, for whichever providers the site configures. It
+// returns "" when the telemetry master switch is off or no provider is configured. p is nil
+// for non-post pages (index, tag, author), which carry no post dimensions. The hidden persona
+// is deliberately never emitted here. master is the top-level telemetry switch.
+func analyticsHead(master bool, a core.Analytics, basePath string, p *page) string {
+	if !master {
 		return ""
 	}
+	var b strings.Builder
+	if a.Statsfactory.Configured() {
+		b.WriteString(statsfactoryBeacon(a.Statsfactory, basePath, p))
+	}
+	if a.GoogleAnalytics.Configured() {
+		b.WriteString(googleAnalyticsTag(a.GoogleAnalytics.MeasurementID))
+	}
+	return b.String()
+}
+
+// statsfactoryBeacon is the <script> tag that loads the cookieless beacon for one page,
+// carrying the endpoint/key and the page's public dimensions as data-* attributes.
+func statsfactoryBeacon(cfg core.AnalyticsStatsfactory, basePath string, p *page) string {
 	var b strings.Builder
 	b.WriteString(`<script defer src="`)
 	b.WriteString(html.EscapeString(basePath + analyticsAsset))
@@ -41,8 +55,8 @@ func analyticsHead(site core.Site, basePath string, p *page) string {
 		b.WriteString(html.EscapeString(val))
 		b.WriteString(`"`)
 	}
-	attr("data-sf-url", strings.TrimRight(site.Analytics.ServerURL, "/"))
-	attr("data-sf-key", site.Analytics.AppKey)
+	attr("data-sf-url", strings.TrimRight(cfg.ServerURL, "/"))
+	attr("data-sf-key", cfg.AppKey)
 	if p != nil {
 		attr("data-sf-slug", slugFromURL(p.URL))
 		attr("data-sf-type", p.Type)
@@ -53,9 +67,19 @@ func analyticsHead(site core.Site, basePath string, p *page) string {
 	return b.String()
 }
 
-// emitBuildTelemetry sends the server-side build events: the overall build, the document
-// count per source (by driver type), and the post count per persona voice. It is a no-op when
-// t is nil (e.g. a serve preview rebuild) or disabled, so preview builds never emit anything.
+// googleAnalyticsTag is the standard GA4 gtag.js snippet. Unlike the statsfactory beacon, GA
+// sets cookies and carries its own consent obligations — that is the site owner's call.
+func googleAnalyticsTag(id string) string {
+	id = html.EscapeString(id)
+	return `<script async src="https://www.googletagmanager.com/gtag/js?id=` + id + `"></script>` +
+		`<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}` +
+		`gtag('js',new Date());gtag('config','` + id + `');</script>`
+}
+
+// emitBuildTelemetry sends colophon's own build events — the overall build and the document
+// count per source driver type — to the tool-telemetry client. It is a no-op when t is nil
+// (e.g. a serve preview rebuild) or disabled, so previews never emit anything. The hidden
+// persona is intentionally NOT reported here: it is site-owner content, not tool usage.
 func emitBuildTelemetry(t *telemetry.Client, site core.Site, docs []sourceDoc, pages []page) {
 	if t == nil {
 		return
@@ -71,21 +95,6 @@ func emitBuildTelemetry(t *telemetry.Client, site core.Site, docs []sourceDoc, p
 	}
 	for id, n := range srcCount {
 		t.Source(srcDriver[id], id, n)
-	}
-
-	personaCount := map[string]int{}
-	for _, p := range pages {
-		if p.Static {
-			continue
-		}
-		persona := p.Persona
-		if persona == "" {
-			persona = "(none)"
-		}
-		personaCount[persona]++
-	}
-	for persona, n := range personaCount {
-		t.Persona(persona, n)
 	}
 }
 

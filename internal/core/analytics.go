@@ -2,46 +2,50 @@ package core
 
 import "strings"
 
-// Analytics configures privacy-respecting telemetry for a site, sent to a statsfactory
-// instance. The same configuration drives two surfaces: a reader-facing web beacon embedded
-// in pages (page views + engagement time) and the binary's own build/publish events. It is
-// inert until both ServerURL and AppKey are set, so an unconfigured project ships nothing —
-// the values usually come from {env:STATSFACTORY_*} placeholders (see the dot-env files), and
-// the statsfactory ingest key is a public "sf_live_" key that is safe to embed in page HTML.
+// Analytics configures a site's reader-facing analytics (page views, engagement), one block
+// per provider. Each provider is independent and the build emits a beacon for every configured
+// one. This is reader data, owned by the site owner — distinct from the tool's own usage
+// reporting (see Telemetry). It is additionally subject to the top-level telemetry master
+// switch: Telemetry.Enabled=false disables every provider here too.
 type Analytics struct {
-	// Provider names the backend; only "statsfactory" is supported. Empty or "off" disables.
-	Provider string `yaml:"provider,omitempty"`
-	// ServerURL is the statsfactory base URL (no trailing slash); AppKey is its public
-	// ingest key. Both empty → analytics is inert.
-	ServerURL string `yaml:"server_url,omitempty"`
-	AppKey    string `yaml:"app_key,omitempty"`
-	// Enabled is the master switch (default true when configured); Web and Server gate the
-	// two surfaces individually (each default true when active). An explicit false opts out.
-	Enabled *bool `yaml:"enabled,omitempty"`
-	Web     *bool `yaml:"web,omitempty"`
-	Server  *bool `yaml:"server,omitempty"`
+	Statsfactory    AnalyticsStatsfactory `yaml:"statsfactory,omitempty"`
+	GoogleAnalytics AnalyticsGoogle       `yaml:"google_analytics,omitempty"`
 }
 
-// Active reports whether analytics is configured and not disabled: a supported provider,
-// both credentials present, and Enabled not explicitly false.
-func (a Analytics) Active() bool {
+// Any reports whether at least one analytics provider is configured.
+func (a Analytics) Any() bool {
+	return a.Statsfactory.Configured() || a.GoogleAnalytics.Configured()
+}
+
+// AnalyticsStatsfactory points the cookieless statsfactory beacon at the site owner's instance.
+// The ingest key is a public "sf_live_" key, safe to embed in pages.
+type AnalyticsStatsfactory struct {
+	Enabled   *bool  `yaml:"enabled,omitempty"`
+	ServerURL string `yaml:"server_url,omitempty"`
+	AppKey    string `yaml:"app_key,omitempty"`
+}
+
+// Configured reports whether the statsfactory beacon should be emitted: credentials present
+// and not explicitly disabled.
+func (a AnalyticsStatsfactory) Configured() bool {
 	if a.Enabled != nil && !*a.Enabled {
 		return false
 	}
-	provider := strings.ToLower(strings.TrimSpace(a.Provider))
-	if provider == "" || provider == "off" {
+	return strings.TrimSpace(a.ServerURL) != "" && strings.TrimSpace(a.AppKey) != ""
+}
+
+// AnalyticsGoogle configures Google Analytics (GA4). Unlike the statsfactory beacon, GA sets
+// cookies and carries its own consent obligations, so it is opt-in per site and independent of
+// the cookieless beacon.
+type AnalyticsGoogle struct {
+	Enabled       *bool  `yaml:"enabled,omitempty"`
+	MeasurementID string `yaml:"measurement_id,omitempty"`
+}
+
+// Configured reports whether a GA tag should be emitted.
+func (a AnalyticsGoogle) Configured() bool {
+	if a.Enabled != nil && !*a.Enabled {
 		return false
 	}
-	return provider == "statsfactory" &&
-		strings.TrimSpace(a.ServerURL) != "" && strings.TrimSpace(a.AppKey) != ""
-}
-
-// WebEnabled reports whether the reader-facing web beacon should be emitted.
-func (a Analytics) WebEnabled() bool {
-	return a.Active() && (a.Web == nil || *a.Web)
-}
-
-// ServerEnabled reports whether the binary should send its own build/publish events.
-func (a Analytics) ServerEnabled() bool {
-	return a.Active() && (a.Server == nil || *a.Server)
+	return strings.TrimSpace(a.MeasurementID) != ""
 }
