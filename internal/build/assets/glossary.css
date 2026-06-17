@@ -3,15 +3,18 @@
    properties (with neutral fallbacks for token-less themes). A theme may override .gloss or
    .gloss-tip in its own stylesheet for a bespoke look. */
 
-/* The in-text term: a light, semi-transparent wavy underline in the theme accent. */
-abbr.gloss {
+/* The in-text term: a light, semi-transparent wavy underline in the theme accent. Styled by
+   the .gloss class (not the element) so an auto-matched <abbr> and an author-forced <dfn> look
+   the same — and the <dfn>'s default italic is reset. */
+.gloss {
+  font-style: normal;
   text-decoration: underline wavy;
   text-decoration-color: color-mix(in srgb, var(--accent, currentColor) 45%, transparent);
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
   cursor: help;
 }
-abbr.gloss:focus-visible {
+.gloss:focus-visible {
   outline: 2px solid var(--accent, currentColor);
   outline-offset: 2px;
   border-radius: 2px;

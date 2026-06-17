@@ -1,7 +1,7 @@
 // colophon glossary decorator. Fetches the published glossary (term -> definition), wraps the
 // first occurrence of each term in the article in <abbr class="gloss" data-gloss="…">, and
 // shows a themeable, accessible popover on hover/focus. The theme owns the look: it styles
-// abbr.gloss (e.g. a wavy underline) and .gloss-tip (the card). Accessibility: the trigger is
+// .gloss (e.g. a wavy underline) and .gloss-tip (the card). Accessibility: the trigger is
 // focusable, the popover is role="tooltip" linked via aria-describedby, it shows on focus as
 // well as hover, and Escape dismisses it (WCAG 1.4.13). No dependency, no framework.
 (function () {
