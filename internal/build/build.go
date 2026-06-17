@@ -210,8 +210,9 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		return Result{}, err
 	}
 
-	// Publish the optional glossary + its decorator; glossaryHead is "" when none is configured.
-	glossaryHead, err := emitGlossary(write, cfg, basePath)
+	// Publish the optional glossary + its decorator; per-page markup is built below so a post
+	// can opt out of auto-matching.
+	hasGlossary, err := emitGlossary(write, cfg)
 	if err != nil {
 		return Result{}, err
 	}
@@ -254,9 +255,11 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		if pageLang == "" {
 			pageLang = siteLang
 		}
-		pageGlossary := glossaryHead
-		if p.GlossaryOff {
-			pageGlossary = ""
+		pageGlossary := ""
+		if hasGlossary {
+			// glossary: false → still load the decorator (so <dfn> can force a term) but
+			// with auto-matching off.
+			pageGlossary = glossaryHeadTag(basePath, !p.GlossaryOff)
 		}
 		ctx := map[string]any{
 			"lang":           pageLang,

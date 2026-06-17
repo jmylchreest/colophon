@@ -29,8 +29,12 @@
     var lower = {};
     Object.keys(gloss).forEach(function (t) { lower[t.toLowerCase()] = t; });
     var used = {};
-    forceMarked(root, gloss, lower, used); // author-forced terms (<dfn>) first
-    autoMatch(root, gloss, lower, used);   // then auto-match the rest
+    forceMarked(root, gloss, lower, used); // author-forced terms (<dfn>) always apply
+    // A post with `glossary: false` sets data-gloss-auto="off": honour explicit forces but
+    // skip automatic matching.
+    if (self.getAttribute("data-gloss-auto") !== "off") {
+      autoMatch(root, gloss, lower, used);
+    }
   }
 
   // forceMarked decorates author-marked terms: a <dfn> (the semantic "defining instance") whose

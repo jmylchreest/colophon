@@ -23,29 +23,38 @@ const (
 	glossaryStyle = "glossary.css"
 )
 
-// emitGlossary writes the glossary data + decorator to the site root when the project ships a
-// glossary, and returns the per-page <script> markup (glossary_head) that loads them. The
-// glossary itself is never rendered as a page; only the term→definition JSON is published, for
-// the theme's decorator to wrap matching terms in <abbr title>. Returns "" when there is no
-// glossary, so a theme's {{ glossary_head }} stays inert.
-func emitGlossary(write func(string, []byte) error, cfg *config.Config, basePath string) (string, error) {
+// emitGlossary writes the glossary data + engine decorator/styles to the site root when the
+// project ships a glossary, and reports whether it did. The glossary itself is never rendered
+// as a page; only the term→definition JSON is published. Per-page markup is built by
+// glossaryHeadTag, so a post can carry the auto-match flag.
+func emitGlossary(write func(string, []byte) error, cfg *config.Config) (bool, error) {
 	if len(cfg.Glossary) == 0 {
-		return "", nil
+		return false, nil
 	}
 	data, err := json.Marshal(cfg.Glossary)
 	if err != nil {
-		return "", err
+		return false, err
 	}
-	if err := write(glossaryData, data); err != nil {
-		return "", err
+	for _, a := range []struct {
+		name string
+		body []byte
+	}{{glossaryData, data}, {glossaryAsset, glossaryJS}, {glossaryStyle, glossaryCSS}} {
+		if err := write(a.name, a.body); err != nil {
+			return false, err
+		}
 	}
-	if err := write(glossaryAsset, glossaryJS); err != nil {
-		return "", err
-	}
-	if err := write(glossaryStyle, glossaryCSS); err != nil {
-		return "", err
-	}
-	return `<link rel="stylesheet" href="` + html.EscapeString(basePath+glossaryStyle) +
+	return true, nil
+}
+
+// glossaryHeadTag is the per-page markup that loads the glossary styles + decorator. auto is
+// false for a post that sets `glossary: false`: the decorator still loads (so an explicit
+// <dfn> can force a single term) but skips automatic matching.
+func glossaryHeadTag(basePath string, auto bool) string {
+	tag := `<link rel="stylesheet" href="` + html.EscapeString(basePath+glossaryStyle) +
 		`"><script defer src="` + html.EscapeString(basePath+glossaryAsset) +
-		`" data-glossary="` + html.EscapeString(basePath+glossaryData) + `"></script>`, nil
+		`" data-glossary="` + html.EscapeString(basePath+glossaryData) + `"`
+	if !auto {
+		tag += ` data-gloss-auto="off"`
+	}
+	return tag + `></script>`
 }
