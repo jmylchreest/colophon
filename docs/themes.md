@@ -128,7 +128,7 @@ For example, to give `type: project` entries a bespoke layout:
 ```html
 {# themes/mytheme/project.html — renders entries with `type: project` #}
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8"><title>{{ meta_title }}</title>
   <link rel="stylesheet" href="{{ base_path }}style.css">{{ seo_head|safe }}
@@ -193,9 +193,13 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `feed_head` | `<link rel="alternate">` feed-discovery tags. Output with `{{ feed_head\|safe }}`. |
 | `seo_head` | Full SEO `<head>`: canonical, robots, Open Graph, Twitter, JSON-LD. `{{ seo_head\|safe }}`. |
 | `analytics_head` | Analytics provider markup (statsfactory beacon and/or GA loader). Output once before `</body>` with `{{ analytics_head\|safe }}`. Empty when the site configures no analytics. See [Analytics](#analytics). |
+| `glossary_head` | Glossary styles + decorator `<link>`/`<script>`. Output once before `</body>` with `{{ glossary_head\|safe }}`. Empty unless the page uses a glossary term. See [Glossary](#glossary). |
+| `lang` | The page's BCP-47 language tag — put it on `<html lang="{{ lang }}">`. |
 | `favicon` | Favicon filename, or empty. |
 | `hero` | Hero banner URL (page-relative, or absolute when routed), or empty. |
+| `hero_alt`, `hero_style` | Hero alt text, and a ready `object-fit`/`object-position` style string (may be empty). Use as `alt="{{ hero_alt }}"`{% if hero_style %} `style="{{ hero_style }}"`{% endif %}. |
 | `image`, `image_abs` | Preview image href; absolute preview URL for `og:image`. |
+| `image_alt`, `image_style` | Card-image alt text and `object-fit` style (the index list items carry `image_alt`/`image_style` too). |
 | `tags` | List of `{name, url}` — linked tag chips. Prefix nothing; `url` is ready to use. |
 | `category` | Primary category string (first category, else first tag, else empty). |
 | `read_time` | Estimated reading time in whole minutes (integer). |
@@ -209,7 +213,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 
 | Variable | Description |
 |----------|-------------|
-| `site_title`, `base_path`, `base_url`, `feed_head`, `favicon`, `analytics_head` | As above. |
+| `lang`, `site_title`, `base_path`, `base_url`, `feed_head`, `favicon`, `analytics_head` | As above. (Listing pages carry no prose, so no `glossary_head`.) |
 | `heading` | Page heading — the site title on the home page, or `Tagged “<name>”` on a tag page. |
 | `feeds` | List of `{label, href}` for subscribe links. |
 | `pages` | List of posts: `{title, url, date, draft, embargoed, embargo_until, image, tags}`. Prefix `url` with `base_path`. |
@@ -252,6 +256,31 @@ The theme never names a provider: `analytics_head` already contains whichever lo
 enabled (statsfactory, GA, both, or — when the site configures none — nothing, leaving the line
 inert). Every built-in and contrib theme includes it; a JS-enabled custom theme should too.
 
+## Glossary
+
+If the site ships a `glossary.yaml` (see [authoring](content.md#glossary)) and a page uses a
+term, the build publishes the data + a small decorator and exposes a `glossary_head` variable.
+A theme opts in with one line before `</body>` (right where the analytics line goes):
+
+```html
+{% if glossary_head %}{{ glossary_head|safe }}{% endif %}
+</body>
+```
+
+That's it — no per-theme CSS or JS needed:
+
+- The **decorator and styles are engine-provided** (`glossary.js` + `glossary.css`, written to
+  the site root). The decorator wraps terms in `<abbr class="gloss" data-gloss="…">` and shows
+  an accessible pop-over on hover/focus (`role="tooltip"` + `aria-describedby`, Escape to
+  dismiss).
+- The default styling **adapts to your theme** through the token contract: it uses
+  `--accent` for the underline and `--elevated`/`--text`/`--muted`/`--border` + `--serif`/`--sans`
+  for the dictionary-stanza card (with neutral fallbacks for token-less themes).
+- To customise the look, **override `.gloss` and `.gloss-tip`** (and `.gloss-tip .gloss-term`
+  / `.gloss-def`) in your own stylesheet — e.g. `press` gives `.gloss` a light wavy underline.
+- A **text-only / no-JS theme** simply omits the line: terms stay plain readable text, so the
+  page still works correctly without the decorator (this is what `minimal` does).
+
 ## Build a theme — step by step
 
 The fastest route is to start from a built-in and change only what you want. A new theme
@@ -293,7 +322,7 @@ A minimal `themes/mytheme/page.html`:
 
 ```html
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -320,7 +349,7 @@ pages like About), and per-tag pages:
 
 ```html
 <!doctype html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head><meta charset="utf-8"><title>{{ heading }}</title>
   <link rel="stylesheet" href="{{ base_path }}style.css">{{ feed_head|safe }}</head>
 <body>
