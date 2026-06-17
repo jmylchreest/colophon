@@ -11,6 +11,7 @@
 {{ feed_head|safe }}
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <div id="progress"></div>
 
 <header class="topbar">
@@ -62,7 +63,7 @@
   </nav>
   {% endif %}
 
-  <main class="post-main">
+  <main id="main" class="post-main">
     <header class="post-hero">
       <a class="back" href="{{ base_path }}">← {{ site_title }}</a>
       <div style="margin-top:1.5rem">

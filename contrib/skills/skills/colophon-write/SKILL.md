@@ -67,6 +67,20 @@ only once it's on `PATH`.
 7. **(Optional)** Improve tags/metadata with `colophon-metadata`, then publish with
    `colophon-publish`.
 
+## Accessibility
+
+Write for screen-reader and keyboard users as you go — it's far cheaper than retrofitting:
+
+- **Link text describes the destination** — `[the Raft paper](...)`, never "click here", "read
+  more", or a bare URL.
+- **Images get alt text** — meaningful images carry a real description in the markdown
+  (`![Raft leader-election timeline](...)`); purely decorative ones use empty alt (`![](...)`).
+  For the banner/card images set `hero_alt:` / `image_alt:` in frontmatter (leave empty if the
+  banner is decorative).
+- **Heading order is logical** — one `#` H1 (the title), then `##`/`###` without skipping levels.
+- **Expand acronyms on first use** (or add them to the site glossary, if one is configured).
+- Set `lang:` in frontmatter if the post is in a different language than the site default.
+
 ## Guardrails
 
 - If `colophon` isn't installed, surface the install command and ask — never install it silently.

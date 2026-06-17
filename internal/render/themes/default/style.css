@@ -14,6 +14,12 @@ body {
 }
 a { color: #0a58ca; text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* Skip link: off-screen until focused, then the first tab stop. */
+.skip-link { position: absolute; left: 0; top: 0; transform: translateY(-130%);
+  background: #0a58ca; color: #fff; padding: 0.5rem 1rem; border-radius: 0 0 6px 0;
+  transition: transform 0.15s; }
+.skip-link:focus { transform: translateY(0); }
 .site-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem 1rem; font-weight: 600; margin-bottom: 2.5rem; }
 .site-header a { color: inherit; }
 .site-nav { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; font-weight: 400; font-size: 0.95rem; }

@@ -18,6 +18,12 @@
 }
 
 html { scroll-behavior: smooth; }
+
+/* Skip link: off-screen until focused, then it slides in as the first tab stop. */
+.skip-link { position: fixed; top: 0; left: 0; z-index: 200;
+  background: var(--accent); color: var(--on-accent); padding: 0.6rem 1rem;
+  border-radius: 0 0 8px 0; transform: translateY(-130%); transition: transform 0.15s; }
+.skip-link:focus { transform: translateY(0); }
 body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 17px;
   line-height: 1.7; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   overflow-x: hidden; transition: background 0.4s, color 0.4s; }

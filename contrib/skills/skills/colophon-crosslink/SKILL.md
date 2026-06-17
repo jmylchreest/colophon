@@ -54,5 +54,7 @@ only once it's on `PATH`.
 ## Guardrails
 
 - If `colophon` isn't installed, surface the install command and ask — never install it silently.
+- Make link text describe the destination (the target's title/topic), never "click here" or a
+  bare slug — this is both better UX and an accessibility requirement.
 - Only link to entries that actually exist (from `colophon posts`). Don't invent targets.
 - Don't over-link; relevance over volume. Keep edits minimal and preserve voice.

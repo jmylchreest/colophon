@@ -10,6 +10,7 @@
 {{ feed_head|safe }}
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <filter id="colo-goo"><feColorMatrix in="SourceGraphic" type="matrix"
     values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10"/></filter>
@@ -61,7 +62,7 @@
   <p class="lede">Write it once. Own it forever. Publish anywhere.</p>
 </section>
 
-<main class="wrap">
+<main id="main" class="wrap">
   <ul class="post-list" data-reveal="8">
   {% for p in pages %}
     <a class="post-row" href="{{ base_path }}{{ p.url }}">

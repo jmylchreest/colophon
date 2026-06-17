@@ -54,6 +54,9 @@ only once it's on `PATH`.
 ## Guardrails
 
 - If `colophon` isn't installed, surface the install command and ask — never install it silently.
+- Keep edits accessible: descriptive link text (never "click here"), alt text on meaningful
+  images (`hero_alt:`/`image_alt:` for banners), and a logical heading order — fix these if you
+  touch a section that violates them.
 - Don't rewrite more than asked. Don't silently change the title's slug or the byline.
 - Keep the post's draft/publish state unless the user asks to change it.
 - If the edit affects metadata (description/SEO/tags), hand off to `colophon-metadata`.
