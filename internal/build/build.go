@@ -295,6 +295,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"has_mermaid":    p.HasMermaid,
 			"has_code":       p.HasCode,
 			"page_type":      p.Type,
+			"search":         searchEnabled(site),
 		}
 		for k, v := range authorVars(author) {
 			ctx[k] = v
@@ -329,6 +330,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		"authors":        authors,
 		"nav_pages":      navPages,
 		"pages":          list,
+		"search":         searchEnabled(site),
 	})
 	if err != nil {
 		return Result{}, err
@@ -812,6 +814,7 @@ func writeTagPages(write func(string, []byte) error, eng render.Engine, site cor
 			"authors":        authors,
 			"nav_pages":      navPages,
 			"pages":          g.items,
+			"search":         searchEnabled(site),
 		})
 		if err != nil {
 			return err

@@ -303,3 +303,38 @@ pre.mermaid { background: none; border: 0; text-align: center; }
   *, body::before { animation: none !important; transition: none !important; }
   .home-hero h1 { filter: none; } .home-hero h1::before { display: none; }
 }
+
+/* search — progressive-enhancement search box. The toggle is hidden until JS is present (no dead
+   control for no-JS visitors); the engine reader is fetched on first open. Uses the shared
+   custom-property palette so any theme built on this base inherits a working search box. */
+.search { position: relative; }
+.search-toggle { display: none; }
+html.js .search-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.1rem; height: 2.1rem; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.search-toggle:hover { color: var(--text); }
+.search-toggle svg { width: 1.15rem; height: 1.15rem; }
+.search-panel {
+  position: absolute; right: 0; top: calc(100% + .5rem); z-index: 60;
+  width: min(92vw, 30rem); padding: .6rem;
+  background: var(--elevated); border: 1px solid var(--border); border-radius: .7rem;
+  box-shadow: 0 10px 40px rgba(0,0,0,.35);
+}
+.search-input {
+  width: 100%; box-sizing: border-box; padding: .55rem .7rem;
+  font: inherit; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: .5rem;
+}
+.search-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.search-results { list-style: none; margin: .5rem 0 0; padding: 0; max-height: 60vh; overflow: auto; }
+.search-results li { margin: 0; }
+.search-hit { display: block; padding: .5rem .6rem; border-radius: .45rem; text-decoration: none; color: var(--text); }
+.search-hit:hover, .search-hit:focus { background: var(--accent-soft); outline: none; }
+.search-hit-title { display: block; font-weight: 600; }
+.search-hit-excerpt {
+  display: block; margin-top: .15rem; color: var(--muted); font-size: .85em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.search-empty { margin: .5rem .2rem 0; color: var(--muted); font-size: .9em; }

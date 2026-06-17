@@ -31,6 +31,16 @@
         <button class="auth-chev next" type="button" aria-label="Scroll authors right" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
       </nav>
       {% endif %}
+      {% if search %}
+      <div class="search" data-search data-search-base="{{ base_path }}_search/">
+        <button class="search-toggle" type="button" aria-label="Search" aria-expanded="false" aria-controls="searchPanel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+        <div class="search-panel" id="searchPanel" hidden>
+          <input class="search-input" type="search" placeholder="Search…" aria-label="Search posts" autocomplete="off" spellcheck="false">
+          <ul class="search-results" aria-label="Search results"></ul>
+          <p class="search-empty" hidden>No results.</p>
+        </div>
+      </div>
+      {% endif %}
       <div class="feeds" data-open="false">
         <div class="feeds-track"><div class="feeds-inner" id="feedsTrack">
           <a class="feed" href="{{ base_path }}rss.xml" data-tip="RSS" aria-label="RSS feed"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6.18" cy="17.82" r="2.18"/><path d="M4 4.44v2.83c7.03 0 12.73 5.7 12.73 12.73h2.83C19.56 11.41 12.59 4.44 4 4.44zM4 10.1v2.83c3.9 0 7.07 3.17 7.07 7.07h2.83C13.9 14.53 9.47 10.1 4 10.1z"/></svg></a>
@@ -104,6 +114,7 @@
 <footer class="foot"><span>Published with colophon</span></footer>
 
 <script defer src="{{ base_path }}app.js"></script>
+{% if search %}<script type="module" src="{{ base_path }}search-ui.js"></script>{% endif %}
 {% if has_code %}
 <link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css">
 <script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>

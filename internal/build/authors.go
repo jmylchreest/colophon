@@ -104,6 +104,7 @@ func writeAuthorPages(write func(string, []byte) error, eng render.Engine, site 
 			"authors":        authors,
 			"nav_pages":      navPages,
 			"pages":          g.items,
+			"search":         searchEnabled(site),
 		})
 		if err != nil {
 			return err
