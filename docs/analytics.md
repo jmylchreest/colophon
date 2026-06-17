@@ -52,8 +52,13 @@ Its public per-page dimensions are `post.slug`, `post.type`, `post.author`, `pos
 `page.path` and `referrer`. The statsfactory ingest key is a **public `sf_live_` key**, safe to
 embed in pages. The **hidden persona is never sent to the beacon**.
 
-Both surfaces are wired into the **default** and **minimal (text)** themes; a custom theme opts
-in by rendering `{{ analytics_head|safe }}` before `</body>`.
+**Google Analytics** (GA4) ships its own loader asset, `analytics-ga.js`, which injects
+Google's `gtag.js`. Each provider's asset is written to the site root **only when that provider
+is enabled** — `analytics.js` for statsfactory, `analytics-ga.js` for GA, both if both, nothing
+if neither.
+
+Both providers are wired into the **default** and **minimal (text)** themes; a custom theme
+opts in by rendering `{{ analytics_head|safe }}` before `</body>`.
 
 > Google Analytics sets cookies and carries consent obligations the cookieless beacon does
 > not — enable it only if that fits your privacy posture.
