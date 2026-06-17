@@ -23,6 +23,7 @@ func Project(dir string) error {
 		{"themes/default/.keep", ""},
 		{"assets/.keep", ""},
 		{".gitignore", gitignore},
+		{".env.defaults", envDefaults},
 	}
 	for _, f := range files {
 		full := filepath.Join(dir, f.path)
@@ -48,6 +49,14 @@ sites:
     federation:
       feeds: [rss, atom, json]       # always emit at least one feed
     search: lexical            # on-site visitor search: lexical | semantic | off
+    # Privacy-respecting analytics via statsfactory (cookieless; honours Do-Not-Track).
+    # Inert until both server_url and app_key resolve. The ingest key is a public
+    # "sf_live_" key, safe to embed in pages. Values flow from .env.defaults / .env / the
+    # real environment (CI secrets override the files). See docs/analytics.md.
+    analytics:
+      provider: statsfactory
+      server_url: "{env:STATSFACTORY_SERVER_URL:-}"
+      app_key: "{env:STATSFACTORY_APP_KEY:-}"
 
 # Publishers are pure mechanism (how to deploy). Environments decide what/where.
 publishers:
@@ -115,4 +124,18 @@ const gitignore = `# colophon build output and derived state
 /public/
 /dist/
 /.colophon/
+
+# Local env overrides / secrets. Shared, non-secret defaults live in .env.defaults
+# (committed); this file overrides them and is where deploy secrets go.
+/.env
+`
+
+const envDefaults = `# Shared, non-secret defaults loaded by colophon before {env:VAR} interpolation.
+# This file IS committed. Precedence: real environment (e.g. CI secrets) > .env (local,
+# gitignored) > .env.defaults. Put only PUBLIC values here — never deploy secrets.
+#
+# The statsfactory ingest key is a public "sf_live_" key, safe to embed in pages. Set these
+# to your statsfactory instance to turn analytics on; leave unset and it stays inert.
+# STATSFACTORY_SERVER_URL=https://stats.example.com
+# STATSFACTORY_APP_KEY=sf_live_xxxxxxxxxxxxxxxx
 `

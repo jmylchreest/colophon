@@ -139,6 +139,11 @@ func Load(root string) (*Config, error) {
 		return nil, fmt.Errorf("read config %s: %w", path, err)
 	}
 
+	// Populate the environment from the project's dot-env files before interpolation, so
+	// {env:VAR} placeholders resolve against them. Real environment variables (e.g. CI
+	// secrets) are never overridden — they win over both files.
+	loadDotEnv(root)
+
 	k := koanf.New(".")
 	if err := k.Load(rawbytes.Provider(interpolateEnv(raw)), yaml.Parser()); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)

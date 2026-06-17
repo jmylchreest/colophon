@@ -24,6 +24,8 @@ type Site struct {
 	Federation Federation `yaml:"federation,omitempty"`
 	// Search selects the visitor-facing on-site search: lexical | semantic | off.
 	Search string `yaml:"search,omitempty"`
+	// Analytics configures privacy-respecting telemetry (statsfactory). Inert until keyed.
+	Analytics Analytics `yaml:"analytics,omitempty"`
 }
 
 // RouteRule sends output matching Match to Publisher, rewriting matched URLs to
