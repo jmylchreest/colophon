@@ -1,0 +1,73 @@
+{
+  "bread recipe": [
+    {
+      "id": "/bread/",
+      "score": 3.385136262468908,
+      "title": "Bread",
+      "url": "/bread/"
+    }
+  ],
+  "go": [
+    {
+      "id": "/go/",
+      "score": 0.8433065715382246,
+      "title": "Go",
+      "url": "/go/"
+    },
+    {
+      "id": "/tigris/",
+      "score": 0.5576182608347762,
+      "title": "Tigris",
+      "url": "/tigris/"
+    },
+    {
+      "id": "/search/",
+      "score": 0.5132846535245907,
+      "title": "Search",
+      "url": "/search/"
+    }
+  ],
+  "go search": [
+    {
+      "id": "/search/",
+      "score": 2.3559792543719915,
+      "title": "Search",
+      "url": "/search/"
+    },
+    {
+      "id": "/go/",
+      "score": 0.8433065715382246,
+      "title": "Go",
+      "url": "/go/"
+    },
+    {
+      "id": "/tigris/",
+      "score": 0.5576182608347762,
+      "title": "Tigris",
+      "url": "/tigris/"
+    }
+  ],
+  "nomatchxyz": [],
+  "object storage": [
+    {
+      "id": "/tigris/",
+      "score": 2.8683787356760884,
+      "title": "Tigris",
+      "url": "/tigris/"
+    }
+  ],
+  "programming language": [
+    {
+      "id": "/go/",
+      "score": 1.7364402923045157,
+      "title": "Go",
+      "url": "/go/"
+    },
+    {
+      "id": "/rust/",
+      "score": 1.7364402923045157,
+      "title": "Rust",
+      "url": "/rust/"
+    }
+  ]
+}

@@ -18,10 +18,11 @@ type Doc struct {
 	Meta  map[string]string // shown on the result card; not indexed
 }
 
-// Params are the BM25 tuning constants.
+// Params are the BM25 tuning constants. The JSON tags are the wire form the browser reader keys
+// on (m.bm25.k1 / m.bm25.b).
 type Params struct {
-	K1 float64 // term-frequency saturation
-	B  float64 // length normalization
+	K1 float64 `json:"k1"` // term-frequency saturation
+	B  float64 `json:"b"`  // length normalization
 }
 
 // DefaultParams are the conventional BM25 defaults.
