@@ -80,3 +80,8 @@ route that can't resolve a URL stays inactive and its files remain co-located. S
 | `location` | no | `CreateBucket` location/`LocationConstraint` hint. |
 | `description` | no | Recorded in the provenance manifest. |
 | `delete_orphaned` | no | Delete objects no longer in the build (default `true`). |
+
+All settings support `{env:VAR}` / `{env:VAR:-default}`
+[config interpolation](../../../docs/publishing.md#configuration-and-interpolation), e.g.
+`bucket: "{env:TIGRIS_BUCKET:-my-site}"` — the standard way to keep non-secret settings flexible
+while credentials stay in the environment.

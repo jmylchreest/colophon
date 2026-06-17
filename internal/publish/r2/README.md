@@ -146,6 +146,14 @@ publishers:
     public_url: "https://my-assets.s3.us-east-1.amazonaws.com"
 ```
 
+For a non-Cloudflare store, prefer the dedicated [`s3` / `tigris`](../s3/README.md) driver — same
+S3 wire protocol, without R2's control-plane bits.
+
+Every setting supports `{env:VAR}` / `{env:VAR:-default}`
+[config interpolation](../../../docs/publishing.md#configuration-and-interpolation) (as the
+`bucket` / `account_id` / `public_url` above show); only the SigV4 keys and `CLOUDFLARE_API_TOKEN`
+come from the environment directly, never config.
+
 ## Routing assets here
 
 A publisher only uploads; **routing** decides what goes to it. On the site, bind a path

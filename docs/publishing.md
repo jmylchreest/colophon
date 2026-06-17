@@ -36,6 +36,45 @@ colophon publish --env production --allow-publish
 | `github-pages` | The `git` driver with GitHub-friendly defaults (branch `gh-pages`). |
 | `command` | Run any CLI against the built tree (surge, Netlify, Vercel, rsync, …) — the escape hatch. |
 
+### Configuration and interpolation
+
+colophon has **two distinct interpolation layers** — they look similar (`{…}`) but resolve at
+different times, and every driver supports the first:
+
+**1. Config interpolation — `{env:VAR}` (all drivers, all config).** Any string value in the
+config may reference the environment, resolved *before the YAML is parsed*, so it works in any
+setting of any publisher (or anywhere else in the config):
+
+| Form | Resolves to |
+|------|-------------|
+| `{env:VAR}` | the value of `VAR`, or empty if unset |
+| `{env:VAR:-default}` | the value of `VAR`, or `default` if unset |
+
+Values come from the process environment and from `.env` / `.env.defaults` (loaded first; a real
+env var wins over a `.env` entry). `colophon env` lists every `{env:VAR}` a project references,
+set or not. This is how non-secret settings stay flexible while **secrets stay in the
+environment** — you never write a token into config:
+
+```yaml
+publishers:
+  - id: r2
+    driver: cloudflare-r2
+    bucket: "{env:R2_BUCKET:-my-assets}"          # default when unset
+    account_id: "{env:CLOUDFLARE_ACCOUNT_ID}"     # required; empty if unset
+    public_url: "{env:R2_PUBLIC_URL:-}"           # optional; empty default
+```
+
+**2. Command interpolation — `{dir}`, `{public_url}`, … (the `command` driver only).** The
+`command` publisher additionally interpolates its `command` argv *at publish time* with runtime
+values (the materialised directory, the manifest path, …) and the publisher's own settings — see
+[Run any CLI](#run-any-cli-the-command-publisher). The two layers compose: `{env:VAR}` is
+substituted when the config loads, then `{placeholder}` when the command runs, so a single
+`command` entry can use both.
+
+Per-driver settings and their interpolation are documented in each driver's README — linked from
+the [Publishers](#publishers) table targets below and listed in
+[Secrets and permissions](#secrets-and-permissions).
+
 ### Secrets and permissions
 
 Deploy credentials are **never** read from config — they come from the environment, so they
@@ -49,10 +88,15 @@ never pass through the agent or the YAML:
 | `tigris` | `TIGRIS_ACCESS_KEY_ID` / `TIGRIS_SECRET_ACCESS_KEY` (or `AWS_*`) | Tigris access key (`tid_`/`tsec_`) — Editor |
 | `git` / `github-pages` | `GITHUB_TOKEN` / `GH_TOKEN` / `GIT_TOKEN` (HTTPS remotes only) | Repo contents → **write** (e.g. a GitHub fine-grained PAT or `GITHUB_TOKEN` in Actions). SSH remotes use the agent — no token. |
 
-Non-secret settings (account id, bucket, project) may use `{env:VAR}` interpolation in config.
-Per-publisher detail lives in each driver's README
-([cloudflare-pages](../internal/publish/cloudflare/README.md),
-[cloudflare-r2](../internal/publish/r2/README.md)).
+Non-secret settings (account id, bucket, project) may use `{env:VAR}`
+[config interpolation](#configuration-and-interpolation). Each driver's README documents its
+settings and interpolation:
+[local](../internal/publish/local/README.md),
+[cloudflare-pages](../internal/publish/cloudflare/README.md),
+[cloudflare-r2](../internal/publish/r2/README.md),
+[s3 / tigris](../internal/publish/s3/README.md),
+[git / github-pages](../internal/publish/git/README.md),
+[command](../internal/publish/command/README.md).
 
 ### Provisioning with `--create`
 

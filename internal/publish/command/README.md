@@ -41,7 +41,19 @@ injection surface. For a one-liner that needs pipes or `&&`, make the shell expl
 
 ## Interpolation
 
-Every argument is interpolated with `{placeholder}` tokens. The namespace is **your own
+> **Two layers, two times.** colophon's universal `{env:VAR}`
+> [config interpolation](../../../docs/publishing.md#configuration-and-interpolation) resolves
+> *when the config loads* (before this driver ever sees it), in every setting including the
+> `command` list. The `{placeholder}` substitution below is **separate** and happens *at publish
+> time*, over runtime values. They compose, so one argument can use both — `{env:VAR}` is filled
+> first, then `{placeholder}`:
+>
+> ```yaml
+> command: ["surge", "{dir}", "{env:SURGE_DOMAIN:-myblog.surge.sh}"]
+> #          program   ^publish-time            ^config-load-time
+> ```
+
+Every argument is then interpolated with `{placeholder}` tokens. The namespace is **your own
 publisher settings** plus colophon-owned runtime values (which win on a name clash). Unknown
 placeholders are an error, so a typo fails loudly. `{{` / `}}` emit literal braces.
 

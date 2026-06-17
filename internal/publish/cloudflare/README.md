@@ -69,6 +69,11 @@ export CLOUDFLARE_ACCOUNT_ID=...       # if not set in config
 colophon publish --env production --allow-publish
 ```
 
+Settings (`project`, `account_id`, the `branch` override) support `{env:VAR}` /
+`{env:VAR:-default}`
+[config interpolation](../../../docs/publishing.md#configuration-and-interpolation), as the
+`account_id` above shows. The API token only ever comes from the environment, never config.
+
 ### `allow_publish` (deploy gate)
 
 `allow_publish` is an **environment** setting that defaults to **true**, so an
