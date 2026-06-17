@@ -190,15 +190,14 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		return Result{}, err
 	}
 
-	// telemetryOn is the master switch governing every analytics provider. analyticsListing is
-	// the per-page analytics markup for listing pages (index/tag/author — no post dimensions),
-	// computed once and threaded through like feedHead.
-	telemetryOn := cfg.Telemetry.On()
-	analyticsListing := analyticsHead(telemetryOn, site.Analytics, basePath, nil)
+	// analyticsListing is the per-page analytics markup for listing pages (index/tag/author —
+	// no post dimensions), computed once and threaded through like feedHead. Site analytics is
+	// independent of the app's telemetry switch; it is gated by each provider's own config.
+	analyticsListing := analyticsHead(site.Analytics, basePath, nil)
 
 	// Bundle each enabled analytics provider's client asset to the site root — and only the
-	// enabled one(s). Nothing is written when the master switch is off.
-	if err := emitAnalyticsAssets(write, telemetryOn, site.Analytics); err != nil {
+	// enabled one(s).
+	if err := emitAnalyticsAssets(write, site.Analytics); err != nil {
 		return Result{}, err
 	}
 
@@ -243,7 +242,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"base_url":       site.BaseURL,
 			"base_path":      basePath,
 			"feed_head":      feedHead,
-			"analytics_head": analyticsHead(telemetryOn, site.Analytics, basePath, &p),
+			"analytics_head": analyticsHead(site.Analytics, basePath, &p),
 			"seo_head":       seoHead(site, p, author),
 			"meta_title":     metaTitle(p),
 			"favicon":        favicon,

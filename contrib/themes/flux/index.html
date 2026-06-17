@@ -31,5 +31,6 @@
   </ul>
 </main>
 <script>document.getElementById('theme-switch').addEventListener('change', (e) => { document.documentElement.dataset.theme = e.target.checked ? 'dark' : 'light'; });</script>
+{% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>

@@ -28,5 +28,6 @@
 </ul>
 {% if feeds %}<p class="post-list" style="color:var(--text-muted);font-size:.78rem">// subscribe:{% for f in feeds %} <a class="ctag" href="{{ f.href }}">{{ f.label }}</a>{% endfor %}</p>{% endif %}
 <script>(function(){ var tt=document.getElementById('themeToggle'), r=document.documentElement; function apply(t){ r.dataset.theme=t; if(tt) tt.setAttribute('aria-checked', t==='dark'); } apply(r.dataset.theme||'dark'); if(tt) tt.addEventListener('click', function(){ var t=r.dataset.theme==='dark'?'light':'dark'; apply(t); try{localStorage.setItem('signal-theme',t);}catch(e){} }); })();</script>
+{% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>

@@ -79,5 +79,6 @@
 <footer class="foot"><span>Published with colophon</span></footer>
 
 <script defer src="{{ base_path }}app.js"></script>
+{% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>

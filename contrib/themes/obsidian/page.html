@@ -91,5 +91,6 @@ window.addEventListener('scroll', () => { const d = document.documentElement; do
 {% if has_code %}<link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css"><script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>{% endif %}
 {% if has_math %}<link rel="stylesheet" href="{{ base_path }}vendor/katex/katex.min.css"><script defer src="{{ base_path }}vendor/katex/katex.min.js"></script><script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.math').forEach(function(el){try{katex.render(el.textContent,el,{displayMode:el.classList.contains('math-display'),throwOnError:false});}catch(e){}});});</script>{% endif %}
 {% if has_mermaid %}<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:'dark'})"></script>{% endif %}
+{% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>

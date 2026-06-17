@@ -84,10 +84,10 @@ environments:
   #   overrides:
   #     cf: { branch: preview }  # Cloudflare: non-production branch → Preview env
 
-# Telemetry is colophon's own anonymous usage reporting (builds, source types, publisher
-# types — never your content), sent to the colophon maintainer. "enabled" is the MASTER
-# switch over ALL telemetry: set it false to disable this AND every site's analytics above.
-# You can also disable just this with the COLOPHON_TELEMETRY=off environment variable.
+# Telemetry is the colophon APP's own anonymous usage reporting (builds, source types,
+# publisher types — never your content), sent to the colophon maintainer. It is separate from
+# the site analytics above and governs only itself: "enabled: false" stops the app from
+# initialising any telemetry (COLOPHON_TELEMETRY=off does the same from the environment).
 telemetry:
   enabled: true
   # statsfactory:                # override the maintainer's default to point at your own

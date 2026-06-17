@@ -4,17 +4,12 @@ import "strings"
 
 // Analytics configures a site's reader-facing analytics (page views, engagement), one block
 // per provider. Each provider is independent and the build emits a beacon for every configured
-// one. This is reader data, owned by the site owner — distinct from the tool's own usage
-// reporting (see Telemetry). It is additionally subject to the top-level telemetry master
-// switch: Telemetry.Enabled=false disables every provider here too.
+// one. This is reader data, owned by the site owner, and is entirely separate from the app's
+// own usage reporting (see Telemetry): the telemetry.enabled switch does NOT affect it. A
+// provider here is enabled purely by its own configuration.
 type Analytics struct {
 	Statsfactory    AnalyticsStatsfactory `yaml:"statsfactory,omitempty"`
 	GoogleAnalytics AnalyticsGoogle       `yaml:"google_analytics,omitempty"`
-}
-
-// Any reports whether at least one analytics provider is configured.
-func (a Analytics) Any() bool {
-	return a.Statsfactory.Configured() || a.GoogleAnalytics.Configured()
 }
 
 // AnalyticsStatsfactory points the cookieless statsfactory beacon at the site owner's instance.

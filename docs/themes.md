@@ -192,6 +192,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `base_url` | Absolute site root, for canonical/social URLs. |
 | `feed_head` | `<link rel="alternate">` feed-discovery tags. Output with `{{ feed_head\|safe }}`. |
 | `seo_head` | Full SEO `<head>`: canonical, robots, Open Graph, Twitter, JSON-LD. `{{ seo_head\|safe }}`. |
+| `analytics_head` | Analytics provider markup (statsfactory beacon and/or GA loader). Output once before `</body>` with `{{ analytics_head\|safe }}`. Empty when the site configures no analytics. See [Analytics](#analytics). |
 | `favicon` | Favicon filename, or empty. |
 | `hero` | Hero banner URL (page-relative, or absolute when routed), or empty. |
 | `image`, `image_abs` | Preview image href; absolute preview URL for `og:image`. |
@@ -208,7 +209,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 
 | Variable | Description |
 |----------|-------------|
-| `site_title`, `base_path`, `base_url`, `feed_head`, `favicon` | As above. |
+| `site_title`, `base_path`, `base_url`, `feed_head`, `favicon`, `analytics_head` | As above. |
 | `heading` | Page heading — the site title on the home page, or `Tagged “<name>”` on a tag page. |
 | `feeds` | List of `{label, href}` for subscribe links. |
 | `pages` | List of posts: `{title, url, date, draft, embargoed, embargo_until, image, tags}`. Prefix `url` with `base_path`. |
@@ -231,6 +232,25 @@ Your theme is free to do something else with the same markup: load the libraries
 swap in a different highlighter, or — like the `minimal` theme — do nothing and let the raw
 text stand. The markup contract (`<pre class="mermaid">`, `<span class="math …">`,
 `<pre><code class="language-…">`, `<div class="callout …">`) does not change.
+
+## Analytics
+
+colophon owns the analytics clients; a theme's only job is to **include** them. When a site
+configures a provider (statsfactory and/or Google Analytics — see [analytics](analytics.md)),
+the build writes that provider's loader to the site root — `analytics-sf.js` for the cookieless
+statsfactory beacon, `analytics-ga.js` for the Google Analytics loader — and exposes the
+matching `<script>` markup (with each page's dimensions) as the `analytics_head` variable.
+
+A theme leverages both providers with one line, just before `</body>`:
+
+```html
+{% if analytics_head %}{{ analytics_head|safe }}{% endif %}
+</body>
+```
+
+The theme never names a provider: `analytics_head` already contains whichever loaders are
+enabled (statsfactory, GA, both, or — when the site configures none — nothing, leaving the line
+inert). Every built-in and contrib theme includes it; a JS-enabled custom theme should too.
 
 ## Build a theme — step by step
 

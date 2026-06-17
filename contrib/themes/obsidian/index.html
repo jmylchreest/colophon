@@ -36,5 +36,6 @@
 <script>
 (function(){ var tt=document.getElementById('themeToggle'), r=document.documentElement; function apply(t){ r.dataset.theme=t; if(tt) tt.setAttribute('aria-checked', t==='dark'); } apply(r.dataset.theme||'dark'); if(tt) tt.addEventListener('click', function(){ var t=r.dataset.theme==='dark'?'light':'dark'; apply(t); try{localStorage.setItem('obsidian2-theme',t);}catch(e){} }); })();
 </script>
+{% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>

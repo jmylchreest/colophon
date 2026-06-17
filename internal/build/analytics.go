@@ -13,27 +13,25 @@ import (
 // analytics is enabled. It is theme-agnostic (referenced by every theme via analytics_head),
 // so it lives here rather than being duplicated per theme.
 //
-//go:embed assets/analytics.js
-var analyticsJS []byte
+//go:embed assets/analytics-sf.js
+var analyticsSFJS []byte
 
 //go:embed assets/analytics-ga.js
 var analyticsGAJS []byte
 
 // Output paths of the per-provider client assets, relative to the site root.
 const (
-	analyticsAsset   = "analytics.js"
+	analyticsSFAsset = "analytics-sf.js"
 	analyticsGAAsset = "analytics-ga.js"
 )
 
 // emitAnalyticsAssets writes each enabled provider's client asset to the site root — and only
 // that provider's. statsfactory ships its cookieless beacon; Google Analytics ships its gtag
-// loader. Nothing is written when the master switch is off or no provider is configured.
-func emitAnalyticsAssets(write func(string, []byte) error, master bool, a core.Analytics) error {
-	if !master {
-		return nil
-	}
+// loader. Site analytics is independent of the app's telemetry switch, so it is gated purely
+// by each provider's own configuration.
+func emitAnalyticsAssets(write func(string, []byte) error, a core.Analytics) error {
 	if a.Statsfactory.Configured() {
-		if err := write(analyticsAsset, analyticsJS); err != nil {
+		if err := write(analyticsSFAsset, analyticsSFJS); err != nil {
 			return err
 		}
 	}
@@ -47,13 +45,10 @@ func emitAnalyticsAssets(write func(string, []byte) error, master bool, a core.A
 
 // analyticsHead returns the per-page analytics markup for one page: a statsfactory beacon
 // script and/or a Google Analytics tag, for whichever providers the site configures. It
-// returns "" when the telemetry master switch is off or no provider is configured. p is nil
-// for non-post pages (index, tag, author), which carry no post dimensions. The hidden persona
-// is deliberately never emitted here. master is the top-level telemetry switch.
-func analyticsHead(master bool, a core.Analytics, basePath string, p *page) string {
-	if !master {
-		return ""
-	}
+// returns "" when no provider is configured. p is nil for non-post pages (index, tag, author),
+// which carry no post dimensions. The hidden persona is deliberately never emitted here. Site
+// analytics is independent of the app's telemetry switch.
+func analyticsHead(a core.Analytics, basePath string, p *page) string {
 	var b strings.Builder
 	if a.Statsfactory.Configured() {
 		b.WriteString(statsfactoryBeacon(a.Statsfactory, basePath, p))
@@ -69,7 +64,7 @@ func analyticsHead(master bool, a core.Analytics, basePath string, p *page) stri
 func statsfactoryBeacon(cfg core.AnalyticsStatsfactory, basePath string, p *page) string {
 	var b strings.Builder
 	b.WriteString(`<script defer src="`)
-	b.WriteString(html.EscapeString(basePath + analyticsAsset))
+	b.WriteString(html.EscapeString(basePath + analyticsSFAsset))
 	b.WriteString(`"`)
 	attr := func(name, val string) {
 		if val == "" {

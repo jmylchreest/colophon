@@ -2,17 +2,16 @@ package core
 
 import "strings"
 
-// Telemetry is colophon's own usage reporting (the tool → its maintainer) and the master
-// switch over ALL telemetry. Enabled defaults to true; setting it false disables everything —
-// the tool's own build/publish events AND every site's reader Analytics. Credentials default
-// to values baked into the binary at release (see internal/telemetry) and may be overridden
-// here to point colophon at a different statsfactory instance.
+// Telemetry is the colophon APP's own usage reporting (the tool → its maintainer). It is
+// distinct from site Analytics and governs only itself: Enabled (default true) toggles whether
+// the app initialises its telemetry at all. Credentials default to values baked into the
+// binary at release (see internal/telemetry) and may be overridden here.
 type Telemetry struct {
 	Enabled      *bool                 `yaml:"enabled,omitempty"`
 	Statsfactory TelemetryStatsfactory `yaml:"statsfactory,omitempty"`
 }
 
-// On reports the master switch: telemetry is globally enabled unless explicitly disabled.
+// On reports whether the app should initialise its own telemetry (enabled unless set false).
 func (t Telemetry) On() bool { return t.Enabled == nil || *t.Enabled }
 
 // TelemetryStatsfactory is the tool-telemetry destination. Empty fields fall back to the
