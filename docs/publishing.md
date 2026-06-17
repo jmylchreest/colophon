@@ -29,7 +29,9 @@ colophon publish --env production --allow-publish
 |--------|---------|
 | `local` | Copy the built tree to a directory (offline preview / diffing). |
 | `cloudflare-pages` | Deploy the site to Cloudflare Pages (direct upload). |
-| `cloudflare-r2` | Upload files to an S3-compatible object store (R2, S3, MinIO). |
+| `cloudflare-r2` | Upload files to Cloudflare R2 (S3 + R2 control-plane: public-URL discovery, `--create` expose). |
+| `s3` | Upload files to any S3-compatible store (MinIO, B2, Wasabi, Amazon S3) — pure data plane, no SDK. |
+| `tigris` | The `s3` driver with Tigris (Fly.io) defaults — needs only a bucket. |
 | `git` | Force-push the built tree to a branch of any git remote (GitHub/GitLab/Codeberg Pages, mirrors, self-hosted). |
 | `github-pages` | The `git` driver with GitHub-friendly defaults (branch `gh-pages`). |
 
@@ -42,6 +44,8 @@ never pass through the agent or the YAML:
 |-----------|-----------------|------------------|
 | `cloudflare-pages` | `CLOUDFLARE_API_TOKEN` | Account → Cloudflare Pages → **Edit** |
 | `cloudflare-r2` | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` (or `AWS_*`) | R2 → **Object Read & Write** (+ bucket-create for `--create`) |
+| `s3` | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Object read & write (+ bucket-create for `--create`) |
+| `tigris` | `TIGRIS_ACCESS_KEY_ID` / `TIGRIS_SECRET_ACCESS_KEY` (or `AWS_*`) | Tigris access key (`tid_`/`tsec_`) — Editor |
 | `git` / `github-pages` | `GITHUB_TOKEN` / `GH_TOKEN` / `GIT_TOKEN` (HTTPS remotes only) | Repo contents → **write** (e.g. a GitHub fine-grained PAT or `GITHUB_TOKEN` in Actions). SSH remotes use the agent — no token. |
 
 Non-secret settings (account id, bucket, project) may use `{env:VAR}` interpolation in config.
@@ -55,20 +59,50 @@ Per-publisher detail lives in each driver's README
 `cloudflare-pages` creates the Pages project, `cloudflare-r2` creates the bucket. Both are
 idempotent — an existing destination is left untouched.
 
-### Generic S3 / MinIO
+### Generic S3 / MinIO / Backblaze / Wasabi
 
-The `cloudflare-r2` driver is plain S3 (SigV4). Point it at any S3-compatible store with an
-`endpoint` (and a `region`) instead of an `account_id`:
+The `s3` driver is plain S3 (SigV4) with no control-plane code — point it at any S3-compatible
+store with an `endpoint` and `region`:
 
 ```yaml
 publishers:
   - id: s3
-    driver: cloudflare-r2
+    driver: s3
     bucket: my-assets
     endpoint: "https://s3.us-east-1.amazonaws.com"   # or http://localhost:9000 (MinIO)
     region: us-east-1
     public_url: "https://my-assets.s3.us-east-1.amazonaws.com"
 ```
+
+Credentials come from `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. `publish --create` creates
+the bucket (idempotent). `public_url` is how colophon learns the public base URL — there's no
+control-plane lookup, so set it (a route with no resolvable URL stays inactive).
+
+### Tigris (Fly.io)
+
+[Tigris](https://www.tigrisdata.com/) is Fly.io's global object store, and it's **plain S3** —
+colophon talks to it with the same client as any S3 store, so **no `flyctl` / Fly SDK /
+control-plane token is involved.** The `tigris` driver is the `s3` driver with the endpoint
+(`https://t3.storage.dev`) and region (`auto`) defaulted, so it needs only a bucket:
+
+```yaml
+publishers:
+  - id: assets
+    driver: tigris
+    bucket: my-blog-assets
+    public_url: "https://my-blog-assets.t3.storage.dev"   # the bucket's public/CDN domain
+```
+
+Credentials come from `TIGRIS_ACCESS_KEY_ID` / `TIGRIS_SECRET_ACCESS_KEY` (the `tid_`/`tsec_`
+keys, falling back to `AWS_*`). `publish --create` creates the bucket. Two things are one-time
+**dashboard** settings (Tigris has no data-plane API for them, which is what keeps publishing
+SDK-free): **make the bucket public** to serve a site from it, and optionally **attach a custom
+domain** (a CNAME to `<bucket>.t3.storage.dev`). Newer accounts serve public content from
+`t3.tigrisfiles.io` — set `public_url` to whatever the bucket actually serves at.
+
+> Provisioning credentials is separate: `flyctl storage create` issues a bucket + keys, but
+> that's a one-time setup step, not part of `colophon publish`. colophon only consumes the keys
+> from the environment.
 
 ## Git-based hosting (GitHub / GitLab / Codeberg Pages)
 

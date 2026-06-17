@@ -8,6 +8,7 @@ import (
 	_ "github.com/jmylchreest/colophon/internal/publish/git"
 	_ "github.com/jmylchreest/colophon/internal/publish/local"
 	_ "github.com/jmylchreest/colophon/internal/publish/r2"
+	_ "github.com/jmylchreest/colophon/internal/publish/s3"
 	_ "github.com/jmylchreest/colophon/internal/source/mddir"
 	_ "github.com/jmylchreest/colophon/internal/source/obsidian"
 )
