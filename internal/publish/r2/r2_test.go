@@ -143,6 +143,10 @@ func TestProvisionSendsLocationHint(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound) // bucket missing
 			return
 		}
+		if r.URL.RawQuery == "cors=" { // the CORS PUT, not the CreateBucket PUT
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		b, _ := io.ReadAll(r.Body)
 		body = string(b)
 		w.WriteHeader(http.StatusOK)

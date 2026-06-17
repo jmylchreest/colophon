@@ -207,6 +207,11 @@ func (p *Publisher) Provision(ctx context.Context) (bool, error) {
 				"could not enable public access (CLOUDFLARE_API_TOKEN needs R2 Admin Read & Write): "+err.Error())
 		}
 	}
+	// Allow cross-origin GET so routed assets/search are fetchable from the site origin (<img> is
+	// CORS-exempt but fetch()/ES-module import are not). Idempotent; warn and continue on failure.
+	if err := p.s3.PutCORS(ctx, []string{"*"}); err != nil {
+		p.log.Step("PUBLISH", p.id, "warning", "could not set CORS policy (cross-origin fetch of routed search/assets may fail): "+err.Error())
+	}
 	return created, nil
 }
 

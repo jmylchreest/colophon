@@ -148,3 +148,32 @@ func TestPutDeleteLog(t *testing.T) {
 		t.Errorf("logger lines = %v, want a put then a delete", log.lines)
 	}
 }
+
+func TestPutCORS(t *testing.T) {
+	var path, query, body string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path, query = r.URL.Path, r.URL.RawQuery
+		b, _ := io.ReadAll(r.Body)
+		body = string(b)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	c := New(srv.URL, "b", "auto", "AK", "SK")
+	c.HTTPClient = srv.Client()
+	if err := c.PutCORS(context.Background(), []string{"*"}); err != nil {
+		t.Fatal(err)
+	}
+	if path != "/b" || query != "cors=" {
+		t.Errorf("request = %s?%s, want /b?cors=", path, query)
+	}
+	for _, want := range []string{
+		"<AllowedOrigin>*</AllowedOrigin>",
+		"<AllowedMethod>GET</AllowedMethod>",
+		"<AllowedHeader>content-type</AllowedHeader>", // R2 rejects "*" here
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("CORS body missing %q:\n%s", want, body)
+		}
+	}
+}

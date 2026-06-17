@@ -214,13 +214,20 @@ func (p *Publisher) Provision(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if exists {
-		return false, nil
+	created := false
+	if !exists {
+		if err := p.s3.Create(ctx, p.location); err != nil {
+			return false, err
+		}
+		created = true
 	}
-	if err := p.s3.Create(ctx, p.location); err != nil {
-		return false, err
+	// Allow cross-origin GET so a routed search index / assets are fetchable from the site origin
+	// (<img> is CORS-exempt but fetch()/ES-module import are not). Runs for an existing bucket too;
+	// warn and continue on failure (a store may not support PutBucketCors).
+	if err := p.s3.PutCORS(ctx, []string{"*"}); err != nil && p.log != nil {
+		p.log.Step("PUBLISH", p.id, "warning", "could not set CORS policy (cross-origin fetch may fail): "+err.Error())
 	}
-	return true, nil
+	return created, nil
 }
 
 func firstEnv(keys ...string) string {

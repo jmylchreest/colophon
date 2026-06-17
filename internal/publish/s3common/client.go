@@ -8,6 +8,8 @@ package s3common
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -170,6 +172,55 @@ func (c *Client) List(ctx context.Context) (core.State, error) {
 		}
 		token = lr.NextContinuationToken
 	}
+}
+
+// PutCORS sets the bucket's CORS policy via the S3 PutBucketCors subresource, allowing
+// cross-origin GET/HEAD from the given origins (use "*" for any). It exists so a routed search
+// index (or any asset fetched via fetch()/an ES-module import, which — unlike <img> — are not
+// CORS-exempt) is reachable from the site's origin. It's the only way to set CORS on R2 (no
+// dashboard), and R2 rejects AllowedHeader "*", so specific headers are listed.
+func (c *Client) PutCORS(ctx context.Context, origins []string) error {
+	body := corsConfig(origins)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.Endpoint+"/"+c.Bucket, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.URL.RawQuery = "cors=" // the ?cors subresource; signed via the canonical query string
+	req.ContentLength = int64(len(body))
+	req.Header.Set("Content-Type", "application/xml")
+	sum := md5.Sum(body) // AWS requires Content-MD5 on PutBucketCors; harmless on R2/Tigris
+	req.Header.Set("Content-MD5", base64.StdEncoding.EncodeToString(sum[:]))
+	signV4(req, "/"+c.Bucket, c.AccessKey, c.SecretKey, c.Region, hexSHA256(body), c.clock())
+
+	resp, err := c.httpClient().Do(req)
+	if err != nil {
+		return err
+	}
+	defer drain(resp)
+	if resp.StatusCode/100 != 2 {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("s3 put cors %s: %s: %s", c.Bucket, resp.Status, strings.TrimSpace(string(msg)))
+	}
+	c.log("cors", c.Bucket, "origins", strings.Join(origins, " "))
+	return nil
+}
+
+// corsConfig builds a CORSConfiguration allowing GET/HEAD from each origin. AllowedHeader is kept
+// to specific values (not "*") because R2 rejects the wildcard there.
+func corsConfig(origins []string) []byte {
+	esc := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+	var b strings.Builder
+	b.WriteString(`<CORSConfiguration>`)
+	for _, o := range origins {
+		b.WriteString(`<CORSRule>`)
+		b.WriteString(`<AllowedOrigin>` + esc.Replace(o) + `</AllowedOrigin>`)
+		b.WriteString(`<AllowedMethod>GET</AllowedMethod><AllowedMethod>HEAD</AllowedMethod>`)
+		b.WriteString(`<AllowedHeader>content-type</AllowedHeader><AllowedHeader>range</AllowedHeader>`)
+		b.WriteString(`<MaxAgeSeconds>3600</MaxAgeSeconds>`)
+		b.WriteString(`</CORSRule>`)
+	}
+	b.WriteString(`</CORSConfiguration>`)
+	return []byte(b.String())
 }
 
 // Put uploads an object with a content type inferred from its extension. It satisfies

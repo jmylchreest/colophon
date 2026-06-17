@@ -101,8 +101,15 @@ settings and interpolation:
 ### Provisioning with `--create`
 
 `colophon publish --env <name> --create` provisions destinations before deploying:
-`cloudflare-pages` creates the Pages project, `cloudflare-r2` creates the bucket. Both are
-idempotent — an existing destination is left untouched.
+`cloudflare-pages` creates the Pages project; `cloudflare-r2` / `s3` / `tigris` create the
+bucket. All are idempotent — an existing destination is left untouched.
+
+For the object stores, `--create` also sets a **CORS policy** allowing cross-origin `GET`/`HEAD`
+from any origin (via the S3 `PutBucketCors` API — the only way to configure CORS on R2, which has
+no dashboard for it). This matters when assets are fetched with `fetch()` or imported as an ES
+module rather than via an `<img>`/`<script>` tag — notably a **routed search index** (below): a
+cross-origin `<img>` needs no CORS, but `fetch()`/`import()` do. The step is best-effort: if a
+store doesn't support `PutBucketCors`, the publish warns and continues, and you set CORS manually.
 
 ### Generic S3 / MinIO / Backblaze / Wasabi
 
@@ -355,3 +362,20 @@ A rule is **inactive until a URL resolves _and_ its publisher is deploying** in 
 environment. With nothing resolvable, routing is a no-op: images stay co-located and the
 whole tree goes to the default publisher — so local builds and previews work with no object
 store configured.
+
+### Routing the search index
+
+The static search index (`_search/**`) can be routed to the object store too, to keep it off a
+Pages-style file budget:
+
+```yaml
+routing:
+  - match: "_search/**"
+    publisher: r2
+```
+
+When routed, colophon points the browser reader at the store's URL automatically (the
+`search_base` it emits follows the route). Because the reader loads the index with `fetch()` and
+imports `search.js` as a module — neither CORS-exempt — the bucket must allow cross-origin `GET`;
+`publish --create` sets that policy for you (see [Provisioning](#provisioning-with---create)).
+Unrouted, the index stays on the same origin and no CORS is involved.
