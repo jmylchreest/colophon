@@ -17,7 +17,7 @@
     .then(function (gloss) { if (gloss && Object.keys(gloss).length) start(gloss); })
     .catch(function () { /* never let the glossary break the page */ });
 
-  // Tags whose text must not be decorated: code, links, existing abbreviations, headings.
+  // Tags whose text must not be auto-decorated: code, links, existing abbreviations, headings.
   var SKIP = { CODE: 1, PRE: 1, KBD: 1, SAMP: 1, A: 1, ABBR: 1, BUTTON: 1, SCRIPT: 1, STYLE: 1,
     H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1 };
 
@@ -25,17 +25,43 @@
     var root = document.querySelector(".prose") ||
       document.querySelector("article") || document.querySelector("main");
     if (!root) return;
-    decorate(root, gloss);
     setupPopover();
+    var lower = {};
+    Object.keys(gloss).forEach(function (t) { lower[t.toLowerCase()] = t; });
+    var used = {};
+    forceMarked(root, gloss, lower, used); // author-forced terms (<dfn>) first
+    autoMatch(root, gloss, lower, used);   // then auto-match the rest
   }
 
-  function decorate(root, gloss) {
+  // forceMarked decorates author-marked terms: a <dfn> (the semantic "defining instance") whose
+  // text is a glossary term. This lets an author force a specific occurrence regardless of the
+  // first-occurrence auto-match.
+  function forceMarked(root, gloss, lower, used) {
+    var marks = root.querySelectorAll("dfn");
+    for (var i = 0; i < marks.length; i++) {
+      var el = marks[i];
+      var key = lower[(el.textContent || "").trim().toLowerCase()];
+      if (!key) continue;
+      el.className = (el.className ? el.className + " " : "") + "gloss";
+      el.setAttribute("data-gloss", gloss[key]);
+      el.setAttribute("data-gloss-term", key);
+      el.setAttribute("tabindex", "0");
+      used[key] = true; // don't auto-match it again elsewhere
+    }
+  }
+
+  function autoMatch(root, gloss, lower, used) {
     var terms = Object.keys(gloss).sort(function (a, b) { return b.length - a.length; });
     var escaped = terms.map(function (t) { return t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); });
     var matcher = new RegExp("\\b(" + escaped.join("|") + ")\\b", "gi");
-    var lower = {};
-    terms.forEach(function (t) { lower[t.toLowerCase()] = t; });
-    walk(root, gloss, lower, matcher, {});
+    walk(root, gloss, lower, matcher, used);
+  }
+
+  // skip reports an element the decorator must not descend into: code/links/headings, anything
+  // already decorated, or an author opt-out (class "no-gloss").
+  function skip(el) {
+    return SKIP[el.tagName] ||
+      (el.classList && (el.classList.contains("no-gloss") || el.classList.contains("gloss")));
   }
 
   function walk(node, gloss, lower, matcher, used) {
@@ -44,7 +70,7 @@
       var n = kids[i];
       if (n.nodeType === 3) {
         wrap(n, gloss, lower, matcher, used);
-      } else if (n.nodeType === 1 && !SKIP[n.tagName]) {
+      } else if (n.nodeType === 1 && !skip(n)) {
         walk(n, gloss, lower, matcher, used);
       }
     }
@@ -126,7 +152,7 @@
     }
 
     function target(e) {
-      return e.target && e.target.closest ? e.target.closest("abbr.gloss") : null;
+      return e.target && e.target.closest ? e.target.closest(".gloss[data-gloss]") : null;
     }
     document.addEventListener("mouseover", function (e) { var el = target(e); if (el) show(el); });
     document.addEventListener("mouseout", function (e) { if (target(e) === current) hide(); });

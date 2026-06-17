@@ -104,6 +104,7 @@ type page struct {
 	Static       bool   // standing page (e.g. About): kept out of the chronological list + feeds, surfaced in nav
 	Type         string // page type (post|page|custom): selects the template and placement
 	Lang         string // per-post language override (BCP-47); empty → the site language
+	GlossaryOff  bool   // post opted out of glossary decoration (frontmatter glossary: false)
 
 	Hero       string // hero banner URL: page-relative when co-located, absolute when routed
 	HeroAlt    string // accessible alt text for the hero; empty → decorative (alt="")
@@ -253,6 +254,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		if pageLang == "" {
 			pageLang = siteLang
 		}
+		pageGlossary := glossaryHead
+		if p.GlossaryOff {
+			pageGlossary = ""
+		}
 		ctx := map[string]any{
 			"lang":           pageLang,
 			"nav_pages":      navPages,
@@ -262,7 +267,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"base_path":      basePath,
 			"feed_head":      feedHead,
 			"analytics_head": analyticsHead(site.Analytics, basePath, &p),
-			"glossary_head":  glossaryHead,
+			"glossary_head":  pageGlossary,
 			"seo_head":       seoHead(site, p, author),
 			"meta_title":     metaTitle(p),
 			"favicon":        favicon,
@@ -556,6 +561,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 			}
 		}
 		p.Lang = fm.Lang
+		p.GlossaryOff = fm.Glossary != nil && !*fm.Glossary
 		p.HeroAlt, p.ImageAlt = fm.HeroAlt, fm.ImageAlt
 		p.HeroFit, p.HeroPos = fm.HeroFit, fm.HeroPosition
 		p.ImageFit, p.ImagePos = fm.ImageFit, fm.ImagePosition

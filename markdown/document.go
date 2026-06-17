@@ -58,6 +58,11 @@ type Frontmatter struct {
 	Persona      string            `yaml:"persona,omitempty"`
 	Publications []PublicationSpec `yaml:"publications,omitempty"`
 
+	// Glossary opts this post out of glossary decoration when false (default on). An author
+	// can also suppress a single term with <span class="no-gloss">…</span> or force one with
+	// <dfn>term</dfn> in the body.
+	Glossary *bool `yaml:"glossary,omitempty"`
+
 	// Draft is a manual gate; PublishAfter is a time gate ("not before"). Publish is
 	// the Obsidian whitelist flag: nil means "default true" unless a source opts in.
 	Draft        bool       `yaml:"draft,omitempty"`
