@@ -1,0 +1,179 @@
+name: Build Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_tag: ${{ steps.version.outputs.version_tag }}
+      is_release: ${{ steps.version.outputs.is_release }}
+      should_skip: ${{ steps.skip.outputs.should_skip }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        uses: jmylchreest/gha-extract-git-version@v1
+
+      - name: Check if build should be skipped
+        id: skip
+        env:
+          REF: ${{ github.ref }}
+          IS_TAGGED: ${{ steps.version.outputs.is_tagged }}
+        run: |
+          # Skip main-branch builds when the commit already carries a release tag
+          # (the tag-triggered run handles the release).
+          if [[ "$REF" == refs/heads/main && "$IS_TAGGED" == "true" ]]; then
+            echo "should_skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        if: steps.skip.outputs.should_skip != 'true'
+        run: go test -race ./...
+
+  build:
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.should_skip != 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux, goarch: amd64 }
+          - { goos: linux, goarch: arm64 }
+          - { goos: darwin, goarch: amd64 }
+          - { goos: darwin, goarch: arm64 }
+          - { goos: windows, goarch: amd64 }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+          # App telemetry, baked from repo secrets/variables (empty on a fork → reports nothing).
+          SF_URL: ${{ secrets.COLOPHON_TELEMETRY_SERVER_URL || vars.COLOPHON_TELEMETRY_SERVER_URL }}
+          SF_KEY: ${{ secrets.COLOPHON_TELEMETRY_APP_KEY || vars.COLOPHON_TELEMETRY_APP_KEY }}
+        run: |
+          bin=colophon
+          [ "$GOOS" = windows ] && bin=colophon.exe
+          pkg=github.com/jmylchreest/colophon/internal
+          go build -trimpath -ldflags "-s -w \
+            -X ${pkg}/cli.version=${VERSION_TAG} \
+            -X ${pkg}/telemetry.DefaultServerURL=${SF_URL} \
+            -X ${pkg}/telemetry.DefaultAppKey=${SF_KEY}" \
+            -o "$bin" ./cmd/colophon
+
+      - name: Package
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          mkdir -p dist
+          name="colophon_${VERSION}_${GOOS}_${GOARCH}"
+          if [ "$GOOS" = windows ]; then
+            zip "dist/${name}.zip" colophon.exe
+          else
+            tar -czf "dist/${name}.tar.gz" colophon
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: colophon_${{ needs.prepare.outputs.version }}_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: dist/*
+          retention-days: 1
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [prepare, build]
+    if: needs.prepare.outputs.should_skip != 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} release/ \;
+          cd release
+          sha256sum * > checksums.txt
+          ls -la
+
+      - name: Changelog
+        env:
+          IS_RELEASE: ${{ needs.prepare.outputs.is_release }}
+        run: |
+          if [[ "$IS_RELEASE" == "true" ]]; then
+            prev=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            if [ -n "$prev" ]; then
+              { echo "## Changelog"; echo; \
+                git log --pretty=format:"* %h %s" "${prev}..HEAD" \
+                  | grep -Ev "^\* [a-f0-9]+ (docs|test|ci|chore):" || echo "* No notable changes"; \
+              } > changelog.txt
+            else
+              echo "* Initial release" > changelog.txt
+            fi
+          else
+            echo "Automated snapshot build from main." > changelog.txt
+          fi
+          cat changelog.txt
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_RELEASE: ${{ needs.prepare.outputs.is_release }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+        run: |
+          if [[ "$IS_RELEASE" == "true" ]]; then
+            gh release create "$VERSION_TAG" --title "$VERSION_TAG" --notes-file changelog.txt release/*
+          else
+            gh release create "$VERSION_TAG" --title "Snapshot $VERSION" --prerelease --notes-file changelog.txt release/*
+          fi

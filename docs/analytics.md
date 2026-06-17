@@ -93,7 +93,7 @@ go build -ldflags "\
   ./cmd/colophon
 ```
 
-colophon's release workflow (`.github/workflows/release.yml`, goreleaser) bakes these from the
+colophon's release workflow (`.github/workflows/build-release.yml`) bakes these from the
 repository's `COLOPHON_TELEMETRY_*` secrets/variables, alongside the version (from the git tag),
 so tagged binaries are versioned and report by default. A project may override the destination
 (e.g. to self-host the maintainer role) under `telemetry.statsfactory`.
