@@ -65,7 +65,11 @@ The reusable unit is **three artifacts bound by one spec**:
 
 1. **Go builder/query module** (`…/colophon/search`).
 2. **JS reader** — a single dependency-free ES module (`search.js`), also publishable to npm.
-3. **The format + analyzer spec** (this document) — the real public contract.
+3. **The format + analyzer spec** — the real public contract. This document is the *rationale*;
+   the **normative, language-neutral specification** lives in
+   [`search/SPEC.md`](../../search/SPEC.md) (with `search/README.md` as the adopter entry point),
+   precise enough to implement a conformant reader or builder in any language against the
+   committed test vectors.
 
 ### Engine API (source- and FS-agnostic)
 
