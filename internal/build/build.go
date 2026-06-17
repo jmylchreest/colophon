@@ -389,6 +389,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		opts.Log.Detail("ASSET", a.src.ID(), "file", a.outPath, "bytes", len(b))
 	}
 
+	if err := writeSearchIndex(write, pages, site, basePath, opts.Log); err != nil {
+		return Result{}, err
+	}
+
 	if err := sweep(outDir, written); err != nil {
 		return Result{}, err
 	}
