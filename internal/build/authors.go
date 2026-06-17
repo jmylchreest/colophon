@@ -26,12 +26,13 @@ func navLinks(pages []page, basePath string) []map[string]any {
 // index-item maps for its posts. Groups are returned most-recent-first (the order an author
 // first appears while scanning the newest-first pages slice).
 type authorGroup struct {
-	id       string
-	name     string
-	avatar   string
-	initials string
-	url      string
-	items    []map[string]any
+	id          string
+	name        string
+	avatar      string
+	avatarStyle string
+	initials    string
+	url         string
+	items       []map[string]any
 }
 
 // collectAuthors groups pages by their resolved byline author, preserving the newest-first
@@ -50,11 +51,12 @@ func collectAuthors(cfg *config.Config, pages []page, list []map[string]any, bas
 		g := byID[id]
 		if g == nil {
 			g = &authorGroup{
-				id:       id,
-				name:     author.Name,
-				avatar:   author.Avatar,
-				initials: initials(author.Name),
-				url:      basePath + "authors/" + id + "/",
+				id:          id,
+				name:        author.Name,
+				avatar:      author.Avatar,
+				avatarStyle: imageStyle(author.AvatarFit, author.AvatarPosition),
+				initials:    initials(author.Name),
+				url:         basePath + "authors/" + id + "/",
 			}
 			byID[id] = g
 			order = append(order, g)
@@ -74,11 +76,12 @@ func authorStrip(groups []authorGroup) []map[string]any {
 	out := make([]map[string]any, len(groups))
 	for i, g := range groups {
 		out[i] = map[string]any{
-			"name":     g.name,
-			"url":      g.url,
-			"avatar":   g.avatar,
-			"initials": g.initials,
-			"count":    len(g.items),
+			"name":         g.name,
+			"url":          g.url,
+			"avatar":       g.avatar,
+			"avatar_style": g.avatarStyle,
+			"initials":     g.initials,
+			"count":        len(g.items),
 		}
 	}
 	return out

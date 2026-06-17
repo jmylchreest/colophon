@@ -8,12 +8,16 @@ import "strings"
 // feeds and JSON-LD. An author is an identity (a person, or a brand name) and is distinct
 // from a persona, which is the hidden writing voice and is never shown.
 type Author struct {
-	ID     string   `yaml:"id" json:"id"`
-	Name   string   `yaml:"name" json:"name"`
-	Bio    string   `yaml:"bio,omitempty" json:"bio,omitempty"`
-	Avatar string   `yaml:"avatar,omitempty" json:"avatar,omitempty"`
-	Email  string   `yaml:"email,omitempty" json:"email,omitempty"`
-	URLs   []string `yaml:"urls,omitempty" json:"urls,omitempty"`
+	ID     string `yaml:"id" json:"id"`
+	Name   string `yaml:"name" json:"name"`
+	Bio    string `yaml:"bio,omitempty" json:"bio,omitempty"`
+	Avatar string `yaml:"avatar,omitempty" json:"avatar,omitempty"`
+	// AvatarFit/AvatarPosition choose how the avatar fills its (usually circular) frame —
+	// CSS object-fit / object-position. Empty → the theme default (cover, centred).
+	AvatarFit      string   `yaml:"avatar_fit,omitempty" json:"avatar_fit,omitempty"`
+	AvatarPosition string   `yaml:"avatar_position,omitempty" json:"avatar_position,omitempty"`
+	Email          string   `yaml:"email,omitempty" json:"email,omitempty"`
+	URLs           []string `yaml:"urls,omitempty" json:"urls,omitempty"`
 }
 
 // AnonymousAuthor is the fallback byline when a post names no author and none are configured.

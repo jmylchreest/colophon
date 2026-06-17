@@ -18,7 +18,7 @@
 <article>
 {% if draft %}<p class="draft">Draft — not published</p>{% endif %}
 {% if embargoed %}<p class="embargo">Embargoed until {{ embargo_until }} — not yet public</p>{% endif %}
-{% if hero %}<img class="hero" src="{{ hero }}" alt="">{% endif %}
+{% if hero %}<img class="hero" src="{{ hero }}" alt=""{% if hero_style %} style="{{ hero_style }}"{% endif %}>{% endif %}
 <h1>{{ title }}</h1>
 {% if date %}<p class="meta"><time datetime="{{ date }}">{{ date }}</time></p>{% endif %}
 {{ content|safe }}

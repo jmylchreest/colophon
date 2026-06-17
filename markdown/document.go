@@ -33,6 +33,14 @@ type Frontmatter struct {
 	Hero  string `yaml:"hero,omitempty"`
 	Image string `yaml:"image,omitempty"`
 
+	// HeroFit/ImageFit choose how the image fills its box (CSS object-fit: cover|contain|
+	// fill|scale-down|none); *Position picks which part shows when cropping (CSS
+	// object-position, e.g. "top" or "50% 20%"). Empty → the theme's default (usually cover).
+	HeroFit       string `yaml:"hero_fit,omitempty"`
+	HeroPosition  string `yaml:"hero_position,omitempty"`
+	ImageFit      string `yaml:"image_fit,omitempty"`
+	ImagePosition string `yaml:"image_position,omitempty"`
+
 	// Author is the byline shown to readers — the id of an authors/*.yaml entry. Empty
 	// falls back to the first configured author, else "Anonymous".
 	Author string `yaml:"author,omitempty"`

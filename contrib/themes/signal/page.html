@@ -41,7 +41,7 @@
       {% if description %}<p class="hero-desc">{{ description }}</p>{% endif %}
     </div>
   </div>
-  {% if hero %}<img class="hero-banner" src="{{ hero }}" alt="{{ title }}">{% endif %}
+  {% if hero %}<img class="hero-banner" src="{{ hero }}" alt="{{ title }}"{% if hero_style %} style="{{ hero_style }}"{% endif %}>{% endif %}
   <div class="status-line">
     <div class="sl-item"><span class="sl-dot"></span><span class="sl-val-green">{% if draft %}draft{% elif embargoed %}embargoed{% else %}published{% endif %}</span></div>
     <div class="sl-item"><span class="sl-key">reading:</span><span class="sl-val">{{ read_time }} min</span></div>

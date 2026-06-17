@@ -23,7 +23,7 @@
         <div class="auth-track">
           {% for a in authors %}
           <a class="auth" href="{{ a.url }}" data-tip="{{ a.name }}" aria-label="{{ a.name }}">
-            {% if a.avatar %}<img src="{{ a.avatar }}" alt="{{ a.name }}" loading="lazy">{% else %}<span class="auth-fb">{{ a.initials }}</span>{% endif %}
+            {% if a.avatar %}<img src="{{ a.avatar }}" alt="{{ a.name }}" loading="lazy"{% if a.avatar_style %} style="{{ a.avatar_style }}"{% endif %}>{% else %}<span class="auth-fb">{{ a.initials }}</span>{% endif %}
           </a>
           {% endfor %}
         </div>
@@ -81,7 +81,7 @@
       </div>
     </header>
 
-    {% if hero %}<figure class="cover"><img src="{{ hero }}" alt=""></figure>{% endif %}
+    {% if hero %}<figure class="cover"><img src="{{ hero }}" alt=""{% if hero_style %} style="{{ hero_style }}"{% endif %}></figure>{% endif %}
 
     <article class="prose">{{ content|safe }}</article>
 
