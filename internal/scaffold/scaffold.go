@@ -24,6 +24,7 @@ func Project(dir string) error {
 		{"assets/.keep", ""},
 		{".gitignore", gitignore},
 		{".env.defaults", envDefaults},
+		{filepath.Join(".github", "workflows", "deploy.yml"), deployWorkflow},
 	}
 	for _, f := range files {
 		full := filepath.Join(dir, f.path)
@@ -128,6 +129,54 @@ const gitignore = `# colophon build output and derived state
 # Local env overrides / secrets. Shared, non-secret defaults live in .env.defaults
 # (committed); this file overrides them and is where deploy secrets go.
 /.env
+`
+
+// deployWorkflow builds (and optionally publishes) the site in GitHub Actions, sourcing the
+// analytics config and any deploy credentials from the repository's Actions secrets/variables.
+// The statsfactory ingest key is public, so it is a Variable; deploy credentials are Secrets
+// and are only read by colophon, never written into the output tree.
+const deployWorkflow = `name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Configure under Settings → Secrets and variables → Actions:
+#   Variables (public):  STATSFACTORY_SERVER_URL, STATSFACTORY_APP_KEY
+#   Secrets (private):   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID,
+#                        R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+# These override .env.defaults at build time (real env wins). The analytics key is a
+# public sf_live_ key embedded in pages; the deploy credentials never leave colophon.
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Public analytics config — baked into the built site.
+      STATSFACTORY_SERVER_URL: ${{ vars.STATSFACTORY_SERVER_URL }}
+      STATSFACTORY_APP_KEY: ${{ vars.STATSFACTORY_APP_KEY }}
+      # Deploy credentials — used by colophon to publish, never embedded in output.
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - name: Install colophon
+        run: go install github.com/jmylchreest/colophon/cmd/colophon@latest
+      - name: Build
+        run: colophon build --env production
+      # Enable once the production environment targets a cloud publisher (e.g.
+      # cloudflare-pages + cloudflare-r2) and the secrets above are set:
+      # - name: Publish
+      #   run: colophon publish --env production --allow-publish
 `
 
 const envDefaults = `# Shared, non-secret defaults loaded by colophon before {env:VAR} interpolation.

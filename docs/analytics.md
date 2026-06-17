@@ -50,6 +50,20 @@ STATSFACTORY_SERVER_URL=https://stats.example.com
 STATSFACTORY_APP_KEY=sf_live_xxxxxxxxxxxxxxxx
 ```
 
+### GitHub Actions
+
+`colophon init` scaffolds `.github/workflows/deploy.yml`, which builds (and, once a cloud
+publisher is configured, publishes) the site with the credentials sourced from the repository's
+Actions config. Set them under **Settings → Secrets and variables → Actions**:
+
+- **Variables** (public): `STATSFACTORY_SERVER_URL`, `STATSFACTORY_APP_KEY` — the ingest key
+  is a public `sf_live_` key, so a Variable (not a Secret) is appropriate.
+- **Secrets** (private): your deploy credentials — `CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+
+These override `.env.defaults` at build time (real environment wins), so the same repo builds
+with the right analytics endpoint locally and in CI.
+
 ## The web beacon
 
 When `web` analytics is active, the build writes a single ~2 KB dependency-free
