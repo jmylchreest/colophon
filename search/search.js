@@ -65,13 +65,23 @@ export function createReader(opts) {
     const { k1, b } = m.bm25;
     const avgdl = m.avgdl;
 
-    const scores = new Map();
+    // Prefix matching: each query term matches every index term that begins with it (so "wiki"
+    // finds "wikilinks"). All prefixes of a query term share its first character, hence its shard,
+    // so one shard fetch per query term covers the expansion. Score the union of matched terms once
+    // each, in sorted order — identical to the Go engine.
+    const matched = new Map(); // index term → postings
     for (const term of terms) {
       const s = shardForTerm(m, term);
       if (!s) continue;
       const shard = await loadShard(s.file);
-      const postings = shard[term];
-      if (!postings) continue;
+      for (const indexTerm in shard) {
+        if (indexTerm.startsWith(term)) matched.set(indexTerm, shard[indexTerm]);
+      }
+    }
+
+    const scores = new Map();
+    for (const term of [...matched.keys()].sort()) {
+      const postings = matched.get(term);
       const df = postings.length;
       const idf = Math.log(1 + (N - df + 0.5) / (df + 0.5));
       for (const [docId, tf] of postings) {

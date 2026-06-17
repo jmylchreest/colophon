@@ -15,7 +15,11 @@ func fixtureDocs() []Doc {
 	}
 }
 
-var fixtureQueries = []string{"go", "programming language", "go search", "bread recipe", "object storage", "nomatchxyz"}
+var fixtureQueries = []string{
+	"go", "programming language", "go search", "bread recipe", "object storage", "nomatchxyz",
+	// prefix matching: "program" → "programming", "obj" → "object", "stor" → "storage".
+	"program", "obj", "stor",
+}
 
 // TestGenerateJSFixture (re)generates the deterministic fixture and expected results that the JS
 // parity test (search.test.mjs) consumes, so the browser reader is checked against the Go engine

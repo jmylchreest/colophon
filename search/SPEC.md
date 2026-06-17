@@ -152,8 +152,8 @@ human-facing result card and nothing the scorer needs:
 
 ### The analyzer (`simple-1`)
 
-Tokenization is the one contract both **builder and reader MUST share** — query terms are matched
-against indexed terms by exact string equality, so both sides **MUST** produce identical tokens.
+Tokenization is the one contract both **builder and reader MUST share** — query tokens are matched
+against indexed terms by the prefix rule (§7), so both sides **MUST** produce identical tokens.
 `simple-1` is:
 
 1. Lowercase the input (Unicode-aware case folding — Go `strings.ToLower`, JS `String.toLowerCase`).
@@ -174,27 +174,33 @@ Conformance is pinned by the golden vectors in [`testdata/analyzer.json`](testda
 
 ## 7. Querying (normative)
 
-Given a query string and a limit, a conformant reader produces results as follows.
+Matching is by **prefix**: a query token matches every index term that begins with it, so `wiki`
+matches `wiki`, `wikilink`, and `wikilinks` (an exact term is just the full-length prefix). Given a
+query string and a limit, a conformant reader produces results as follows.
 
-1. **Tokenize** the query with the analyzer (§6) and **deduplicate**, keeping each distinct term
-   once. (Repeated query terms do not increase a document's score.)
-2. **Initialize** `score[doc] = 0` for all documents (sparsely).
-3. For each distinct query **term** `t`:
-   a. Select its shard (§5); if none, skip `t`.
-   b. Fetch + gunzip the shard; look up `postings = shard[t]`; if absent, skip `t`.
-   c. Let `df = len(postings)` and compute the inverse document frequency
-      **`idf = ln( 1 + (N − df + 0.5) / (df + 0.5) )`** with `N = docCount`.
-   d. For each `[doc, tf]` in `postings`, with `dl = docs[doc].len`, `b = bm25.b`,
-      `k1 = bm25.k1`, `avgdl = manifest.avgdl`, add to `score[doc]`:
+1. **Tokenize** the query with the analyzer (§6).
+2. **Expand to matched index terms.** For each query token `q`, every index term that has `q` as a
+   prefix is a match. Because all of `q`'s prefix-expansions begin with the same first character,
+   they live in the **same shard** (§5): a reader fetches, per query token, the single shard
+   covering that token's first character, then selects the terms in it that start with `q`. Form
+   the **set** of matched index terms (the union over query tokens — so a term matched by two
+   tokens is still counted once), and process it in **ascending code-point order** (§9.3) so
+   accumulation is deterministic.
+3. **Initialize** `score[doc] = 0` for all documents (sparsely).
+4. For each matched index term `t` (sorted), with `postings = shard[t]`: let `df = len(postings)`
+   and compute the inverse document frequency
+   **`idf = ln( 1 + (N − df + 0.5) / (df + 0.5) )`** with `N = docCount`. Then for each
+   `[doc, tf]` in `postings`, with `dl = docs[doc].len`, `b = bm25.b`, `k1 = bm25.k1`,
+   `avgdl = manifest.avgdl`, add to `score[doc]`:
 
    ```
    idf · ( tf · (k1 + 1) ) / ( tf + k1 · (1 − b + b · dl / avgdl) )
    ```
 
-4. **Rank** documents by `score` descending. Ties **MUST** break by document ID ascending
+5. **Rank** documents by `score` descending. Ties **MUST** break by document ID ascending
    (code-point order, §9.3) so output is deterministic.
-5. Take the top `limit` (all, if `limit ≤ 0`).
-6. For each result, fetch its fragment (§6) and emit `{ id, url, title, excerpt, meta, score }`.
+6. Take the top `limit` (all, if `limit ≤ 0`).
+7. For each result, fetch its fragment (§6) and emit `{ id, url, title, excerpt, meta, score }`.
 
 All arithmetic is IEEE-754 double precision. Accumulation order is term-by-term, and within a
 term by the shard's posting order; following this order reproduces the reference scores

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 )
 
 // Doc is anything indexable. The engine knows nothing about colophon pages — a caller maps its
@@ -129,21 +130,30 @@ type Result struct {
 }
 
 // Search ranks documents against the query with BM25 and returns the top limit (all, if limit <=
-// 0). Query terms are analyzed with the index's analyzer and de-duplicated. Ties break on doc ID
-// so results are deterministic.
+// 0). Matching is by prefix: each analyzed query term matches every index term that begins with
+// it (so "wiki" finds "wikilinks", and an exact term is just the length-N prefix). The union of
+// matched index terms is scored once each, in sorted order, so the result is deterministic and
+// matches the JS reader bit-for-bit. Ties break on doc ID.
 func (ix *Index) Search(query string, limit int) []Result {
 	n := float64(len(ix.docs))
 	scores := map[int]float64{}
-	seen := map[string]struct{}{}
-	for _, term := range ix.analyzer(query) {
-		if _, dup := seen[term]; dup {
-			continue
+
+	matched := map[string]struct{}{}
+	for _, qt := range ix.analyzer(query) {
+		for term := range ix.post {
+			if strings.HasPrefix(term, qt) {
+				matched[term] = struct{}{}
+			}
 		}
-		seen[term] = struct{}{}
+	}
+	terms := make([]string, 0, len(matched))
+	for t := range matched {
+		terms = append(terms, t)
+	}
+	sort.Strings(terms)
+
+	for _, term := range terms {
 		postings := ix.post[term]
-		if len(postings) == 0 {
-			continue
-		}
 		df := float64(len(postings))
 		idf := math.Log(1 + (n-df+0.5)/(df+0.5))
 		for _, p := range postings {
