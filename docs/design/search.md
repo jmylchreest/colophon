@@ -276,13 +276,22 @@ v1 is **lexical only**, but semantic is designed-in as the `semantic` index type
 parallel system. It emits per-chunk **embedding vectors** as content-addressed, sharded files
 reusing the *same* doc identity and fragments — added alongside lexical, never instead.
 
-The only genuinely new cost is **query-time embedding**: the browser needs a model
-(transformers.js + a ~25–30MB quantized MiniLM, now feasible) or a query endpoint; the *index*
-slots into the existing file model. Scaling options that fit the sharded design: small corpora
-load all vectors (brute-force cosine); larger ones use IVF-style **centroid prefiltering**
-(centroids in the manifest → fetch only the nearest clusters' vector shards), or the §8 pure-Go
-**HNSW** behind the `Retriever` interface. The CLI semantic path (§8 `vectors.f32`) is the same
-vectors consumed in Go. None of this is in v1 — but the substrate makes it additive.
+The only genuinely new cost is **query-time embedding**: the browser needs a model or a query
+endpoint; the *index* slots into the existing file model. Scaling options that fit the sharded
+design: small corpora load all vectors (brute-force cosine); larger ones use IVF-style **centroid
+prefiltering** (centroids in the manifest → fetch only the nearest clusters' vector shards), or
+the §8 pure-Go **HNSW** behind the `Retriever` interface. The CLI semantic path (§8 `vectors.f32`)
+is the same vectors consumed in Go. None of this is in v1 — but the substrate makes it additive.
+
+**Embedder-parity contract** (the embedding analog of the analyzer contract): the build-side
+embedder (Go) and the query-side embedder (browser) must be the **same model**, or query vectors
+won't share the doc vectors' space. The recommended future embedder is therefore **static
+embeddings (Model2Vec / `potion-*`)**: a token→vector lookup table that is implementable
+identically in Go and JS from one shared weights file (golden-vector tested, like the analyzer),
+runs in pure code with **no ONNX/WASM runtime on either side**, and is a few MB rather than ~30MB.
+It trades ~10–20% quality vs a MiniLM transformer — acceptable because semantic is used as a
+**hybrid recall/rerank assist over lexical BM25**, not a replacement. A full transformers.js
+MiniLM stays the higher-quality opt-in fallback.
 
 ## Key decisions
 
