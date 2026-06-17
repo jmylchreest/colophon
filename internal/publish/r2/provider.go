@@ -33,7 +33,7 @@ func detectProvider(endpoint string) providerName {
 	return providerUnknown
 }
 
-func (p *Publisher) ops() providerOps { return providerBehaviour[detectProvider(p.endpoint)] }
+func (p *Publisher) ops() providerOps { return providerBehaviour[detectProvider(p.s3.Endpoint)] }
 
 // resolvePublicURL returns the configured public_url, else asks the matching provider to
 // discover one, else "" — in which case routing stays inert and assets remain co-located.

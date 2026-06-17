@@ -1,4 +1,4 @@
-package r2
+package s3common
 
 import (
 	"net/http"

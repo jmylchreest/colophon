@@ -4,32 +4,28 @@
 // of consuming a Pages/Workers deployment's file budget — paired with site routing, which
 // sends matched paths here and rewrites their URLs to the store's public base.
 //
+// The S3 wire protocol lives in internal/publish/s3common (shared with other S3 backends);
+// this package adds only the Cloudflare control-plane bits (public-URL discovery, r2.dev
+// enablement — see cfapi.go / provider.go).
+//
 // Credentials never pass through config: the access key id and secret are read from the
 // environment (R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY, falling back to AWS_*). Bucket,
 // account/endpoint and the public base URL come from the publisher config.
 package r2
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
-	"io"
 	"io/fs"
-	"mime"
-	"net/http"
-	"net/url"
 	"os"
-	"path"
-	"regexp"
 	"strings"
-	"time"
 
 	"github.com/jmylchreest/colophon/internal/clog"
 	"github.com/jmylchreest/colophon/internal/config"
 	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/publish"
+	"github.com/jmylchreest/colophon/internal/publish/s3common"
 )
 
 func init() {
@@ -37,22 +33,6 @@ func init() {
 	// R2 uses S3 data-plane keys (AWS_* are accepted as fallbacks) and CLOUDFLARE_API_TOKEN
 	// for the control-plane discovery / r2.dev enable.
 	publish.RegisterEnv("cloudflare-r2", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "CLOUDFLARE_API_TOKEN")
-}
-
-// bucketNameRE matches the S3/R2 naming rules below the length check: lowercase letters,
-// numbers and hyphens, beginning and ending with a letter or number (no dots).
-var bucketNameRE = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?$`)
-
-// validateBucketName checks a bucket name against the S3/R2 rules, so a typo fails with a
-// clear message up front rather than a 400 from the API mid-publish.
-func validateBucketName(name string) error {
-	if len(name) < 3 || len(name) > 63 {
-		return fmt.Errorf("must be 3–63 characters")
-	}
-	if !bucketNameRE.MatchString(name) {
-		return fmt.Errorf("must be lowercase letters, numbers and hyphens, starting and ending with a letter or number")
-	}
-	return nil
 }
 
 // New builds an R2 publisher. Required: bucket, and either account_id (→ the R2 endpoint)
@@ -63,7 +43,7 @@ func New(root string, cfg config.PublisherConfig) (core.Publisher, error) {
 	if bucket == "" {
 		return nil, fmt.Errorf("r2 publisher %q: 'bucket' is required", cfg.ID)
 	}
-	if err := validateBucketName(bucket); err != nil {
+	if err := s3common.ValidateBucketName(bucket); err != nil {
 		return nil, fmt.Errorf("r2 publisher %q: invalid bucket name %q: %w", cfg.ID, bucket, err)
 	}
 	endpoint := get("endpoint")
@@ -82,18 +62,17 @@ func New(root string, cfg config.PublisherConfig) (core.Publisher, error) {
 	if v, ok := cfg.Settings["delete_orphaned"].(bool); ok {
 		deleteOrphaned = v
 	}
+	s3 := s3common.New(endpoint, bucket, region,
+		firstEnv("R2_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
+		firstEnv("R2_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"))
+	s3.Name = cfg.ID
 	p := &Publisher{
 		id:             cfg.ID,
-		bucket:         bucket,
-		endpoint:       strings.TrimRight(endpoint, "/"),
-		region:         region,
+		s3:             s3,
 		location:       get("location"),
 		description:    get("description"),
 		publicURL:      strings.TrimRight(get("public_url"), "/"),
 		deleteOrphaned: deleteOrphaned,
-		accessKey:      firstEnv("R2_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
-		secretKey:      firstEnv("R2_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
-		client:         &http.Client{Timeout: 2 * time.Minute},
 	}
 	// A control-plane token (shared with the Pages publisher) enables public-URL discovery
 	// for providers that support it; the endpoint→provider glob table (provider.go) decides
@@ -106,27 +85,25 @@ func New(root string, cfg config.PublisherConfig) (core.Publisher, error) {
 
 type Publisher struct {
 	id             string
-	bucket         string
-	endpoint       string
-	region         string
+	s3             *s3common.Client // the shared S3 wire client
+	cf             *cfAPI           // Cloudflare control plane (nil without a token)
 	location       string
 	description    string
 	publicURL      string
 	deleteOrphaned bool
-	cf             *cfAPI
-	accessKey      string
-	secretKey      string
-	client         *http.Client
 	log            *clog.Logger
 }
 
-func (p *Publisher) SetLogger(l *clog.Logger) { p.log = l }
+func (p *Publisher) SetLogger(l *clog.Logger) {
+	p.log = l
+	p.s3.Logger = l // *clog.Logger satisfies s3common.Logger (Detail)
+}
 
 func (p *Publisher) ID() string     { return p.id }
 func (p *Publisher) Driver() string { return "cloudflare-r2" }
 
 func (p *Publisher) ensureCreds() error {
-	if p.accessKey == "" || p.secretKey == "" {
+	if p.s3.AccessKey == "" || p.s3.SecretKey == "" {
 		return fmt.Errorf("r2 publisher %q: set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY", p.id)
 	}
 	return nil
@@ -138,7 +115,7 @@ func (p *Publisher) Deployed(ctx context.Context) (core.State, bool, error) {
 	if err := p.ensureCreds(); err != nil {
 		return nil, false, err
 	}
-	state, err := p.listObjects(ctx)
+	state, err := p.s3.List(ctx)
 	return state, true, err
 }
 
@@ -152,28 +129,11 @@ func (p *Publisher) Protected(name string) bool {
 	return strings.HasPrefix(name, ".well-known/")
 }
 
-// Put uploads an object; Delete removes one — the per-file apply surface the planner drives.
-func (p *Publisher) Put(ctx context.Context, name string, b []byte) error {
-	if err := p.put(ctx, name, b); err != nil {
-		return err
-	}
-	p.log.Detail("PUBLISH", p.id, "put", name, "bytes", len(b))
-	return nil
-}
-
-func (p *Publisher) Delete(ctx context.Context, name string) error {
-	if err := p.deleteObject(ctx, name); err != nil {
-		return err
-	}
-	p.log.Detail("PUBLISH", p.id, "delete", name)
-	return nil
-}
-
 func (p *Publisher) Commit(ctx context.Context, tree fs.FS, plan *core.Plan) (core.Result, error) {
 	if err := p.ensureCreds(); err != nil {
 		return core.Result{}, err
 	}
-	res, err := publish.CommitFiles(ctx, tree, p, plan, p.deleteOrphaned)
+	res, err := publish.CommitFiles(ctx, tree, p.s3, plan, p.deleteOrphaned)
 	if err == nil {
 		// An aggregate closing line so --verbose isn't only the per-object put/delete noise.
 		p.log.Detail("PUBLISH", p.id, "committed",
@@ -209,12 +169,12 @@ func (p *Publisher) WriteManifest(ctx context.Context, m core.SiteManifest) erro
 		Description string `json:"description,omitempty"`
 		Bucket      string `json:"bucket"`
 		PublicURL   string `json:"public_url,omitempty"`
-	}{m, p.description, p.bucket, p.publicURL}
+	}{m, p.description, p.s3.Bucket, p.publicURL}
 	b, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return err
 	}
-	return p.put(ctx, manifestKey, b)
+	return p.s3.Put(ctx, manifestKey, b)
 }
 
 // Provision makes the bucket ready for web delivery (`publish --create`): it creates the
@@ -227,25 +187,16 @@ func (p *Publisher) Provision(ctx context.Context) (bool, error) {
 	if err := p.ensureCreds(); err != nil {
 		return false, err
 	}
-	exists, err := p.bucketExists(ctx)
+	exists, err := p.s3.Head(ctx)
 	if err != nil {
 		return false, err
 	}
 	created := false
 	if !exists {
-		resp, err := p.do(ctx, http.MethodPut, "/"+p.bucket, createBucketBody(p.location))
-		if err != nil {
+		if err := p.s3.Create(ctx, p.location); err != nil {
 			return false, err
 		}
-		status := resp.StatusCode
-		drain(resp)
-		switch {
-		case status/100 == 2:
-			created = true
-		case status == http.StatusConflict: // already owned (race) — fine
-		default:
-			return false, fmt.Errorf("r2 create bucket %s: %s", p.bucket, http.StatusText(status))
-		}
+		created = true
 	}
 	// Ensure the bucket is publicly reachable (the provider enables r2.dev only when nothing
 	// already exposes it — see r2EnablePublicAccess). Runs for an existing bucket too, and a
@@ -259,139 +210,6 @@ func (p *Publisher) Provision(ctx context.Context) (bool, error) {
 	return created, nil
 }
 
-func (p *Publisher) bucketExists(ctx context.Context) (bool, error) {
-	resp, err := p.do(ctx, http.MethodHead, "/"+p.bucket, nil)
-	if err != nil {
-		return false, err
-	}
-	defer drain(resp)
-	switch resp.StatusCode {
-	case http.StatusNotFound:
-		return false, nil
-	case http.StatusOK, http.StatusForbidden: // 403: exists but listing denied — treat as present
-		return true, nil
-	default:
-		return false, fmt.Errorf("r2 head bucket %s: %s", p.bucket, resp.Status)
-	}
-}
-
-// listResult is the subset of an S3 ListObjectsV2 response colophon needs.
-type listResult struct {
-	IsTruncated           bool   `xml:"IsTruncated"`
-	NextContinuationToken string `xml:"NextContinuationToken"`
-	Contents              []struct {
-		Key  string `xml:"Key"`
-		ETag string `xml:"ETag"`
-	} `xml:"Contents"`
-}
-
-// listObjects enumerates the bucket via ListObjectsV2 (paginated) into a key → ETag (MD5)
-// manifest. The signed canonical query string is built by url.Values.Encode (sorted, encoded).
-func (p *Publisher) listObjects(ctx context.Context) (core.State, error) {
-	state := core.State{}
-	token := ""
-	for {
-		params := url.Values{"list-type": {"2"}}
-		if token != "" {
-			params.Set("continuation-token", token)
-		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.endpoint+"/"+p.bucket, nil)
-		if err != nil {
-			return nil, err
-		}
-		req.URL.RawQuery = params.Encode()
-		signV4(req, "/"+p.bucket, p.accessKey, p.secretKey, p.region, emptyPayloadHash, now())
-		resp, err := p.client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		if resp.StatusCode/100 != 2 {
-			msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-			drain(resp)
-			return nil, fmt.Errorf("r2 list %s: %s: %s", p.bucket, resp.Status, strings.TrimSpace(string(msg)))
-		}
-		var lr listResult
-		err = xml.NewDecoder(resp.Body).Decode(&lr)
-		drain(resp)
-		if err != nil {
-			return nil, fmt.Errorf("r2 list %s: %w", p.bucket, err)
-		}
-		for _, c := range lr.Contents {
-			state[c.Key] = strings.Trim(c.ETag, `"`)
-		}
-		if !lr.IsTruncated || lr.NextContinuationToken == "" {
-			return state, nil
-		}
-		token = lr.NextContinuationToken
-	}
-}
-
-// deleteObject removes an object; a missing object is not an error (already gone).
-func (p *Publisher) deleteObject(ctx context.Context, key string) error {
-	resp, err := p.do(ctx, http.MethodDelete, p.objectPath(key), nil)
-	if err != nil {
-		return err
-	}
-	defer drain(resp)
-	if resp.StatusCode/100 != 2 && resp.StatusCode != http.StatusNotFound {
-		return fmt.Errorf("r2 delete %s: %s", key, resp.Status)
-	}
-	return nil
-}
-
-// put uploads an object with a content type inferred from its extension.
-func (p *Publisher) put(ctx context.Context, key string, body []byte) error {
-	resp, err := p.do(ctx, http.MethodPut, p.objectPath(key), body)
-	if err != nil {
-		return err
-	}
-	defer drain(resp)
-	if resp.StatusCode/100 != 2 {
-		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return fmt.Errorf("r2 put %s: %s: %s", key, resp.Status, strings.TrimSpace(string(msg)))
-	}
-	return nil
-}
-
-func (p *Publisher) objectPath(key string) string { return "/" + p.bucket + "/" + encodeKey(key) }
-
-// do builds, signs and sends a request to an already-encoded path. A non-nil body is sent
-// with its SHA-256 and a content type inferred from the path; a nil body signs as empty.
-func (p *Publisher) do(ctx context.Context, method, encodedPath string, body []byte) (*http.Response, error) {
-	hash := emptyPayloadHash
-	var r io.Reader
-	if body != nil {
-		hash = hexSHA256(body)
-		r = bytes.NewReader(body)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, p.endpoint+encodedPath, r)
-	if err != nil {
-		return nil, err
-	}
-	if body != nil {
-		req.ContentLength = int64(len(body))
-		if ct := mime.TypeByExtension(path.Ext(encodedPath)); ct != "" {
-			req.Header.Set("Content-Type", ct)
-		}
-	}
-	signV4(req, encodedPath, p.accessKey, p.secretKey, p.region, hash, now())
-	return p.client.Do(req)
-}
-
-func drain(resp *http.Response) {
-	_, _ = io.Copy(io.Discard, resp.Body)
-	_ = resp.Body.Close()
-}
-
-// createBucketBody returns the CreateBucket request body carrying the location hint, or nil
-// (auto-locate) when no location is configured. Location values are restricted tokens.
-func createBucketBody(location string) []byte {
-	if location == "" {
-		return nil
-	}
-	return []byte("<CreateBucketConfiguration><LocationConstraint>" + location + "</LocationConstraint></CreateBucketConfiguration>")
-}
-
 func firstEnv(keys ...string) string {
 	for _, k := range keys {
 		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
@@ -400,6 +218,3 @@ func firstEnv(keys ...string) string {
 	}
 	return ""
 }
-
-// now is overridable in tests.
-var now = func() time.Time { return time.Now() }

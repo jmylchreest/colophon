@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/jmylchreest/colophon/internal/publish/s3common"
 )
 
 func TestDetectProvider(t *testing.T) {
@@ -56,8 +58,8 @@ func cfMock(t *testing.T, custom, managed string) *cfAPI {
 
 func r2Publisher(cf *cfAPI, publicURL string) *Publisher {
 	return &Publisher{
-		id: "r2", bucket: "b", endpoint: "https://acct.r2.cloudflarestorage.com",
-		publicURL: publicURL, cf: cf,
+		id: "r2", publicURL: publicURL, cf: cf,
+		s3: &s3common.Client{Bucket: "b", Endpoint: "https://acct.r2.cloudflarestorage.com"},
 	}
 }
 
@@ -72,14 +74,14 @@ func TestPublicURLConfigShortCircuits(t *testing.T) {
 
 func TestPublicURLPrefersShortestCustomDomain(t *testing.T) {
 	cf := cfMock(t,
-		`{"domains":[{"domain":"cdn.assets.blog.i0.pm","enabled":true},{"domain":"assets.blog.i0.pm","enabled":true},{"domain":"x.blog.i0.pm","enabled":false}]}`,
+		`{"domains":[{"domain":"cdn.assets.example.com","enabled":true},{"domain":"assets.example.com","enabled":true},{"domain":"x.blog.example.com","enabled":false}]}`,
 		`{"domain":"pub-xyz.r2.dev","enabled":true}`)
 	p := r2Publisher(cf, "")
 	got, err := p.resolvePublicURL(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "https://assets.blog.i0.pm" {
+	if got != "https://assets.example.com" {
 		t.Errorf("got %q, want the shortest enabled custom domain", got)
 	}
 }
@@ -139,7 +141,7 @@ func TestEnablePublicAccessOnlyWhenNeeded(t *testing.T) {
 
 	// A connected custom domain already exposes it → r2.dev is NOT enabled (minimal surface).
 	enabled = false
-	p = r2Publisher(enableTracker(t, `{"domains":[{"domain":"assets.blog.i0.pm","enabled":true}]}`, `{"enabled":false}`, &enabled), "")
+	p = r2Publisher(enableTracker(t, `{"domains":[{"domain":"assets.example.com","enabled":true}]}`, `{"enabled":false}`, &enabled), "")
 	if err := r2EnablePublicAccess(context.Background(), p); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +162,8 @@ func TestEnablePublicAccessOnlyWhenNeeded(t *testing.T) {
 
 func TestGenericS3HasNoDiscovery(t *testing.T) {
 	// A non-R2 endpoint never discovers; it relies on explicit public_url.
-	p := &Publisher{id: "s3", bucket: "b", endpoint: "https://s3.amazonaws.com", cf: cfMock(t, `{"domains":[]}`, `{}`)}
+	p := &Publisher{id: "s3", cf: cfMock(t, `{"domains":[]}`, `{}`),
+		s3: &s3common.Client{Bucket: "b", Endpoint: "https://s3.amazonaws.com"}}
 	got, err := p.resolvePublicURL(context.Background())
 	if err != nil || got != "" {
 		t.Errorf("generic S3 should not discover: got %q, %v", got, err)

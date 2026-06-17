@@ -123,8 +123,8 @@ func r2PublicURL(ctx context.Context, p *Publisher) (string, error) {
 	if p.cf == nil {
 		return "", nil // no control-plane token: rely on an explicit public_url
 	}
-	account := r2Account(p.endpoint)
-	customs, err := p.cf.r2CustomDomains(ctx, account, p.bucket)
+	account := r2Account(p.s3.Endpoint)
+	customs, err := p.cf.r2CustomDomains(ctx, account, p.s3.Bucket)
 	if err != nil {
 		return "", err
 	}
@@ -137,7 +137,7 @@ func r2PublicURL(ctx context.Context, p *Publisher) (string, error) {
 	if best != "" {
 		return "https://" + best, nil
 	}
-	m, err := p.cf.r2ManagedDomain(ctx, account, p.bucket)
+	m, err := p.cf.r2ManagedDomain(ctx, account, p.s3.Bucket)
 	if err != nil {
 		return "", err
 	}
@@ -163,5 +163,5 @@ func r2EnablePublicAccess(ctx context.Context, p *Publisher) error {
 	if u, _ := r2PublicURL(ctx, p); u != "" {
 		return nil // a domain already exposes it — keep the public surface minimal
 	}
-	return p.cf.r2EnableManagedDomain(ctx, r2Account(p.endpoint), p.bucket)
+	return p.cf.r2EnableManagedDomain(ctx, r2Account(p.s3.Endpoint), p.s3.Bucket)
 }

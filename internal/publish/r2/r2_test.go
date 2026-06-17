@@ -13,6 +13,7 @@ import (
 	"github.com/jmylchreest/colophon/internal/config"
 	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/publish"
+	"github.com/jmylchreest/colophon/internal/publish/s3common"
 )
 
 func TestWriteManifest(t *testing.T) {
@@ -26,25 +27,25 @@ func TestWriteManifest(t *testing.T) {
 	}))
 	t.Cleanup(srv.Close)
 	p := &Publisher{
-		id: "r2", bucket: "b", endpoint: srv.URL, region: "auto",
-		description: "blog.i0.pm assets", publicURL: "https://assets.blog.i0.pm",
-		accessKey: "AK", secretKey: "SK", client: srv.Client(),
+		id: "r2", description: "blog.example.com assets", publicURL: "https://assets.example.com",
+		s3: &s3common.Client{Name: "r2", Bucket: "b", Endpoint: srv.URL, Region: "auto",
+			AccessKey: "AK", SecretKey: "SK", HTTPClient: srv.Client()},
 	}
 	err := p.WriteManifest(context.Background(), core.SiteManifest{
-		Generator: "colophon", Site: "https://blog.i0.pm", Sitemap: "https://blog.i0.pm/sitemap.xml",
-		Feeds: map[string]string{"rss": "https://blog.i0.pm/rss.xml"},
+		Generator: "colophon", Site: "https://blog.example.com", Sitemap: "https://blog.example.com/sitemap.xml",
+		Feeds: map[string]string{"rss": "https://blog.example.com/rss.xml"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
 		`"generator": "colophon"`,
-		`"site": "https://blog.i0.pm"`,
-		`"sitemap": "https://blog.i0.pm/sitemap.xml"`,
-		`"rss": "https://blog.i0.pm/rss.xml"`,
-		`"description": "blog.i0.pm assets"`,
+		`"site": "https://blog.example.com"`,
+		`"sitemap": "https://blog.example.com/sitemap.xml"`,
+		`"rss": "https://blog.example.com/rss.xml"`,
+		`"description": "blog.example.com assets"`,
 		`"bucket": "b"`,
-		`"public_url": "https://assets.blog.i0.pm"`,
+		`"public_url": "https://assets.example.com"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("manifest missing %s\n%s", want, body)
@@ -117,8 +118,9 @@ func newTestPublisher(t *testing.T) (*Publisher, *fakeStore) {
 	srv := httptest.NewServer(store.handler("b"))
 	t.Cleanup(srv.Close)
 	p := &Publisher{
-		id: "r2", bucket: "b", endpoint: srv.URL, region: "auto",
-		deleteOrphaned: true, accessKey: "AKID", secretKey: "secret", client: srv.Client(),
+		id: "r2", deleteOrphaned: true,
+		s3: &s3common.Client{Name: "r2", Bucket: "b", Endpoint: srv.URL, Region: "auto",
+			AccessKey: "AKID", SecretKey: "secret", HTTPClient: srv.Client()},
 	}
 	return p, store
 }
@@ -146,8 +148,9 @@ func TestProvisionSendsLocationHint(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(srv.Close)
-	p := &Publisher{id: "r2", bucket: "b", endpoint: srv.URL, region: "auto", location: "weur",
-		accessKey: "AKID", secretKey: "secret", client: srv.Client()}
+	p := &Publisher{id: "r2", location: "weur",
+		s3: &s3common.Client{Name: "r2", Bucket: "b", Endpoint: srv.URL, Region: "auto",
+			AccessKey: "AKID", SecretKey: "secret", HTTPClient: srv.Client()}}
 	if _, err := p.Provision(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -203,29 +206,6 @@ func TestRunUploadsSkipsAndDeletes(t *testing.T) {
 	}
 }
 
-func TestValidateBucketName(t *testing.T) {
-	valid := []string{"colophon-assets", "abc", "a1-b2-c3", strings.Repeat("a", 63)}
-	for _, n := range valid {
-		if err := validateBucketName(n); err != nil {
-			t.Errorf("validateBucketName(%q) = %v, want nil", n, err)
-		}
-	}
-	invalid := []string{
-		"jzZ0GjHXh0b18s6Ooi6dQ", // uppercase (the reported failure)
-		"ab",                    // too short
-		strings.Repeat("a", 64), // too long
-		"assets.blog.i0.pm",     // dots not allowed
-		"-leading",              // must start alphanumeric
-		"trailing-",             // must end alphanumeric
-		"under_score",           // underscore not allowed
-	}
-	for _, n := range invalid {
-		if err := validateBucketName(n); err == nil {
-			t.Errorf("validateBucketName(%q) = nil, want error", n)
-		}
-	}
-}
-
 func TestNewRejectsBadBucket(t *testing.T) {
 	_, err := New("", config.PublisherConfig{ID: "r2", Driver: "cloudflare-r2",
 		Settings: map[string]any{"bucket": "Uppercase", "account_id": "acct"}})
@@ -235,7 +215,7 @@ func TestNewRejectsBadBucket(t *testing.T) {
 }
 
 func TestDeployedRequiresCreds(t *testing.T) {
-	p := &Publisher{id: "r2", bucket: "b", endpoint: "https://x", region: "auto"}
+	p := &Publisher{id: "r2", s3: &s3common.Client{Bucket: "b", Endpoint: "https://x", Region: "auto"}}
 	if _, _, err := p.Deployed(context.Background()); err == nil {
 		t.Error("Deployed without credentials should error")
 	}
