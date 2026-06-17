@@ -16,6 +16,7 @@ type Frontmatter struct {
 	Title       string    `yaml:"title"`
 	Date        time.Time `yaml:"date,omitempty"`
 	Slug        string    `yaml:"slug,omitempty"`
+	Lang        string    `yaml:"lang,omitempty"` // per-post BCP-47 override of the site language
 	Description string    `yaml:"description,omitempty"`
 	Tags        []string  `yaml:"tags,omitempty"`
 	Categories  []string  `yaml:"categories,omitempty"`
@@ -32,6 +33,12 @@ type Frontmatter struct {
 	// Obsidian [[embed]] is accepted too) that the build copies beside the page.
 	Hero  string `yaml:"hero,omitempty"`
 	Image string `yaml:"image,omitempty"`
+
+	// HeroAlt/ImageAlt are the accessible alt text for the banner and card images. Empty
+	// means decorative (alt=""), which is correct for a purely ornamental banner; set them
+	// when the image carries meaning a screen-reader user would otherwise miss.
+	HeroAlt  string `yaml:"hero_alt,omitempty"`
+	ImageAlt string `yaml:"image_alt,omitempty"`
 
 	// HeroFit/ImageFit choose how the image fills its box (CSS object-fit: cover|contain|
 	// fill|scale-down|none); *Position picks which part shows when cropping (CSS

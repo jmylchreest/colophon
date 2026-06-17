@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="{{ lang }}" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -81,7 +81,7 @@
       </div>
     </header>
 
-    {% if hero %}<figure class="cover"><img src="{{ hero }}" alt=""{% if hero_style %} style="{{ hero_style }}"{% endif %}></figure>{% endif %}
+    {% if hero %}<figure class="cover"><img src="{{ hero }}" alt="{{ hero_alt }}"{% if hero_style %} style="{{ hero_style }}"{% endif %}></figure>{% endif %}
 
     <article class="prose">{{ content|safe }}</article>
 

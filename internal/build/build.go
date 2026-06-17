@@ -103,11 +103,14 @@ type page struct {
 	EmbargoUntil string // formatted publish_after, when Embargoed
 	Static       bool   // standing page (e.g. About): kept out of the chronological list + feeds, surfaced in nav
 	Type         string // page type (post|page|custom): selects the template and placement
+	Lang         string // per-post language override (BCP-47); empty → the site language
 
 	Hero       string // hero banner URL: page-relative when co-located, absolute when routed
+	HeroAlt    string // accessible alt text for the hero; empty → decorative (alt="")
 	HeroFit    string // CSS object-fit for the hero (cover|contain|…); empty → theme default
 	HeroPos    string // CSS object-position for the hero (e.g. "top"); empty → theme default
 	Image      string // preview image href for the index card (rooted path or absolute), or ""
+	ImageAlt   string // accessible alt text for the card image; empty → decorative (alt="")
 	ImageFit   string // CSS object-fit for the card/preview image; empty → theme default
 	ImagePos   string // CSS object-position for the card/preview image; empty → theme default
 	ImageAbs   string // absolute preview image URL for og:image, or ""
@@ -188,6 +191,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 
 	formats := feedFormats(site)
 	feedHead := feedDiscoveryLinks(site, formats)
+	siteLang := defaultLang(site.Lang)
 
 	favicon, err := writeFavicon(write, eng, cfg.Root, site)
 	if err != nil {
@@ -220,7 +224,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// post, most-recent-first) are built up front so every page's header can show the strip.
 	list := make([]map[string]any, len(posts))
 	for i, p := range posts {
-		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_style": imageStyle(p.ImageFit, p.ImagePos), "tags": tagLinks(p.Tags, basePath)}
+		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "tags": tagLinks(p.Tags, basePath)}
 	}
 	authorGroups := collectAuthors(cfg, posts, list, basePath)
 	authors := authorStrip(authorGroups)
@@ -239,7 +243,12 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			slugSeen[p.URL] = p.SourcePath
 		}
 		author := resolveAuthor(cfg, p.Author)
+		pageLang := p.Lang
+		if pageLang == "" {
+			pageLang = siteLang
+		}
 		ctx := map[string]any{
+			"lang":           pageLang,
 			"nav_pages":      navPages,
 			"authors":        authors,
 			"site_title":     site.Title,
@@ -258,8 +267,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"embargoed":      p.Embargoed,
 			"embargo_until":  p.EmbargoUntil,
 			"hero":           p.Hero,
+			"hero_alt":       p.HeroAlt,
 			"hero_style":     imageStyle(p.HeroFit, p.HeroPos),
 			"image":          p.Image,
+			"image_alt":      p.ImageAlt,
 			"image_style":    imageStyle(p.ImageFit, p.ImagePos),
 			"image_abs":      p.ImageAbs,
 			"tags":           tagLinks(p.Tags, basePath),
@@ -284,6 +295,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	}
 
 	index, err := eng.Render("index.html", map[string]any{
+		"lang":           siteLang,
 		"site_title":     site.Title,
 		"base_url":       site.BaseURL,
 		"base_path":      basePath,
@@ -536,6 +548,8 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 				p.Image, p.ImageAbs = basePath+out, absURL(baseURL, out)
 			}
 		}
+		p.Lang = fm.Lang
+		p.HeroAlt, p.ImageAlt = fm.HeroAlt, fm.ImageAlt
 		p.HeroFit, p.HeroPos = fm.HeroFit, fm.HeroPosition
 		p.ImageFit, p.ImagePos = fm.ImageFit, fm.ImagePosition
 		p.HasMermaid = strings.Contains(html, `class="mermaid"`)
@@ -760,6 +774,7 @@ func writeTagPages(write func(string, []byte) error, eng render.Engine, site cor
 	for _, s := range slugs {
 		g := groups[s]
 		html, err := eng.Render("index.html", map[string]any{
+			"lang":           defaultLang(site.Lang),
 			"site_title":     site.Title,
 			"base_url":       site.BaseURL,
 			"base_path":      basePath,

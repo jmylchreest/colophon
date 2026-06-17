@@ -7,6 +7,9 @@ type Site struct {
 	Title   string `yaml:"title"`
 	BaseURL string `yaml:"base_url"`
 	Theme   string `yaml:"theme"`
+	// Lang is the site's BCP-47 language tag (e.g. "en", "en-GB", "fr"), emitted as
+	// <html lang>. A post may override it per-page. Empty defaults to "en".
+	Lang string `yaml:"lang,omitempty"`
 	// Favicon is a project-root-relative image used as the site icon. Empty falls back
 	// to the theme's favicon.svg.
 	Favicon string `yaml:"favicon,omitempty"`

@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+// defaultLang returns the BCP-47 language tag or "en" when unset — used for <html lang>.
+func defaultLang(lang string) string {
+	if l := strings.TrimSpace(lang); l != "" {
+		return l
+	}
+	return "en"
+}
+
 // objectFits is the allowed set of CSS object-fit values, exposed to authors as the `*_fit`
 // frontmatter so they can choose how an image fills its box: cover (crop to fill, the theme
 // default), contain (fit whole, letterbox), fill (stretch), scale-down, or none.
