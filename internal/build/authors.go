@@ -90,15 +90,16 @@ func authorStrip(groups []authorGroup) []map[string]any {
 func writeAuthorPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, feedHead, favicon string, authors, navPages []map[string]any, groups []authorGroup) error {
 	for _, g := range groups {
 		html, err := eng.Render("index.html", map[string]any{
-			"site_title": site.Title,
-			"base_url":   site.BaseURL,
-			"base_path":  basePath,
-			"feed_head":  feedHead,
-			"favicon":    favicon,
-			"heading":    "By " + g.name,
-			"authors":    authors,
-			"nav_pages":  navPages,
-			"pages":      g.items,
+			"site_title":     site.Title,
+			"base_url":       site.BaseURL,
+			"base_path":      basePath,
+			"feed_head":      feedHead,
+			"analytics_head": analyticsHead(site, basePath, nil),
+			"favicon":        favicon,
+			"heading":        "By " + g.name,
+			"authors":        authors,
+			"nav_pages":      navPages,
+			"pages":          g.items,
 		})
 		if err != nil {
 			return err

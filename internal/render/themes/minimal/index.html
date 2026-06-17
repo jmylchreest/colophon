@@ -20,5 +20,6 @@
 {% if feeds %}<p class="meta">Subscribe:{% for f in feeds %} <a href="{{ f.href }}">{{ f.label }}</a>{% endfor %}</p>{% endif %}
 </main>
 <footer>Built with colophon</footer>
+{% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>

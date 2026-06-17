@@ -184,6 +184,14 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		return Result{}, err
 	}
 
+	// The web beacon is a single colophon-owned asset, written once and referenced by every
+	// page (see analyticsHead). Only emitted when web analytics is configured.
+	if site.Analytics.WebEnabled() {
+		if err := write(analyticsAsset, analyticsJS); err != nil {
+			return Result{}, err
+		}
+	}
+
 	// Dateless pages (About, Now, …) are standing chrome, not dated posts: they surface in
 	// the nav menu rather than the chronological list/feeds. Posts drive the list, tags,
 	// authors and feeds; every page (post or static) still renders its own document.
@@ -219,33 +227,34 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		}
 		author := resolveAuthor(cfg, p.Author)
 		ctx := map[string]any{
-			"nav_pages":     navPages,
-			"authors":       authors,
-			"site_title":    site.Title,
-			"base_url":      site.BaseURL,
-			"base_path":     basePath,
-			"feed_head":     feedHead,
-			"seo_head":      seoHead(site, p, author),
-			"meta_title":    metaTitle(p),
-			"favicon":       favicon,
-			"title":         p.Title,
-			"date":          p.Date,
-			"description":   p.Description,
-			"content":       p.HTML,
-			"draft":         p.Draft,
-			"embargoed":     p.Embargoed,
-			"embargo_until": p.EmbargoUntil,
-			"hero":          p.Hero,
-			"image":         p.Image,
-			"image_abs":     p.ImageAbs,
-			"tags":          tagLinks(p.Tags, basePath),
-			"category":      pageCategory(p),
-			"read_time":     readingTime(p.HTML),
-			"toc":           tableOfContents(p.HTML),
-			"has_math":      p.HasMath,
-			"has_mermaid":   p.HasMermaid,
-			"has_code":      p.HasCode,
-			"page_type":     p.Type,
+			"nav_pages":      navPages,
+			"authors":        authors,
+			"site_title":     site.Title,
+			"base_url":       site.BaseURL,
+			"base_path":      basePath,
+			"feed_head":      feedHead,
+			"analytics_head": analyticsHead(site, basePath, &p),
+			"seo_head":       seoHead(site, p, author),
+			"meta_title":     metaTitle(p),
+			"favicon":        favicon,
+			"title":          p.Title,
+			"date":           p.Date,
+			"description":    p.Description,
+			"content":        p.HTML,
+			"draft":          p.Draft,
+			"embargoed":      p.Embargoed,
+			"embargo_until":  p.EmbargoUntil,
+			"hero":           p.Hero,
+			"image":          p.Image,
+			"image_abs":      p.ImageAbs,
+			"tags":           tagLinks(p.Tags, basePath),
+			"category":       pageCategory(p),
+			"read_time":      readingTime(p.HTML),
+			"toc":            tableOfContents(p.HTML),
+			"has_math":       p.HasMath,
+			"has_mermaid":    p.HasMermaid,
+			"has_code":       p.HasCode,
+			"page_type":      p.Type,
 		}
 		for k, v := range authorVars(author) {
 			ctx[k] = v
@@ -260,16 +269,17 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	}
 
 	index, err := eng.Render("index.html", map[string]any{
-		"site_title": site.Title,
-		"base_url":   site.BaseURL,
-		"base_path":  basePath,
-		"feed_head":  feedHead,
-		"favicon":    favicon,
-		"heading":    site.Title,
-		"feeds":      feedLinks(formats, basePath),
-		"authors":    authors,
-		"nav_pages":  navPages,
-		"pages":      list,
+		"site_title":     site.Title,
+		"base_url":       site.BaseURL,
+		"base_path":      basePath,
+		"feed_head":      feedHead,
+		"analytics_head": analyticsHead(site, basePath, nil),
+		"favicon":        favicon,
+		"heading":        site.Title,
+		"feeds":          feedLinks(formats, basePath),
+		"authors":        authors,
+		"nav_pages":      navPages,
+		"pages":          list,
 	})
 	if err != nil {
 		return Result{}, err
@@ -732,15 +742,16 @@ func writeTagPages(write func(string, []byte) error, eng render.Engine, site cor
 	for _, s := range slugs {
 		g := groups[s]
 		html, err := eng.Render("index.html", map[string]any{
-			"site_title": site.Title,
-			"base_url":   site.BaseURL,
-			"base_path":  basePath,
-			"feed_head":  feedHead,
-			"favicon":    favicon,
-			"heading":    "Tagged “" + g.name + "”",
-			"authors":    authors,
-			"nav_pages":  navPages,
-			"pages":      g.items,
+			"site_title":     site.Title,
+			"base_url":       site.BaseURL,
+			"base_path":      basePath,
+			"feed_head":      feedHead,
+			"analytics_head": analyticsHead(site, basePath, nil),
+			"favicon":        favicon,
+			"heading":        "Tagged “" + g.name + "”",
+			"authors":        authors,
+			"nav_pages":      navPages,
+			"pages":          g.items,
 		})
 		if err != nil {
 			return err

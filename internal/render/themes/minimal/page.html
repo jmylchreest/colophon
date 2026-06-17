@@ -23,5 +23,6 @@
 </article>
 </main>
 <footer><a href="{{ base_path }}">← {{ site_title }}</a></footer>
+{% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>
