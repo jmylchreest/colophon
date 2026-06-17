@@ -17,9 +17,10 @@
     .then(function (gloss) { if (gloss && Object.keys(gloss).length) start(gloss); })
     .catch(function () { /* never let the glossary break the page */ });
 
-  // Tags whose text must not be auto-decorated: code, links, existing abbreviations, headings.
-  var SKIP = { CODE: 1, PRE: 1, KBD: 1, SAMP: 1, A: 1, ABBR: 1, BUTTON: 1, SCRIPT: 1, STYLE: 1,
-    H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1 };
+  // Tags whose text must not be auto-decorated: code, links, existing abbreviations, headings,
+  // and <noabbr> — the author's "leave this word alone" opt-out.
+  var SKIP = { CODE: 1, PRE: 1, KBD: 1, SAMP: 1, A: 1, ABBR: 1, NOABBR: 1, BUTTON: 1, SCRIPT: 1,
+    STYLE: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1 };
 
   function start(gloss) {
     var root = document.querySelector(".prose") ||
@@ -37,12 +38,12 @@
     }
   }
 
-  // forceMarked decorates author-marked terms: an <abbr> (the same element auto-match produces;
-  // <dfn> is also accepted) whose text is a glossary term. This lets an author force a specific
-  // occurrence regardless of the first-occurrence auto-match. An <abbr> that already carries its
-  // own title is left alone — that's the author's one-off abbreviation, not a glossary term.
+  // forceMarked decorates author-marked terms: an <abbr> (the same element auto-match produces)
+  // whose text is a glossary term. This lets an author force a specific occurrence regardless of
+  // the first-occurrence auto-match. An <abbr> that already carries its own title is left alone —
+  // that's the author's one-off abbreviation, not a glossary term.
   function forceMarked(root, gloss, lower, used) {
-    var marks = root.querySelectorAll("abbr, dfn");
+    var marks = root.querySelectorAll("abbr");
     for (var i = 0; i < marks.length; i++) {
       var el = marks[i];
       if (el.getAttribute("data-gloss") || el.title) continue;
@@ -63,11 +64,10 @@
     walk(root, gloss, lower, matcher, used);
   }
 
-  // skip reports an element the decorator must not descend into: code/links/headings, anything
-  // already decorated, or an author opt-out (class "no-gloss").
+  // skip reports an element the decorator must not descend into: code/links/headings/<noabbr>,
+  // or anything already decorated (.gloss).
   function skip(el) {
-    return SKIP[el.tagName] ||
-      (el.classList && (el.classList.contains("no-gloss") || el.classList.contains("gloss")));
+    return SKIP[el.tagName] || (el.classList && el.classList.contains("gloss"));
   }
 
   function walk(node, gloss, lower, matcher, used) {

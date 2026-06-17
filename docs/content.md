@@ -36,7 +36,7 @@ All fields are optional unless noted.
 | `hero_fit`, `image_fit` | How the image fills its box — CSS `object-fit`: `cover` (crop, default), `contain` (letterbox), `fill`, `scale-down`, `none`. |
 | `hero_position`, `image_position` | Which part shows when cropping — CSS `object-position`, e.g. `top` or `50% 20%`. |
 | `lang` | Per-post language (BCP-47, e.g. `fr`), overriding the site `lang`. Emitted as `<html lang>`. |
-| `glossary` | `false` turns off automatic [glossary](#glossary) decoration for this post; an explicit `<dfn>` still works. |
+| `glossary` | `false` turns off automatic [glossary](#glossary) decoration for this post; an explicit `<abbr>` still works. |
 | `draft` | `true` keeps the post out of production builds (shown in preview/serve). |
 | `publish` | Obsidian whitelist flag, honoured when a source sets `publish_required: true`. |
 | `publish_after` | Embargo: not published until this time (ISO 8601, e.g. `2026-07-01T09:00:00Z`). |
@@ -142,12 +142,13 @@ controls are available (the syntactic sugar):
 
 | You want… | Write… | Effect |
 |-----------|--------|--------|
-| Turn the whole post off | `glossary: false` in frontmatter | No automatic matching. Explicit forces below still work. |
-| **Force** a specific word | `<abbr>API</abbr>` | Always decorated, even mid-post or in an opted-out post — the same `<abbr>` auto-match produces. (`<dfn>` also works.) An `<abbr title="…">` you write yourself is left alone. |
-| **Suppress** one word | `<span class="no-gloss">Go</span>` | That occurrence is left alone (use it when a term is also a common word). |
+| Turn the whole post off | `glossary: false` in frontmatter | No automatic matching. Explicit `<abbr>` forces still work. |
+| **Force** a specific word | `<abbr>API</abbr>` | Always decorated, even mid-post or in an opted-out post — the same `<abbr>` auto-match produces. An `<abbr title="…">` you write yourself is left alone. |
+| **Suppress** one word | `<noabbr>Go</noabbr>` | That occurrence is left plain (use it when a term is also a common word). The mirror of `<abbr>`. |
 
-Decoration always skips code, links, headings and existing abbreviations, and only the **first**
-occurrence of a term is auto-decorated, so a post is never peppered with repeats.
+Decoration always skips code, links, headings, your own `<abbr title="…">` and anything inside
+`<noabbr>`, and only the **first** occurrence of a term is auto-decorated, so a post is never
+peppered with repeats.
 
 ## Sources
 
