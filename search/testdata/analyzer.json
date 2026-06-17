@@ -1,0 +1,10 @@
+[
+  { "in": "Hello, World!", "out": ["hello", "world"] },
+  { "in": "Tigris & R2 publishing", "out": ["tigris", "r2", "publishing"] },
+  { "in": "  multiple   spaces\tand\nnewlines ", "out": ["multiple", "spaces", "and", "newlines"] },
+  { "in": "CamelCase stays whole", "out": ["camelcase", "stays", "whole"] },
+  { "in": "snake_case-dash.dot", "out": ["snake", "case", "dash", "dot"] },
+  { "in": "version2.0.1", "out": ["version2", "0", "1"] },
+  { "in": "", "out": [] },
+  { "in": "!!!", "out": [] }
+]

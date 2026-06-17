@@ -1,0 +1,9 @@
+go 1.26.4
+
+// The colophon SSG and the standalone search engine are separate modules in one repo so the
+// engine keeps its own lean go.mod while co-development stays one-repo / one-PR. This workspace
+// makes colophon build against the local ./search without a published tag. See docs/design/search.md.
+use (
+	.
+	./search
+)

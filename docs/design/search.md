@@ -101,16 +101,22 @@ a directory.
 ## The analyzer (the contract)
 
 Specified once; implemented identically in Go and JS. **v1 is deliberately trivial** to make
-parity self-evident:
+parity self-evident and keep the core **stdlib-only**:
 
-1. Unicode NFC normalize.
-2. Lowercase (Unicode-aware).
-3. Split on any non-(letter|number) run → tokens.
-4. Drop tokens of length < 1; **no stop-word list, no stemming** in v1.
+1. Lowercase (Unicode-aware: Go `unicode.ToLower` / JS `toLowerCase`).
+2. Split on any run of non-(letter|number) → tokens (Go `unicode.IsLetter/IsNumber` via
+   `strings.FieldsFunc` / JS `/[^\p{L}\p{N}]+/u`).
+3. **No NFC normalization, no stop-words, no stemming** in v1.
 
-That's it — two implementations of one pure function `analyze(string) []string`. A shared
-golden-vector test fixture (`testdata/analyzer.json`: input → expected tokens) is run by **both**
-the Go and JS test suites, so drift is caught mechanically.
+That's it — two implementations of one pure function `Analyze(string) []string`. A shared
+golden-vector fixture (`testdata/analyzer.json`: input → expected tokens) is run by **both** the
+Go and JS test suites, so drift is caught mechanically.
+
+NFC is deferred deliberately: stdlib Go has no NFC, and adding it would pull in `x/text` —
+against the zero-dep goal. The consequence is that *decomposed* Unicode (e.g. `e`+combining
+accent) tokenizes differently from *composed* (`é`); content from normal editors is composed, and
+the golden fixture stays ASCII to avoid encoding ambiguity. NFC + a matched Go/JS stemmer arrive
+together behind an analyzer-id bump (`simple-1` → `…-2`), which a stale reader can detect.
 
 Stemming (e.g. a matched Go+JS Snowball/Porter2 pair) and stop words are **deferred** — added
 only as a matched pair, behind a version bump of the analyzer id recorded in the manifest.
@@ -158,6 +164,43 @@ manifest — compact in postings, while the *interning is deterministic from sor
 ```json
 { "url": "/posts/tigris/", "title": "Publishing to Tigris", "excerpt": "…", "meta": {"type":"post"} }
 ```
+
+## Extensibility: shared substrate + pluggable index types
+
+The format separates a **substrate** (shared by every search mode) from **index types** layered
+over it. This is the seam that lets fuzzy and semantic search be added later as *additive
+artifacts*, never a reformat.
+
+**Substrate (always present):**
+- **Doc identity** — the stable string ID ↔ interned int table (in the manifest).
+- **Fragments** — per-doc result cards (`fragment/…`).
+- **Manifest** — the mutable root, listing which index types are present and where their shards live.
+
+**Index types** (each optional; each sharded + content-addressed + deterministic the same way):
+
+| Type | Maps | Status | Adds |
+|---|---|---|---|
+| `lexical` | term → [docId, tf] (BM25) | **v1** | `index/` shards |
+| `fuzzy` | trigram → [termId] | opt-in, additive | `trigram/` shards |
+| `semantic` | docId/chunk → vector (+ ANN) | future, additive | `vector/` shards |
+
+The manifest gains one optional section per present type; the Go query layer and JS reader
+dispatch on what's there. Turning a type on is a build flag plus more emitted files — the
+substrate, the postings format, and existing files are untouched. `BuildOptions` gains `Fuzzy
+bool` (and later `Semantic …`) accordingly.
+
+### Fuzzy / typo-tolerance (n-gram + Levenshtein)
+
+The optional `fuzzy` type is a **character-trigram index** (`trigram → terms`), sharded by
+trigram range like everything else. Query path, when enabled and an exact match yields too few
+hits: decompose the query term into trigrams → fetch those trigram shards → gather candidate
+terms by trigram overlap → keep those within a bounded **Levenshtein** distance (computed in JS
+over the small candidate set) → fetch the candidates' postings shards → BM25, optionally
+down-weighted by edit distance. Trigrams derive from the *same* analyzer output, so there's no
+new analysis contract. Opt-in because it roughly doubles index size.
+
+Two near-free relatives of lexical-range sharding: **prefix/autocomplete** (shards are sorted, so
+a prefix hits one/few shards via binary search) and **substring** (falls out of the trigram index).
 
 ## Sharding — fixed lexical ranges
 
@@ -227,12 +270,19 @@ loads. The `search.js` + CSS are theme/engine-emitted assets; the index files ar
 build (and routable like any other output — so the index can even live on an object store while
 HTML is on Pages).
 
-## Semantic search — out of scope here
+## Semantic — a future index type over the same substrate
 
-Lexical only for this engine. Semantic stays **CLI/agent-side** per §8 (local embeddings,
-brute-force cosine over `vectors.f32`). In-browser semantic (transformers.js + a ~25–30MB
-quantized MiniLM, now feasible) is noted as a **future optional enhancement** layered on top —
-not part of v1, and never the default given the model download.
+v1 is **lexical only**, but semantic is designed-in as the `semantic` index type (above), not a
+parallel system. It emits per-chunk **embedding vectors** as content-addressed, sharded files
+reusing the *same* doc identity and fragments — added alongside lexical, never instead.
+
+The only genuinely new cost is **query-time embedding**: the browser needs a model
+(transformers.js + a ~25–30MB quantized MiniLM, now feasible) or a query endpoint; the *index*
+slots into the existing file model. Scaling options that fit the sharded design: small corpora
+load all vectors (brute-force cosine); larger ones use IVF-style **centroid prefiltering**
+(centroids in the manifest → fetch only the nearest clusters' vector shards), or the §8 pure-Go
+**HNSW** behind the `Retriever` interface. The CLI semantic path (§8 `vectors.f32`) is the same
+vectors consumed in Go. None of this is in v1 — but the substrate makes it additive.
 
 ## Key decisions
 
@@ -241,7 +291,9 @@ not part of v1, and never the default given the model download.
 | Build vs runtime | Build-time static index | Fully static, no server (§8) |
 | Format | Our own JSON(.gz) | Own every byte; no Pagefind-format/version coupling |
 | Browser runtime | Vanilla JS scorer | No WASM; fine at blog/medium scale; ours to maintain |
+| Architecture | Substrate + pluggable index types | Fuzzy/semantic become additive, not a reformat |
 | Index shape | Sharded inverted (BM25) | Never load the whole index; low bandwidth |
+| Fuzzy | Opt-in trigram index + Levenshtein filter | Typo tolerance without bloating the default index |
 | Sharding | Fixed lexical ranges | Stable boundaries → minimal rewrites on edit |
 | Filenames | Content-addressed | Incremental publish + immutable CDN caching |
 | Doc IDs | Stable (URL-derived) | Edits don't renumber → postings stay stable |
