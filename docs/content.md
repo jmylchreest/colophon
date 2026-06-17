@@ -143,7 +143,7 @@ controls are available (the syntactic sugar):
 | You want… | Write… | Effect |
 |-----------|--------|--------|
 | Turn the whole post off | `glossary: false` in frontmatter | No automatic matching. Explicit forces below still work. |
-| **Force** a specific word | `<dfn>API</dfn>` | Always decorated, even mid-post or in an opted-out post. `<dfn>` is the semantic "defining instance". |
+| **Force** a specific word | `<abbr>API</abbr>` | Always decorated, even mid-post or in an opted-out post — the same `<abbr>` auto-match produces. (`<dfn>` also works.) An `<abbr title="…">` you write yourself is left alone. |
 | **Suppress** one word | `<span class="no-gloss">Go</span>` | That occurrence is left alone (use it when a term is also a common word). |
 
 Decoration always skips code, links, headings and existing abbreviations, and only the **first**

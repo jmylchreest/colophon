@@ -37,16 +37,18 @@
     }
   }
 
-  // forceMarked decorates author-marked terms: a <dfn> (the semantic "defining instance") whose
-  // text is a glossary term. This lets an author force a specific occurrence regardless of the
-  // first-occurrence auto-match.
+  // forceMarked decorates author-marked terms: an <abbr> (the same element auto-match produces;
+  // <dfn> is also accepted) whose text is a glossary term. This lets an author force a specific
+  // occurrence regardless of the first-occurrence auto-match. An <abbr> that already carries its
+  // own title is left alone — that's the author's one-off abbreviation, not a glossary term.
   function forceMarked(root, gloss, lower, used) {
-    var marks = root.querySelectorAll("dfn");
+    var marks = root.querySelectorAll("abbr, dfn");
     for (var i = 0; i < marks.length; i++) {
       var el = marks[i];
+      if (el.getAttribute("data-gloss") || el.title) continue;
       var key = lower[(el.textContent || "").trim().toLowerCase()];
       if (!key) continue;
-      el.className = (el.className ? el.className + " " : "") + "gloss";
+      el.classList.add("gloss");
       el.setAttribute("data-gloss", gloss[key]);
       el.setAttribute("data-gloss-term", key);
       el.setAttribute("tabindex", "0");
