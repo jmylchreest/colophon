@@ -45,7 +45,7 @@ body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', 
 /* search — progressive enhancement: the toggle only shows when JS is on */
 .search { position: relative; display: none; }
 :root.js .search { display: block; }
-.search-toggle { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; cursor: pointer;
+.search-toggle { display: grid; place-items: center; width: 30px; height: 24px; padding: 0; cursor: pointer;
   border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text2); transition: all 0.15s; }
 .search-toggle:hover, .search-toggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
 .search-toggle svg { width: 15px; height: 15px; }

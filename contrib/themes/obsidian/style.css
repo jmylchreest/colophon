@@ -41,7 +41,7 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 /* search — progressive enhancement: the toggle only shows when JS is on */
 .search { position: relative; display: none; margin-left: 0.25rem; }
 :root.js .search { display: block; }
-.search-toggle { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; cursor: pointer;
+.search-toggle { display: grid; place-items: center; width: 30px; height: 26px; padding: 0; cursor: pointer;
   border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--muted); transition: all 0.15s; }
 .search-toggle:hover, .search-toggle[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
 .search-toggle svg { width: 15px; height: 15px; }
@@ -93,6 +93,9 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 @media (max-width: 1024px) { .article-wrap { grid-template-columns: 1fr; } .side-col { display: none; } }
 @media (max-width: 600px) {
   .topbar-inner, .hero-content, .article-wrap { padding-left: 1.25rem; padding-right: 1.25rem; }
+  /* let the bar grow instead of clipping: logo on its own row, nav (links + search + toggle) wraps below */
+  .topbar-inner { height: auto; flex-wrap: wrap; row-gap: 0.4rem; padding-top: 0.55rem; padding-bottom: 0.55rem; }
+  .logo { font-size: 1.25rem; }
   .nav > a { padding: 0.4rem 0.55rem; font-size: 0.8rem; }
   .hero-full { min-height: 340px; }
 }
