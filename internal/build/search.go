@@ -44,7 +44,7 @@ func writeSearchIndex(write func(string, []byte) error, pages []page, site core.
 		return nil
 	}
 	docs := pagesToSearchDocs(pages, basePath)
-	man, err := search.Build(docs, searchWriter{write: write}, search.BuildOptions{ManifestName: searchManifestName(env)})
+	man, err := search.Build(docs, searchWriter{write: write}, search.BuildOptions{ManifestName: searchManifestName(site.ID, env)})
 	if err != nil {
 		return err
 	}
@@ -55,16 +55,17 @@ func writeSearchIndex(write func(string, []byte) error, pages []page, site core.
 	return nil
 }
 
-// searchManifestName is the per-environment manifest filename. Builds for different environments
-// can publish to one object store; only the manifest (the mutable root) is environment-specific,
-// so their roots don't collide — the content-addressed shards/fragments are safely shared. The
-// name is a short, deterministic hash of the environment (not the name itself, which would leak
-// into the bucket/URLs); the default environment keeps the bare "manifest.json".
-func searchManifestName(env string) string {
-	if env == "" {
+// searchManifestName is the per-deployment manifest filename. Several builds can publish to one
+// object store; only the manifest (the mutable root) is per-deployment, so their roots don't
+// collide — the content-addressed shards/fragments are safely shared. The name is a short,
+// deterministic hash of (siteID, env) — both, so two sites that share a bucket and happen to use
+// the same env name don't collide — and of the hash, not the names themselves, which would leak
+// into the bucket/URLs. The fully-default case (no site, no env) keeps the bare "manifest.json".
+func searchManifestName(siteID, env string) string {
+	if siteID == "" && env == "" {
 		return "manifest.json"
 	}
-	sum := sha256.Sum256([]byte(env))
+	sum := sha256.Sum256([]byte(siteID + "\x00" + env)) // NUL-separated so (a,bc) != (ab,c)
 	return "manifest-" + hex.EncodeToString(sum[:4]) + ".json"
 }
 

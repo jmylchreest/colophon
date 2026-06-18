@@ -9,19 +9,23 @@ import (
 )
 
 func TestSearchManifestName(t *testing.T) {
-	if got := searchManifestName(""); got != "manifest.json" {
-		t.Errorf("empty env = %q, want manifest.json", got)
+	if got := searchManifestName("", ""); got != "manifest.json" {
+		t.Errorf("no site/env = %q, want manifest.json", got)
 	}
-	// Deterministic, distinct per env, hashed (no env name leaked).
-	prod := searchManifestName("production")
-	if prod != searchManifestName("production") {
+	prod := searchManifestName("blog", "production")
+	if prod != searchManifestName("blog", "production") {
 		t.Error("not deterministic")
 	}
-	if prod == searchManifestName("preview") {
-		t.Error("different envs must differ")
+	if prod == searchManifestName("blog", "preview") {
+		t.Error("different envs on one site must differ")
 	}
-	if !strings.HasPrefix(prod, "manifest-") || !strings.HasSuffix(prod, ".json") || strings.Contains(prod, "production") {
-		t.Errorf("name = %q, want manifest-<hash>.json with no env name", prod)
+	// The site ID is in the hash: same env name on two sites must not collide.
+	if searchManifestName("blog", "production") == searchManifestName("docs", "production") {
+		t.Error("same env name on different sites must differ")
+	}
+	if !strings.HasPrefix(prod, "manifest-") || !strings.HasSuffix(prod, ".json") ||
+		strings.Contains(prod, "production") || strings.Contains(prod, "blog") {
+		t.Errorf("name = %q, want manifest-<hash>.json with no site/env name", prod)
 	}
 }
 

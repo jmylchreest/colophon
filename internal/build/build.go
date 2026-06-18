@@ -168,7 +168,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// several environments can share one bucket without their roots colliding. Both are
 	// site-global and threaded into every template.
 	searchURL := searchBaseURL(router, basePath)
-	searchManifest := searchManifestName(opts.Env)
+	searchManifest := searchManifestName(site.ID, opts.Env)
 	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router)
 	if err != nil {
 		return Result{}, err
