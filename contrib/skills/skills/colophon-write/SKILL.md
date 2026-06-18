@@ -59,13 +59,25 @@ only once it's on `PATH`.
    Leave `[[wikilinks]]` where you'd cross-link to other posts rather than inventing URLs (the
    `colophon-crosslink` skill resolves them). Keep `draft: true` until the user approves.
 
-6. **Preview.**
+6. **Metadata pass — do this for every post.** Once the body exists, fill the metadata that
+   drives search, social cards and tag pages: a genuine 140–160-char `description`, the `seo:`
+   block where it adds value, and 3–6 `tags` reusing the site's existing vocabulary (plus a
+   glossary entry only for jargon that's specific to this article — see below). Run the
+   **`colophon-metadata`** skill for the field-by-field detail; start by learning the tag
+   vocabulary so you reuse it rather than spawning near-duplicates:
+   ```sh
+   colophon posts --json
+   ```
+   This is **not optional** — a post with no description or tags ships worse search results and
+   social previews. Do it before previewing so the rendered head is what you check.
+
+7. **Preview.**
    ```sh
    colophon serve --open=latest      # opens the newest post; prints the URL too
    ```
 
-7. **(Optional)** Improve tags/metadata with `colophon-metadata`, then publish with
-   `colophon-publish`.
+8. **Publish** when the user approves — via the **`colophon-publish`** skill (gated; secrets stay
+   in the env). Never deploy from this skill.
 
 ## Accessibility
 

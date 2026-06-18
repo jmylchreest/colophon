@@ -11,7 +11,8 @@ rest.
 
 ## When to use
 
-The user wants better SEO/social metadata, a description, or tags on an existing post.
+The user wants metadata — a description, the `seo:` block, tags, or a glossary entry — on a post:
+either a new one as the final pass of `colophon-write`, or an existing one on its own.
 
 ## Requirements
 
