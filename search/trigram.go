@@ -50,6 +50,36 @@ func levenshtein(a, b string) int {
 	return prev[len(rb)]
 }
 
+// prefixLevenshtein is the minimum edit distance between a and any prefix of b — so a short,
+// mistyped token can still reach a longer term through its start ("wiik" → "wikilinks" via "wik").
+// It's the minimum of the final DP row (each cell j is the distance from a to b's j-char prefix).
+func prefixLevenshtein(a, b string) int {
+	ra, rb := []rune(a), []rune(b)
+	prev := make([]int, len(rb)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	cur := make([]int, len(rb)+1)
+	for i := 1; i <= len(ra); i++ {
+		cur[0] = i
+		for j := 1; j <= len(rb); j++ {
+			cost := 1
+			if ra[i-1] == rb[j-1] {
+				cost = 0
+			}
+			cur[j] = min3(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+		}
+		prev, cur = cur, prev
+	}
+	best := prev[0]
+	for _, v := range prev {
+		if v < best {
+			best = v
+		}
+	}
+	return best
+}
+
 func min3(a, b, c int) int {
 	m := a
 	if b < m {

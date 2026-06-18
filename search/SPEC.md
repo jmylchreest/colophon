@@ -284,14 +284,18 @@ intersects a token's trigrams against the index): pad the term with a `$` sentin
 analyzer's letter/number alphabet), then take every distinct length-3 window of **code points** of
 `$term$`. `go` → `["$go","go$"]`; `tigris` → `["$ti","tig","igr","gri","ris","is$"]`.
 
-**Edit distance** is rune-wise Levenshtein (insert/delete/substitute), and the **budget** is
-`maxEditDist(token) = 1 if len ≤ 4 else 2`. Both **MUST** match the reference (and the JS reader),
-guarded by test vectors like the analyzer.
+**Edit distance** is rune-wise Levenshtein (insert/delete/substitute), measured against any
+**prefix** of the candidate term — i.e. the minimum distance from the token to `term[:k]` over all
+`k` (so a short typo reaches a longer term through its start: `wiik` → `wikilinks` via `wik`). The
+**budget** is `maxEditDist(token) = 1 if len ≤ 4 else 2`. Both **MUST** match the reference (and the
+JS reader), guarded by test vectors like the analyzer. (Note the trigram prefilter still gates
+candidates, so a typo sharing no trigram with the term — e.g. a leading transposition — won't be
+reached.)
 
 **Query (extends §7).** Fuzzy is a **fallback per token**, so clean queries stay exact: for a query
 token with *no* exact/prefix match (and only then), gather candidate terms = the union of
-`trigrams[g]` over the token's trigrams `g`, keep those with `levenshtein(token, term) ≤
-maxEditDist(token)`, and add them to the matched-term set — scored by their lexical postings
+`trigrams[g]` over the token's trigrams `g`, keep those whose **prefix** edit distance to the
+token is `≤ maxEditDist(token)`, and add them to the matched-term set — scored by their lexical postings
 exactly like any other matched term (§7.4). Because Go (in-memory) and the JS reader (trigram
 shards) derive the *same* candidate set and apply the *same* distance budget, fuzzy rankings match.
 

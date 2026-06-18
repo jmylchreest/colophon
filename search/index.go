@@ -157,7 +157,7 @@ func (ix *Index) fuzzyCandidates(qt string) []string {
 	budget := maxEditDist(qt)
 	var out []string
 	for term := range cand {
-		if levenshtein(qt, term) <= budget {
+		if prefixLevenshtein(qt, term) <= budget {
 			out = append(out, term)
 		}
 	}

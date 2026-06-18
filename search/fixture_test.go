@@ -12,6 +12,7 @@ func fixtureDocs() []Doc {
 		{ID: "/bread/", URL: "/bread/", Title: "Bread", Body: "a recipe for fresh sourdough bread at home", Meta: map[string]string{"type": "recipe"}},
 		{ID: "/search/", URL: "/search/", Title: "Search", Body: "building a static search index with bm25 ranking in go"},
 		{ID: "/tigris/", URL: "/tigris/", Title: "Tigris", Body: "publishing assets to tigris object storage from go"},
+		{ID: "/wiki/", URL: "/wiki/", Title: "Wiki", Body: "resolving wikilinks and aliased text in obsidian"},
 	}
 }
 
@@ -21,6 +22,9 @@ var fixtureQueries = []string{
 	"program", "obj", "stor",
 	// fuzzy fallback (the fixture is built with Fuzzy): "tigirs" → "tigris", "objet" → "object".
 	"tigirs", "objet",
+	// fuzzy-prefix: a short typo reaches a longer term via its start — "wiik" → "wikilinks",
+	// "progrm" → "programming".
+	"wiik", "progrm",
 }
 
 // TestGenerateJSFixture (re)generates the deterministic fixture and expected results that the JS

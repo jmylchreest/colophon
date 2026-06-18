@@ -47,6 +47,13 @@ func TestSearchFuzzyFallback(t *testing.T) {
 	if got := ids(fz.Search("wikilnk", 0)); len(got) != 1 || got[0] != "/w/" {
 		t.Errorf(`fuzzy Search("wikilnk") = %v, want [/w/]`, got)
 	}
+	// Fuzzy-prefix: a short typo reaches the longer term through its start ("wiik" → "wikilinks").
+	if got := ids(fz.Search("wiik", 0)); len(got) != 1 || got[0] != "/w/" {
+		t.Errorf(`fuzzy-prefix Search("wiik") = %v, want [/w/]`, got)
+	}
+	if d := prefixLevenshtein("wiik", "wikilinks"); d != 1 {
+		t.Errorf("prefixLevenshtein(wiik, wikilinks) = %d, want 1", d)
+	}
 	// An exact/prefix hit must NOT trigger the fuzzy fallback (clean queries stay clean).
 	if got := ids(fz.Search("tigris", 0)); len(got) != 1 || got[0] != "/t/" {
 		t.Errorf(`fuzzy Search("tigris") = %v, want [/t/]`, got)

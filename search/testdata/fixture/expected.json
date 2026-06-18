@@ -2,7 +2,7 @@
   "bread recipe": [
     {
       "id": "/bread/",
-      "score": 3.385136262468908,
+      "score": 3.7242790160587202,
       "title": "Bread",
       "url": "/bread/"
     }
@@ -10,19 +10,19 @@
   "go": [
     {
       "id": "/go/",
-      "score": 0.8433065715382246,
+      "score": 1.0770837229518855,
       "title": "Go",
       "url": "/go/"
     },
     {
       "id": "/tigris/",
-      "score": 0.5576182608347762,
+      "score": 0.7083998080050296,
       "title": "Tigris",
       "url": "/tigris/"
     },
     {
       "id": "/search/",
-      "score": 0.5132846535245907,
+      "score": 0.6510910594922632,
       "title": "Search",
       "url": "/search/"
     }
@@ -30,19 +30,19 @@
   "go search": [
     {
       "id": "/search/",
-      "score": 2.3559792543719915,
+      "score": 2.679141538597486,
       "title": "Search",
       "url": "/search/"
     },
     {
       "id": "/go/",
-      "score": 0.8433065715382246,
+      "score": 1.0770837229518855,
       "title": "Go",
       "url": "/go/"
     },
     {
       "id": "/tigris/",
-      "score": 0.5576182608347762,
+      "score": 0.7083998080050296,
       "title": "Tigris",
       "url": "/tigris/"
     }
@@ -51,7 +51,7 @@
   "obj": [
     {
       "id": "/tigris/",
-      "score": 1.4341893678380442,
+      "score": 1.5743423645865726,
       "title": "Tigris",
       "url": "/tigris/"
     }
@@ -59,7 +59,7 @@
   "object storage": [
     {
       "id": "/tigris/",
-      "score": 2.8683787356760884,
+      "score": 3.1486847291731452,
       "title": "Tigris",
       "url": "/tigris/"
     }
@@ -67,7 +67,7 @@
   "objet": [
     {
       "id": "/tigris/",
-      "score": 1.4341893678380442,
+      "score": 1.5743423645865726,
       "title": "Tigris",
       "url": "/tigris/"
     }
@@ -75,13 +75,13 @@
   "program": [
     {
       "id": "/go/",
-      "score": 0.8682201461522578,
+      "score": 1.0079178369595414,
       "title": "Go",
       "url": "/go/"
     },
     {
       "id": "/rust/",
-      "score": 0.8682201461522578,
+      "score": 1.0079178369595414,
       "title": "Rust",
       "url": "/rust/"
     }
@@ -89,13 +89,27 @@
   "programming language": [
     {
       "id": "/go/",
-      "score": 1.7364402923045157,
+      "score": 2.015835673919083,
       "title": "Go",
       "url": "/go/"
     },
     {
       "id": "/rust/",
-      "score": 1.7364402923045157,
+      "score": 2.015835673919083,
+      "title": "Rust",
+      "url": "/rust/"
+    }
+  ],
+  "progrm": [
+    {
+      "id": "/go/",
+      "score": 1.0079178369595414,
+      "title": "Go",
+      "url": "/go/"
+    },
+    {
+      "id": "/rust/",
+      "score": 1.0079178369595414,
       "title": "Rust",
       "url": "/rust/"
     }
@@ -103,7 +117,7 @@
   "stor": [
     {
       "id": "/tigris/",
-      "score": 1.4341893678380442,
+      "score": 1.5743423645865726,
       "title": "Tigris",
       "url": "/tigris/"
     }
@@ -111,9 +125,17 @@
   "tigirs": [
     {
       "id": "/tigris/",
-      "score": 1.9509468946308641,
+      "score": 2.1499366514721476,
       "title": "Tigris",
       "url": "/tigris/"
+    }
+  ],
+  "wiik": [
+    {
+      "id": "/wiki/",
+      "score": 3.293636967344799,
+      "title": "Wiki",
+      "url": "/wiki/"
     }
   ]
 }

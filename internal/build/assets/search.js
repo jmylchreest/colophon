@@ -129,6 +129,24 @@ export function levenshtein(a, b) {
   return prev[rb.length];
 }
 
+// prefixLevenshtein is the minimum edit distance from a to any prefix of b (the min of the final
+// DP row), so a short typo reaches a longer term via its start. Mirrors Go prefixLevenshtein().
+export function prefixLevenshtein(a, b) {
+  const ra = [...a];
+  const rb = [...b];
+  let prev = Array.from({ length: rb.length + 1 }, (_, j) => j);
+  let cur = new Array(rb.length + 1);
+  for (let i = 1; i <= ra.length; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= rb.length; j++) {
+      const cost = ra[i - 1] === rb[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return Math.min(...prev);
+}
+
 // maxEditDist scales the fuzzy budget to token length. Mirrors Go maxEditDist().
 export function maxEditDist(term) {
   return [...term].length <= 4 ? 1 : 2;
@@ -181,7 +199,7 @@ export function createReader(opts) {
     }
     const budget = maxEditDist(qt);
     const out = [];
-    for (const t of cand) if (levenshtein(qt, t) <= budget) out.push(t);
+    for (const t of cand) if (prefixLevenshtein(qt, t) <= budget) out.push(t);
     return out;
   }
 
