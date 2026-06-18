@@ -104,8 +104,13 @@ environments:
     include_drafts: true
     theme: obsidian
     overrides: { local: { path: ./dist-obsidian } }
-  - name: gazette                # tokens-only theme that inherits press's chrome via base.css
+  - name: press-gazette                # tokens-only theme that inherits press's chrome via base.css
     publish: [local]
     include_drafts: true
-    theme: gazette
-    overrides: { local: { path: ./dist-gazette } }
+    theme: press-gazette
+    overrides: { local: { path: ./dist-press-gazette } }
+  - name: press-broadsheet             # traditional black-on-paper variant of press
+    publish: [local]
+    include_drafts: true
+    theme: press-broadsheet
+    overrides: { local: { path: ./dist-press-broadsheet } }

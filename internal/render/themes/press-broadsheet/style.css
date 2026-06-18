@@ -1,0 +1,22 @@
+/* press-broadsheet — a traditional broadsheet variant of press: strict black-on-paper, a Times-like
+   serif, no accent colour or glow. Inherits all of press's chrome via base.css; only the tokens change. */
+@import url("base.css");
+@import url("vendor/fonts.css");
+
+:root {
+  --bg: #121212; --surface: #181818; --elevated: #202020; --border: #2e2e2e;
+  --text: #ededed; --muted: #9a9a9a; --faint: #5a5a5a;
+  --accent: #f5f5f5; --accent-2: #b9b9b9; --on-accent: #111111;
+  --accent-soft: rgba(255,255,255,0.10);
+  --glow-1: transparent; --glow-2: transparent;
+  --serif: Georgia, 'Times New Roman', Times, serif;
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --maxw: 720px;
+}
+html[data-theme="light"] {
+  --bg: #ffffff; --surface: #ffffff; --elevated: #f3f3f3; --border: #e3e3e3;
+  --text: #111111; --muted: #6a6a6a; --faint: #9a9a9a;
+  --accent: #111111; --accent-2: #555555; --on-accent: #ffffff;
+  --accent-soft: rgba(0,0,0,0.06);
+  --glow-1: transparent; --glow-2: transparent;
+}

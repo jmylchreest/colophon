@@ -342,7 +342,7 @@ The string shorthand `search: lexical` still works (equivalent to `mode: lexical
 
 Results are **prefix-matched** by default ("wiki" → "wikilinks"), with query-aware highlighting
 and an occurrence count. The index + reader ship only when search is on, under `_search/`; a theme
-renders the box (the `press` and `gazette` themes include one). `colophon search "<query>"` queries
+renders the box (the `press`, `press-gazette` and `press-broadsheet` themes include one). `colophon search "<query>"` queries
 the same engine from the CLI (always fuzzy), in text or `--json`.
 
 For large sites, the index can be **routed to an object store** to keep it off a Pages-style file
