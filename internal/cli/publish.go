@@ -34,7 +34,7 @@ func (c *PublishCmd) Run() error {
 	if err != nil {
 		return err
 	}
-	log := newLogger(cfg, c.Verbose)
+	log := newLogger(c.Verbose)
 
 	// Drop build trees of environments that no longer exist (keyed on the full set, not
 	// just the ones being published now, so unrelated envs are preserved).
