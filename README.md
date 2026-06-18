@@ -43,6 +43,27 @@ go build -o colophon ./cmd/colophon
 `init`, `new post|page`, `build`, `serve`, `publish`, `themes`, `authors`, `persona`, `sources`,
 `posts`, `search`, `doctor`, `env`. Run `colophon <command> --help` for details.
 
+## A little help from AI
+
+colophon ships agent skills (write, edit, cross-link, metadata, publish) that teach an AI coding
+agent to drive it — colophon supplies the voice and scaffolding, the agent writes the prose. It
+never calls an LLM or touches your deploy secrets.
+
+Claude Code (this repo is a plugin marketplace):
+
+```text
+/plugin marketplace add jmylchreest/colophon
+/plugin install colophon-skills@colophon
+```
+
+opencode or any other tool — drop the `SKILL.md` folders into its skills directory:
+
+```sh
+cp -r contrib/skills/skills/* ~/.config/opencode/skill/   # or ~/.claude/skills/
+```
+
+See [`contrib/skills/`](contrib/skills/README.md) for the full list and details.
+
 ## Layout
 
 ```
@@ -50,6 +71,7 @@ cmd/colophon     CLI entrypoint
 internal/        engine — render, build, sources, publishers, serve, config
 search/          reusable static-search module (Go + JS, parity-tested)
 contrib/themes/  community themes
+contrib/skills/  AI agent skills (Claude Code / opencode plugin)
 docs/            authoring, theming and publishing guides
 fixtures/        end-to-end example sites
 ```
