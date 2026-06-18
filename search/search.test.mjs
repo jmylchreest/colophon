@@ -5,9 +5,28 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { analyze, createReader } from './search.js';
+import { analyze, createReader, highlight, snippet, countMatches } from './search.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+test('highlight marks prefix matches, losslessly', () => {
+  const seg = highlight('Go and wikilinks', 'wiki');
+  assert.deepEqual(seg.filter((s) => s.mark).map((s) => s.text), ['wikilinks']);
+  assert.equal(seg.map((s) => s.text).join(''), 'Go and wikilinks'); // segments reconstruct the input
+});
+
+test('countMatches counts prefix-matching tokens', () => {
+  assert.equal(countMatches('wiki wikilink wikilinks foo', 'wiki'), 3);
+  assert.equal(countMatches('nothing here', 'wiki'), 0);
+});
+
+test('snippet windows around the first match with ellipses', () => {
+  const text = 'aaa '.repeat(40) + 'needle ' + 'bbb '.repeat(40);
+  const seg = snippet(text, 'needle', { radius: 20 });
+  assert.ok(seg.some((s) => s.mark && s.text === 'needle'), 'the match is marked');
+  const joined = seg.map((s) => s.text).join('');
+  assert.ok(joined.startsWith('…') && joined.endsWith('…'), 'clipped ends carry an ellipsis');
+});
 
 test('analyze matches the Go golden vectors', () => {
   const cases = JSON.parse(readFileSync(join(here, 'testdata/analyzer.json')));

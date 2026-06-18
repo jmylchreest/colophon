@@ -11,6 +11,86 @@ export function analyze(text) {
   return text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
 
+// --- presentation helpers: query-aware highlighting + snippets over a result's text ---
+// They return arrays of { text, mark } segments (not HTML), so a caller builds DOM with
+// textContent and never injects markup. A token matches by the same prefix rule as search.
+
+function queryTerms(q) {
+  return [...new Set(analyze(q))];
+}
+
+// tokenSpans returns the analyzer's tokens with their offsets: [{ term, start, end }] (term
+// lowercased for matching; start/end index the original text for slicing).
+function tokenSpans(text) {
+  const spans = [];
+  for (const m of text.matchAll(/[\p{L}\p{N}]+/gu)) {
+    spans.push({ term: m[0].toLowerCase(), start: m.index, end: m.index + m[0].length });
+  }
+  return spans;
+}
+
+function isMatch(token, terms) {
+  for (const t of terms) if (token.startsWith(t)) return true; // prefix rule, as in search
+  return false;
+}
+
+function segmentize(text, terms, from, to) {
+  const parts = [];
+  let cursor = from;
+  for (const s of tokenSpans(text)) {
+    if (s.end <= from || s.start >= to || !isMatch(s.term, terms)) continue;
+    const st = Math.max(s.start, from);
+    const en = Math.min(s.end, to);
+    if (st > cursor) parts.push({ text: text.slice(cursor, st), mark: false });
+    parts.push({ text: text.slice(st, en), mark: true });
+    cursor = en;
+  }
+  if (cursor < to) parts.push({ text: text.slice(cursor, to), mark: false });
+  return parts;
+}
+
+// highlight segments the whole text, marking tokens that match the query (use for titles).
+export function highlight(text, query) {
+  return segmentize(text, queryTerms(query), 0, text.length);
+}
+
+// snippet returns segments of a window around the first match (with "…" where clipped), or the
+// text's start when nothing matches — the query-aware excerpt for a result.
+export function snippet(text, query, opts = {}) {
+  const radius = opts.radius ?? 90;
+  const max = opts.max ?? 200;
+  const terms = queryTerms(query);
+  const first = tokenSpans(text).find((s) => isMatch(s.term, terms));
+
+  let from = 0;
+  let to = Math.min(text.length, max);
+  if (first) {
+    from = Math.max(0, first.start - radius);
+    to = Math.min(text.length, first.end + radius);
+    if (from > 0) {
+      const sp = text.indexOf(' ', from);
+      if (sp >= 0 && sp < first.start) from = sp + 1; // don't start mid-word
+    }
+  }
+  if (to < text.length) {
+    const sp = text.lastIndexOf(' ', to);
+    if (sp > from) to = sp; // don't end mid-word
+  }
+
+  const parts = segmentize(text, terms, from, to);
+  if (from > 0) parts.unshift({ text: '… ', mark: false });
+  if (to < text.length) parts.push({ text: ' …', mark: false });
+  return parts;
+}
+
+// countMatches counts the tokens in text that match the query (occurrence count for a result).
+export function countMatches(text, query) {
+  const terms = queryTerms(query);
+  let n = 0;
+  for (const s of tokenSpans(text)) if (isMatch(s.term, terms)) n++;
+  return n;
+}
+
 // createReader returns a search reader over an index whose manifest.json lives at opts.base.
 // opts.fetch overrides the global fetch (used in tests). The reader caches the manifest and every
 // shard/fragment it loads.
@@ -104,6 +184,7 @@ export function createReader(opts) {
         url: frag.url,
         title: frag.title,
         excerpt: frag.excerpt,
+        text: frag.text || '',
         meta: frag.meta || {},
         score,
       });

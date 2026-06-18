@@ -60,6 +60,7 @@ type docMeta struct {
 	url     string
 	title   string
 	excerpt string
+	text    string // capped plain body, for query-aware snippets + highlighting in the reader
 	meta    map[string]string
 }
 
@@ -94,7 +95,9 @@ func NewIndex(docs []Doc, opts BuildOptions) (*Index, error) {
 		}
 		ix.docs = append(ix.docs, docMeta{
 			id: d.ID, url: d.URL, title: d.Title,
-			excerpt: makeExcerpt(d.Body, excerptRunes), meta: d.Meta,
+			excerpt: makeExcerpt(d.Body, excerptRunes),
+			text:    capText(d.Body, snippetTextCap),
+			meta:    d.Meta,
 		})
 
 		tokens := opts.Analyzer(d.Title + " " + d.Body)
@@ -119,12 +122,14 @@ func NewIndex(docs []Doc, opts BuildOptions) (*Index, error) {
 // Len reports the number of indexed documents.
 func (ix *Index) Len() int { return len(ix.docs) }
 
-// Result is one ranked hit.
+// Result is one ranked hit. Text is the capped plain body (for query-aware snippets/highlighting);
+// Excerpt is a fixed leading snippet for cheap display.
 type Result struct {
 	ID      string
 	URL     string
 	Title   string
 	Excerpt string
+	Text    string
 	Score   float64
 	Meta    map[string]string
 }
@@ -168,7 +173,7 @@ func (ix *Index) Search(query string, limit int) []Result {
 	for doc, score := range scores {
 		m := ix.docs[doc]
 		results = append(results, Result{
-			ID: m.id, URL: m.url, Title: m.title, Excerpt: m.excerpt, Score: score, Meta: m.meta,
+			ID: m.id, URL: m.url, Title: m.title, Excerpt: m.excerpt, Text: m.text, Score: score, Meta: m.meta,
 		})
 	}
 	sort.Slice(results, func(i, j int) bool {

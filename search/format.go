@@ -16,8 +16,13 @@ import (
 // formatVersion is the emitted-index schema version; the reader refuses a higher one.
 const formatVersion = 1
 
-// excerptRunes caps the static result excerpt length.
-const excerptRunes = 200
+// excerptRunes caps the static result excerpt length; snippetTextCap caps the plain body stored
+// in each fragment for query-aware snippets (a balance between snippet coverage and fragment size
+// — fragments are fetched only for shown results).
+const (
+	excerptRunes   = 200
+	snippetTextCap = 1500
+)
 
 // Writer is the minimal sink Emit writes static files to: relative path → bytes. A directory
 // (DirWriter) implements it for standalone use; colophon adapts its publisher around it. Names
@@ -84,6 +89,7 @@ type fragment struct {
 	URL     string            `json:"url"`
 	Title   string            `json:"title"`
 	Excerpt string            `json:"excerpt"`
+	Text    string            `json:"text,omitempty"` // capped plain body for query-aware snippets
 	Meta    map[string]string `json:"meta,omitempty"`
 }
 
@@ -113,7 +119,7 @@ func (ix *Index) Emit(dst Writer) (*Manifest, error) {
 	// Fragments — one per doc, content-addressed.
 	for i := range ix.docs {
 		m := ix.docs[i]
-		frag := fragment{URL: m.url, Title: m.title, Excerpt: m.excerpt, Meta: m.meta}
+		frag := fragment{URL: m.url, Title: m.title, Excerpt: m.excerpt, Text: m.text, Meta: m.meta}
 		b, err := canonicalJSON(frag)
 		if err != nil {
 			return nil, err
@@ -206,7 +212,7 @@ func Open(fsys fs.FS) (*Index, error) {
 			return nil, err
 		}
 		ix.docs = append(ix.docs, docMeta{
-			id: id, url: frag.URL, title: frag.Title, excerpt: frag.Excerpt, meta: frag.Meta,
+			id: id, url: frag.URL, title: frag.Title, excerpt: frag.Excerpt, text: frag.Text, meta: frag.Meta,
 		})
 		ix.docLen = append(ix.docLen, entry.Len)
 	}
@@ -301,6 +307,17 @@ func gzipBytes(b []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// capText is the plain, whitespace-collapsed body capped at maxRunes — the source the reader
+// builds query-aware snippets from. Unlike makeExcerpt it adds no ellipsis (it isn't shown as-is).
+func capText(body string, maxRunes int) string {
+	joined := strings.Join(strings.Fields(body), " ")
+	r := []rune(joined)
+	if len(r) <= maxRunes {
+		return joined
+	}
+	return string(r[:maxRunes])
 }
 
 // makeExcerpt builds a clean, whitespace-collapsed snippet of at most maxRunes runes, cut at a

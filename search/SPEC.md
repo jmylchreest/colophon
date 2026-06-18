@@ -148,6 +148,7 @@ human-facing result card and nothing the scorer needs:
 | `url` | string | The link to the document. |
 | `title` | string | Display title. |
 | `excerpt` | string | A short prebuilt snippet (builder-defined; e.g. the first ~200 characters). |
+| `text` | string | Optional. A capped plain-text body the reader uses to build a *query-aware* highlighted snippet and an occurrence count. Omitted when empty; readers degrade to `excerpt`. |
 | `meta` | object | Optional `string → string` map (e.g. `{"type":"post"}`). Omitted when empty. |
 
 ### The analyzer (`simple-1`)
