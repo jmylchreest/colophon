@@ -45,7 +45,7 @@ func TestStepDetailLevels(t *testing.T) {
 	l.Step("BUILD", "", "pages", 3)
 	l.Detail("BUILD", "src", "file", "a.md")
 	out := buf.String()
-	if !strings.Contains(out, "category=BUILD") || !strings.Contains(out, "pages=3") {
+	if !strings.Contains(out, "msg=BUILD") || !strings.Contains(out, "pages=3") {
 		t.Errorf("Step not emitted at Info: %q", out)
 	}
 	if strings.Contains(out, "file=a.md") {
@@ -58,6 +58,37 @@ func TestStepDetailLevels(t *testing.T) {
 	v.Detail("BUILD", "src", "file", "a.md")
 	if out := buf.String(); !strings.Contains(out, "label=src") || !strings.Contains(out, "file=a.md") {
 		t.Errorf("Detail not emitted at Debug: %q", out)
+	}
+}
+
+func TestCategoryRedundancy(t *testing.T) {
+	// Text drops the category attribute (the message carries it); JSON keeps it.
+	var text bytes.Buffer
+	New(Options{Writer: &text}).Step("BUILD", "", "pages", 3)
+	if got := text.String(); strings.Contains(got, "category=") {
+		t.Errorf("text should not repeat category: %q", got)
+	}
+
+	var js bytes.Buffer
+	New(Options{Writer: &js, JSON: true}).Step("BUILD", "", "pages", 3)
+	if got := js.String(); !strings.Contains(got, `"category":"BUILD"`) || !strings.Contains(got, `"msg":"BUILD"`) {
+		t.Errorf("JSON should keep category as a field: %q", got)
+	}
+}
+
+func TestVerboseSourceCallSite(t *testing.T) {
+	// --verbose attaches source, attributed to the caller (this test file), not clog.go.
+	var buf bytes.Buffer
+	New(Options{Writer: &buf, Verbose: true}).Step("BUILD", "", "pages", 3)
+	out := buf.String()
+	if !strings.Contains(out, "source=") || !strings.Contains(out, "clog_test.go") {
+		t.Errorf("verbose Step should carry caller source: %q", out)
+	}
+	// Default (non-verbose) omits source entirely.
+	buf.Reset()
+	New(Options{Writer: &buf}).Step("BUILD", "", "pages", 3)
+	if strings.Contains(buf.String(), "source=") {
+		t.Errorf("non-verbose Step should not carry source: %q", buf.String())
 	}
 }
 
