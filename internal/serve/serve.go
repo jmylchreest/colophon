@@ -41,12 +41,22 @@ const reloadPath = "/_colophon/reload"
 
 // reloadScript live-reloads the page on an SSE message, preserving scroll position
 // across the reload (saved per-path in sessionStorage, restored once on the way back).
+//
+// Only the foreground tab holds the EventSource: a backgrounded tab closes it and reconnects
+// when shown again. SSE is a long-lived connection and browsers cap ~6 connections per origin
+// over HTTP/1.1, so without this every open tab would hold one and a handful of tabs would
+// exhaust the pool — leaving favicon/asset/navigation requests to the dev server hanging until
+// serve is restarted.
 var reloadScript = []byte(`<script>(function(){` +
 	`var K="__colophon_scroll:"+location.pathname;` +
 	`try{if("scrollRestoration"in history)history.scrollRestoration="manual";` +
 	`var y=sessionStorage.getItem(K);if(y!==null){sessionStorage.removeItem(K);window.scrollTo(0,parseInt(y,10)||0)}}catch(e){}` +
-	`var s=new EventSource("` + reloadPath + `");` +
-	`s.onmessage=function(){try{sessionStorage.setItem(K,String(window.pageYOffset))}catch(e){}location.reload()}` +
+	`var es=null;` +
+	`function onmsg(){try{sessionStorage.setItem(K,String(window.pageYOffset))}catch(e){}location.reload()}` +
+	`function open(){if(!es){es=new EventSource("` + reloadPath + `");es.onmessage=onmsg;}}` +
+	`function close(){if(es){es.close();es=null;}}` +
+	`document.addEventListener("visibilitychange",function(){document.hidden?close():open();});` +
+	`if(!document.hidden)open();` +
 	`})();</script>`)
 
 type target struct {
