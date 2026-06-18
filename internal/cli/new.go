@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/jmylchreest/colophon/internal/build"
 	"github.com/jmylchreest/colophon/internal/config"
 	"github.com/jmylchreest/colophon/internal/persona"
@@ -183,7 +185,7 @@ func newSkeleton(cfg *config.Config, o newOpts, kind, segment string, tgt writeT
 	}
 	var b strings.Builder
 	b.WriteString("---\n")
-	fmt.Fprintf(&b, "title: %s\n", o.Title)
+	fmt.Fprintf(&b, "title: %s\n", yamlScalar(o.Title)) // quote free text so a colon/quote can't break the YAML
 	fmt.Fprintf(&b, "slug: %s\n", segment)
 	if a := strings.TrimSpace(o.Author); a != "" {
 		fmt.Fprintf(&b, "author: %s\n", a)
@@ -209,6 +211,16 @@ func newSkeleton(cfg *config.Config, o newOpts, kind, segment string, tgt writeT
 	}
 	fmt.Fprintf(&b, "<!-- write the %s here -->\n", kind)
 	return b.String()
+}
+
+// yamlScalar renders s as a YAML scalar, quoting it only when needed (e.g. a title containing a
+// colon-space or a leading quote) so the generated frontmatter is always valid YAML.
+func yamlScalar(s string) string {
+	b, err := yaml.Marshal(s)
+	if err != nil {
+		return strconv.Quote(s)
+	}
+	return strings.TrimSpace(string(b))
 }
 
 func firstLine(s string) string {
