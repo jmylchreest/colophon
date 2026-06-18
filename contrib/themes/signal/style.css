@@ -44,6 +44,31 @@ header.site { border-bottom: 1px solid var(--border); }
 .breadcrumb .current { color: var(--cyan); }
 .bar-right { display: flex; align-items: center; gap: 1.25rem; }
 
+/* search — progressive enhancement: the toggle only shows when JS is on */
+.search { position: relative; display: none; }
+:root.js .search { display: block; }
+.search-toggle { display: grid; place-items: center; width: 30px; height: 24px; padding: 0; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 4px; background: var(--surface2); color: var(--text-muted); transition: all 0.15s; }
+.search-toggle:hover, .search-toggle[aria-expanded="true"] { border-color: var(--cyan); color: var(--cyan); }
+.search-toggle svg { width: 14px; height: 14px; }
+.search-panel { position: absolute; top: calc(100% + 0.5rem); right: 0; width: min(420px, 90vw); z-index: 50;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; box-shadow: 0 12px 30px rgba(0,0,0,0.4); }
+.search-input { width: 100%; padding: 0.5rem 0.7rem; font-family: inherit; font-size: 0.85rem; color: var(--text);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
+.search-input:focus { outline: none; border-color: var(--cyan); }
+.search-results { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow-y: auto; }
+.search-results:empty { display: none; }
+.search-hit { display: block; padding: 0.6rem 0.5rem; border-radius: 4px; text-decoration: none; color: var(--text); border-bottom: 1px solid var(--border); }
+.search-hit:last-child { border-bottom: none; }
+.search-hit.is-active, .search-hit:hover { background: var(--surface2); }
+.search-hit-title { display: block; color: var(--cyan); font-size: 0.85rem; }
+.search-hit-title::before { content: '> '; color: var(--green); }
+.search-hit-excerpt { display: block; color: var(--text-muted); font-size: 0.76rem; margin-top: 0.2rem; line-height: 1.6; }
+.search-hit-count { display: inline-block; color: var(--purple); font-size: 0.68rem; margin-top: 0.3rem; }
+.search-hit mark { background: rgba(57,208,216,0.22); color: var(--strong); border-radius: 2px; }
+.search-empty { color: var(--text-muted); font-size: 0.78rem; padding: 0.5rem; margin: 0; }
+@media (max-width: 600px) { .search-panel { position: fixed; left: 1rem; right: 1rem; width: auto; } }
+
 .hero-block { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
 .file-header { display: flex; align-items: stretch; border: 1px solid var(--border); border-radius: 6px; margin: 2rem 0; overflow: hidden; }
 .file-sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; min-width: 200px; font-size: 0.8rem; color: var(--text-muted); }

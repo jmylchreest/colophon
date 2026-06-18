@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script>try{document.documentElement.dataset.theme=localStorage.getItem('signal-theme')||'dark';}catch(e){}</script>
+<script>document.documentElement.classList.add('js');try{document.documentElement.dataset.theme=localStorage.getItem('signal-theme')||'dark';}catch(e){}</script>
 <title>{{ meta_title }} · {{ site_title }}</title>
 {{ seo_head|safe }}
 <link rel="stylesheet" href="{{ base_path }}style.css">
@@ -22,6 +22,16 @@
         <a href="{{ base_path }}">posts</a><span class="sep">/</span>
         <span class="current">{{ title }}</span>
       </div>
+      {% if search %}
+      <div class="search" data-search data-search-base="{{ search_base }}" data-search-manifest="{{ search_manifest }}">
+        <button class="search-toggle" type="button" aria-label="Search" aria-expanded="false" aria-controls="searchPanel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+        <div class="search-panel" id="searchPanel" hidden>
+          <input class="search-input" type="search" placeholder="search…" aria-label="Search posts" autocomplete="off" spellcheck="false">
+          <ul class="search-results" aria-label="Search results"></ul>
+          <p class="search-empty" hidden>// no results</p>
+        </div>
+      </div>
+      {% endif %}
       <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
     </div>
   </div>
@@ -78,6 +88,7 @@ window.addEventListener('scroll',function(){var d=document.documentElement;docum
 {% if has_code %}<link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css"><script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>{% endif %}
 {% if has_math %}<link rel="stylesheet" href="{{ base_path }}vendor/katex/katex.min.css"><script defer src="{{ base_path }}vendor/katex/katex.min.js"></script><script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.math').forEach(function(el){try{katex.render(el.textContent,el,{displayMode:el.classList.contains('math-display'),throwOnError:false});}catch(e){}});});</script>{% endif %}
 {% if has_mermaid %}<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:(document.documentElement.dataset.theme==='light'?'default':'dark')})"></script>{% endif %}
+{% if search %}<script type="module" src="{{ base_path }}search-ui.js"></script>{% endif %}
 {% if glossary_head %}{{ glossary_head|safe }}{% endif %}
 {% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>

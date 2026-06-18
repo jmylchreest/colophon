@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>document.documentElement.classList.add('js');</script>
 <title>{{ heading|default:site_title }}</title>
 <link rel="stylesheet" href="{{ base_path }}style.css">
 {% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
@@ -14,6 +15,16 @@
     <a class="logo" href="{{ base_path }}">{{ site_title }}</a>
     <div class="nav">
       {% if nav_pages %}{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% endfor %}{% endif %}
+      {% if search %}
+      <div class="search" data-search data-search-base="{{ search_base }}" data-search-manifest="{{ search_manifest }}">
+        <button class="search-toggle" type="button" aria-label="Search" aria-expanded="false" aria-controls="searchPanel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+        <div class="search-panel" id="searchPanel" hidden>
+          <input class="search-input" type="search" placeholder="Search…" aria-label="Search posts" autocomplete="off" spellcheck="false">
+          <ul class="search-results" aria-label="Search results"></ul>
+          <p class="search-empty" hidden>No results.</p>
+        </div>
+      </div>
+      {% endif %}
       <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
     </div>
   </div>
@@ -36,6 +47,7 @@
 <script>
 (function(){ var tt=document.getElementById('themeToggle'), r=document.documentElement; function apply(t){ r.dataset.theme=t; if(tt) tt.setAttribute('aria-checked', t==='dark'); } apply(r.dataset.theme||'dark'); if(tt) tt.addEventListener('click', function(){ var t=r.dataset.theme==='dark'?'light':'dark'; apply(t); try{localStorage.setItem('obsidian2-theme',t);}catch(e){} }); })();
 </script>
+{% if search %}<script type="module" src="{{ base_path }}search-ui.js"></script>{% endif %}
 {% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>
