@@ -23,8 +23,7 @@
 </article>
 </main>
 <footer><a href="{{ base_path }}">← {{ site_title }}</a></footer>
-{# minimal is the text-only, no-JS theme: it skips the glossary decorator (terms stay plain
-   text — the page still reads correctly) but keeps the tiny analytics beacon. #}
+{# minimal is the text-only, no-JS theme: no glossary decorator, just the tiny analytics beacon. #}
 {% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>
 </html>
