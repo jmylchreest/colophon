@@ -9,7 +9,9 @@ sites:
     personas: [default]
     federation:
       feeds: [rss, atom, json]
-    search: lexical
+    search:
+      mode: lexical
+      fuzzy: true        # opt-in typo tolerance (trigram + Levenshtein)
     # Route images to the R2 object store instead of shipping them with the Pages
     # deployment (which has a file/size budget). The rewrite target is inherited from the
     # r2 publisher: its public_url, or — on publish — its auto-discovered R2 domain.

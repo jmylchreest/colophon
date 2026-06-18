@@ -37,7 +37,10 @@ func writeSearchIndex(write func(string, []byte) error, pages []page, site core.
 		return nil
 	}
 	docs := pagesToSearchDocs(pages, basePath)
-	man, err := search.Build(docs, searchWriter{write: write}, search.BuildOptions{ManifestName: searchManifestName(site.ID, env)})
+	man, err := search.Build(docs, searchWriter{write: write}, search.BuildOptions{
+		ManifestName: searchManifestName(site.ID, env),
+		Fuzzy:        site.Search.FuzzyEnabled(),
+	})
 	if err != nil {
 		return err
 	}
@@ -127,7 +130,9 @@ func SearchIndex(cfg *config.Config, opts Options) (*search.Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	return search.NewIndex(pagesToSearchDocs(pages, basePath), search.BuildOptions{})
+	// CLI search is always typo-tolerant (the in-memory trigram map is cheap) — the agent surface
+	// should be forgiving regardless of whether the public site enables fuzzy.
+	return search.NewIndex(pagesToSearchDocs(pages, basePath), search.BuildOptions{Fuzzy: true})
 }
 
 var (
