@@ -15,6 +15,9 @@
   --serif: Georgia, 'Times New Roman', serif;
   --sans: system-ui, -apple-system, sans-serif;
   --maxw: 720px;
+  /* theme-toggle shape: pill by default; a variant sets these to square it up to match
+     a rounded-square search button (e.g. --toggle-radius: 8px; --knob-radius: 5px). */
+  --toggle-radius: 999px; --knob-radius: 50%;
 }
 
 html { scroll-behavior: smooth; }
@@ -93,8 +96,8 @@ a { color: inherit; }
 
 /* sun↔moon morph theme toggle */
 .tt { position: relative; width: 48px; height: 26px; flex-shrink: 0; padding: 0; cursor: pointer;
-  border: 1px solid var(--border); border-radius: 999px; background: var(--elevated); transition: background 0.4s, border-color 0.4s; }
-.tt-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; overflow: hidden;
+  border: 1px solid var(--border); border-radius: var(--toggle-radius, 999px); background: var(--elevated); transition: background 0.4s, border-color 0.4s; }
+.tt-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: var(--knob-radius, 50%); overflow: hidden;
   background: #f4c45a; box-shadow: 0 0 8px rgba(244,196,90,0.55);
   transition: transform 0.5s cubic-bezier(0.65,0,0.35,1), background 0.4s, box-shadow 0.4s; }
 .tt-knob::after { content: ""; position: absolute; top: -2px; right: -3px; width: 15px; height: 15px;

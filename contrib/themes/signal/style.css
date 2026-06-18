@@ -12,12 +12,14 @@
   --border: #d4dce4; --text: #24323f; --text-muted: #5a6b7b; --strong: #0a0f14;
   --green: #1a7f37; --cyan: #0a7ea4; --purple: #8250df; --red: #cf222e; --yellow: #9a6700;
 }
+/* theme-toggle shape (mode-independent): squared to match the rounded-square search button */
+:root { --toggle-radius: 5px; --knob-radius: 4px; }
 
-/* sun↔moon morph theme toggle — squared to match the rounded-square search button */
+/* sun↔moon morph theme toggle — shape driven by --toggle-radius / --knob-radius */
 .tt { position: relative; width: 46px; height: 24px; flex-shrink: 0; padding: 0; cursor: pointer;
-  border: 1px solid var(--border); border-radius: 5px; background: var(--surface2); transition: background 0.4s, border-color 0.4s; }
+  border: 1px solid var(--border); border-radius: var(--toggle-radius, 999px); background: var(--surface2); transition: background 0.4s, border-color 0.4s; }
 .tt:hover { border-color: var(--cyan); }
-.tt-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 4px; overflow: hidden;
+.tt-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: var(--knob-radius, 50%); overflow: hidden;
   background: #f4c45a; box-shadow: 0 0 8px rgba(244,196,90,0.55);
   transition: transform 0.5s cubic-bezier(0.65,0,0.35,1), background 0.4s, box-shadow 0.4s; }
 .tt-knob::after { content: ""; position: absolute; top: -2px; right: -3px; width: 15px; height: 15px;

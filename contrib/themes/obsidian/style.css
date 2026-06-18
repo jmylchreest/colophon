@@ -23,6 +23,8 @@
   --warn: #b45309; --warn-bg: rgba(180,83,9,0.08);
   --tip: #047857; --tip-bg: rgba(4,120,87,0.08);
 }
+/* theme-toggle shape (mode-independent): squared to match the rounded-square search button */
+:root { --toggle-radius: 8px; --knob-radius: 5px; }
 
 html { scroll-behavior: smooth; }
 body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 17px; line-height: 1.8; transition: background 0.25s, color 0.25s; }
@@ -61,11 +63,11 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 .search-empty { color: var(--muted); font-size: 0.85rem; padding: 0.5rem; margin: 0; }
 @media (max-width: 600px) { .search-panel { position: fixed; left: 1rem; right: 1rem; width: auto; } }
 
-/* sun↔moon morph theme toggle — squared to match the rounded-square search button */
+/* sun↔moon morph theme toggle — shape driven by --toggle-radius / --knob-radius */
 .tt { position: relative; width: 48px; height: 26px; flex-shrink: 0; padding: 0; cursor: pointer;
-  border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); transition: background 0.4s, border-color 0.4s; }
+  border: 1px solid var(--border); border-radius: var(--toggle-radius, 999px); background: var(--surface-2); transition: background 0.4s, border-color 0.4s; }
 .tt:hover { border-color: var(--accent); }
-.tt-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 5px; overflow: hidden;
+.tt-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: var(--knob-radius, 50%); overflow: hidden;
   background: #f4c45a; box-shadow: 0 0 8px rgba(244,196,90,0.55);
   transition: transform 0.5s cubic-bezier(0.65,0,0.35,1), background 0.4s, box-shadow 0.4s; }
 .tt-knob::after { content: ""; position: absolute; top: -2px; right: -3px; width: 15px; height: 15px;
