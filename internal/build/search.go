@@ -23,6 +23,14 @@ import (
 //go:embed assets/search.js
 var readerJS []byte
 
+// searchUIJS is the engine-provided search-box glue (toggle, panel, keyboarding, highlighted
+// results). It's emitted at the site root so ANY theme can add a search box with just the markup
+// + CSS — it reads the index location from the markup's data-search-* attributes and lazy-imports
+// the reader. Themes re-skin the box purely through CSS on the .search-* classes.
+//
+//go:embed assets/search-ui.js
+var searchUIJS []byte
+
 // searchBase is the output directory (and URL path) the static index + reader live under.
 const searchBase = "_search"
 
@@ -45,6 +53,11 @@ func writeSearchIndex(write func(string, []byte) error, pages []page, site core.
 		return err
 	}
 	if err := write(searchBase+"/search.js", readerJS); err != nil {
+		return err
+	}
+	// The UI glue ships at the site root (same-origin, not routed), so a theme references it as
+	// {base_path}search-ui.js regardless of where the routed index lives.
+	if err := write("search-ui.js", searchUIJS); err != nil {
 		return err
 	}
 	log.Step("BUILD", "", "search", len(docs), "shards", len(man.Shards))

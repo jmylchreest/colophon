@@ -13,8 +13,10 @@ import (
 //go:embed themes
 var builtinThemes embed.FS
 
-// DefaultTheme is used when a site/environment names no theme.
-const DefaultTheme = "default"
+// DefaultTheme is used when a site/environment names no theme (and the "default" alias maps to
+// it). press is the canonical default; the bare "default" theme remains as press's vendor/asset
+// parent (press inherits it via the base marker), not as a user-facing theme.
+const DefaultTheme = "press"
 
 // baseMarker is an optional one-line file in a built-in theme naming another built-in
 // it inherits from (templates + static assets). It lets a brand theme (e.g. press) reuse
@@ -78,7 +80,10 @@ type themeSource struct {
 }
 
 func newThemeSource(root, theme string) (*themeSource, error) {
-	if theme == "" {
+	// A site naming no theme, or "default" explicitly, gets press. The alias is applied here (the
+	// site's chosen theme) and not in embeddedLayers, so press's own `base: default` marker still
+	// resolves to the literal default theme it inherits its vendored assets from.
+	if theme == "" || theme == "default" {
 		theme = DefaultTheme
 	}
 	layers, err := embeddedLayers(theme)
@@ -120,11 +125,13 @@ func embeddedLayers(name string) ([]fs.FS, error) {
 			return []fs.FS{sub}, nil
 		}
 	}
-	def, err := fs.Sub(builtinThemes, "themes/"+DefaultTheme)
-	if err != nil {
-		return nil, err
+	// Unknown name (or a base-only theme with no templates) inherits the default theme's full
+	// layer chain — so a project-only on-disk theme still gets its chrome and vendored assets.
+	// Guard against self-recursion if the default is itself missing.
+	if name == DefaultTheme {
+		return nil, fmt.Errorf("default theme %q is not a valid built-in", DefaultTheme)
 	}
-	return []fs.FS{def}, nil
+	return embeddedLayers(DefaultTheme)
 }
 
 // has reports whether the theme provides a file by this name, checking the on-disk override
