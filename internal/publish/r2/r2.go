@@ -128,6 +128,11 @@ func (p *Publisher) Hash(name string, b []byte) string { return publish.MD5Hex(b
 // under _search/ — the latter so several environments can share one bucket without each
 // orphan-deleting the others' shards (the shards are immutable and deduped; only each env's own
 // manifest file differs).
+//
+// TODO(search-gc): the prefix list is hardcoded and duplicated across the r2/s3/local Protected
+// methods, and protecting _search/ means superseded shards accumulate. Centralize the list and add
+// a mark-and-sweep GC (delete _search/ objects no live manifest references). See
+// docs/design/search.md → "Multi-deployment sharing & the protection trade-off".
 func (p *Publisher) Protected(name string) bool {
 	return strings.HasPrefix(name, ".well-known/") || strings.HasPrefix(name, "_search/")
 }

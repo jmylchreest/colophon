@@ -251,6 +251,29 @@ is never deleted mid-swap.
 Typical "edit one post" outcome: **1 new fragment + 1 changed manifest + a few hot-term shards**,
 everything else byte-identical and skipped.
 
+### Multi-deployment sharing & the protection trade-off
+
+Several deployments (sites × environments) can publish to **one** object store. Only the manifest
+is per-deployment — its name is a short hash of `(siteID, env)` (`manifest-<hash>.json`; the bare
+`manifest.json` is the no-site/no-env default) — so the mutable roots don't collide. The
+content-addressed shards/fragments are **shared**: identical content across deployments dedupes to
+one object, and each deployment's reader loads its own manifest (told via `data-search-manifest`).
+
+To make that safe, the whole `_search/` prefix is exempt from orphan-deletion: each publisher's
+`Protected(name)` returns true for it, and the incremental planner deletes a deployed object only
+when it is *both* absent from the current build *and* not protected. So a deployment never prunes
+another's shards or manifest — it only writes its own manifest and adds shards.
+
+> **TODO (revisit): garbage collection for `_search/`.** The cost of the protection is that
+> superseded shards/fragments (and the pre-hash `manifest.json`) accumulate, never auto-pruned —
+> tiny (~200 B each) and deduped, but unbounded over time. A proper fix is a **mark-and-sweep GC**:
+> read *every* live `manifest-*.json` in the store, union the shards/fragments they reference, and
+> delete the `_search/` objects nothing references. This can't be the per-publish `delete_orphaned`
+> (which only sees one deployment's set); it wants to be an explicit pass (e.g. `colophon search gc`
+> / `publish --gc`). Related: the protected-prefix list is currently **hardcoded and duplicated**
+> across the r2/s3/local `Protected` methods — worth centralizing (and possibly making
+> configurable) at the same time.
+
 ## Browser query flow
 
 The whole reader is ~a screen of dependency-free JS:
