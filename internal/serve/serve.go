@@ -28,6 +28,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/jmylchreest/colophon/internal/build"
+	"github.com/jmylchreest/colophon/internal/clog"
 	"github.com/jmylchreest/colophon/internal/config"
 )
 
@@ -68,6 +69,7 @@ type buildState struct {
 type Server struct {
 	root string
 	addr string // set at ListenAndServe; used to derive each env's local base_url
+	log  *clog.Logger
 
 	mu      sync.RWMutex // guards cfg, site, targets across config reloads
 	cfg     *config.Config
@@ -88,14 +90,16 @@ type Server struct {
 	shutdownOnce sync.Once
 }
 
-// New builds a Server from the loaded config.
-func New(cfg *config.Config) (*Server, error) {
+// New builds a Server from the loaded config. log carries serve's structured progress
+// (startup URLs, rebuilds, config reloads, shutdown); a nil log is a silent no-op.
+func New(cfg *config.Config, log *clog.Logger) (*Server, error) {
 	site, targets, err := targetsFor(cfg)
 	if err != nil {
 		return nil, err
 	}
 	return &Server{
 		root:     cfg.Root,
+		log:      log,
 		cfg:      cfg,
 		site:     site,
 		targets:  targets,
@@ -158,35 +162,27 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 	watchDone := make(chan struct{})
 	go func() { defer close(watchDone); s.watch(ctx) }()
 
-	fmt.Printf("colophon serve → http://localhost%s/\n", port(addr))
-	// One aligned key=value line per site/env, so a person or an agent can copy any URL directly.
-	site := s.site
-	siteW, envW := len(site), 0
-	for _, t := range targets {
-		if len(t.name) > envW {
-			envW = len(t.name)
-		}
-	}
+	// One structured event per env, so a person or an agent can copy any URL from the kv pairs.
+	s.log.Step("SERVE", "", "listen", "http://localhost"+port(addr)+"/", "site", s.site)
 	slug, hasLatest := s.latestSlug()
 	for _, t := range targets {
 		base := "http://localhost" + port(addr) + t.prefix
-		var kv strings.Builder
-		fmt.Fprintf(&kv, "url=%s", base)
+		kv := []any{"env", t.name, "url", base}
 		if hasLatest {
-			fmt.Fprintf(&kv, " latest=%s%s/", base, slug)
+			kv = append(kv, "latest", base+slug+"/")
 		}
-		fmt.Fprintf(&kv, " sitemap=%ssitemap.xml atom=%satom.xml rss=%srss.xml json=%sfeed.json", base, base, base, base)
+		kv = append(kv, "sitemap", base+"sitemap.xml", "atom", base+"atom.xml", "rss", base+"rss.xml", "json", base+"feed.json")
 		if t.drafts {
-			kv.WriteString(" draft=true")
+			kv = append(kv, "drafts", true)
 		}
-		fmt.Printf("  %-*s  %-*s  %s\n", siteW, site, envW, t.name, kv.String())
+		s.log.Step("SERVE", "", kv...)
 	}
 	if len(targets) > 0 && openTarget != "" {
 		if u, ok := s.resolveURL(addr, targets[0], openTarget); ok {
-			fmt.Printf("opening %s\n", u)
+			s.log.Step("SERVE", "", "open", u)
 			go openBrowserAfter(ctx, 300*time.Millisecond, u)
 		} else {
-			fmt.Printf("  (unknown --open target %q)\n", openTarget)
+			s.log.Step("SERVE", "", "open_unknown", openTarget)
 		}
 	}
 
@@ -209,7 +205,7 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 		return err
 	case <-ctx.Done():
 		stop() // restore default signal handling: a second Ctrl-C aborts the drain
-		fmt.Fprintln(os.Stderr, "\ncolophon: shutting down…")
+		s.log.Step("SERVE", "", "event", "draining")
 		s.beginShutdown() // release live-reload streams so they don't hold Shutdown to its deadline
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -325,8 +321,13 @@ func (s *Server) build(t target) error {
 	// resolvable within the preview, instead of pointing at the configured base_url.
 	opts := t.opts
 	opts.BaseURL = "http://localhost" + port(s.addr) + strings.TrimSuffix(t.prefix, "/")
-	_, err := build.Run(cfg, opts)
-	return err
+	// build internals stay quiet here (no opts.Log) — serve emits one concise rebuilt line
+	// instead, so navigating doesn't replay the whole SOURCE/BUILD breakdown per request.
+	if _, err := build.Run(cfg, opts); err != nil {
+		return err
+	}
+	s.log.Detail("SERVE", "", "env", t.name, "rebuilt", true)
+	return nil
 }
 
 // forceBuild rebuilds t unconditionally (startup and config reload) and records the time.
@@ -475,7 +476,7 @@ func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 func (s *Server) watch(ctx context.Context) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "colophon: live reload disabled: %v\n", err)
+		s.log.Step("SERVE", "", "warning", "live reload disabled: "+err.Error())
 		return
 	}
 	defer func() { _ = w.Close() }()
@@ -528,12 +529,12 @@ func (s *Server) watch(ctx context.Context) {
 func (s *Server) reconfigure() {
 	cfg, err := config.Load(s.root)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "colophon: config reload failed, keeping previous: %v\n", err)
+		s.log.Step("SERVE", "", "config_reload_failed", err.Error())
 		return
 	}
 	site, targets, err := targetsFor(cfg)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "colophon: config reload failed, keeping previous: %v\n", err)
+		s.log.Step("SERVE", "", "config_reload_failed", err.Error())
 		return
 	}
 
@@ -549,10 +550,10 @@ func (s *Server) reconfigure() {
 
 	for _, t := range targets {
 		if err := s.forceBuild(t); err != nil {
-			fmt.Fprintf(os.Stderr, "colophon: rebuild %s failed: %v\n", t.name, err)
+			s.log.Step("SERVE", "", "env", t.name, "rebuild_failed", err.Error())
 		}
 	}
-	fmt.Fprintln(os.Stderr, "colophon: config reloaded")
+	s.log.Step("SERVE", "", "event", "config_reloaded")
 	s.broadcast()
 }
 
