@@ -319,7 +319,8 @@ html.js .search-toggle {
   color: var(--muted); background: transparent; border: 1px solid var(--border);
   transition: color 0.25s, background 0.25s, border-color 0.25s, transform 0.25s cubic-bezier(0.68,-0.55,0.27,1.55);
 }
-.search-toggle:hover { color: var(--on-accent); background: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
+/* match the base rule's specificity (the html.js gate) so the accent fill actually applies. */
+html.js .search-toggle:hover { color: var(--on-accent); background: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
 .search-toggle svg { width: 14px; height: 14px; }
 .topbar-right > .authors { order: 0; }
 .topbar-right > .feeds   { order: 1; }
