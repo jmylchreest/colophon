@@ -1,7 +1,9 @@
 package build
 
 import (
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"html"
 	"regexp"
@@ -56,22 +58,14 @@ func writeSearchIndex(write func(string, []byte) error, pages []page, site core.
 // searchManifestName is the per-environment manifest filename. Builds for different environments
 // can publish to one object store; only the manifest (the mutable root) is environment-specific,
 // so their roots don't collide — the content-addressed shards/fragments are safely shared. The
-// default environment keeps the bare "manifest.json".
+// name is a short, deterministic hash of the environment (not the name itself, which would leak
+// into the bucket/URLs); the default environment keeps the bare "manifest.json".
 func searchManifestName(env string) string {
-	env = strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
-			return r
-		case r >= 'A' && r <= 'Z':
-			return r + ('a' - 'A')
-		default:
-			return '-'
-		}
-	}, env)
 	if env == "" {
 		return "manifest.json"
 	}
-	return "manifest-" + env + ".json"
+	sum := sha256.Sum256([]byte(env))
+	return "manifest-" + hex.EncodeToString(sum[:4]) + ".json"
 }
 
 // searchBaseURL is where the browser reader loads the index from. When _search/ is routed to an

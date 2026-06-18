@@ -2,10 +2,28 @@ package build
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jmylchreest/colophon/internal/core"
 )
+
+func TestSearchManifestName(t *testing.T) {
+	if got := searchManifestName(""); got != "manifest.json" {
+		t.Errorf("empty env = %q, want manifest.json", got)
+	}
+	// Deterministic, distinct per env, hashed (no env name leaked).
+	prod := searchManifestName("production")
+	if prod != searchManifestName("production") {
+		t.Error("not deterministic")
+	}
+	if prod == searchManifestName("preview") {
+		t.Error("different envs must differ")
+	}
+	if !strings.HasPrefix(prod, "manifest-") || !strings.HasSuffix(prod, ".json") || strings.Contains(prod, "production") {
+		t.Errorf("name = %q, want manifest-<hash>.json with no env name", prod)
+	}
+}
 
 func TestSearchBaseURL(t *testing.T) {
 	// Unrouted: the reader loads the index from the local base_path.
