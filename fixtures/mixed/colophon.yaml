@@ -17,7 +17,9 @@ sites:
     # r2 publisher: its public_url, or — on publish — its auto-discovered R2 domain.
     # Inert until a URL is resolvable, so local builds keep assets co-located.
     routing:
-      - match: "**/assets/**"
+      # Match co-located page assets (posts/x/assets/…) and the root-level /assets/… tree
+      # (e.g. published author avatars), so both ship to R2 rather than the Pages budget.
+      - match: "**assets/**"
         publisher: r2
       # Route the static search index to the object store too, to keep it off the Pages file
       # budget. The reader then fetches it cross-origin, so the bucket needs CORS — colophon sets

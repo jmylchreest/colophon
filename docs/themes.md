@@ -207,7 +207,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `page_type` | The resolved page type (`post`, `page`, or a custom value) — for branching within a shared template. |
 | `draft`, `embargoed`, `embargo_until` | Preview-only flags for not-yet-public posts. |
 | `has_code`, `has_math`, `has_mermaid` | True when the post uses that block type — load the matching library only when set. |
-| `author_name`, `author_initials`, `author_bio`, `author_url`, `author_avatar` | Persona h-card fields (empty when no persona). |
+| `author_name`, `author_initials`, `author_bio`, `author_url`, `author_avatar` | Author h-card fields for the byline (empty when unset). `author_avatar` is a ready-to-use `src`: a file-path avatar is published to `/assets/<name>` and emitted root-anchored (or as the object-store URL when routed); `data:`/`http(s)://` avatars pass through. |
 
 ### `index.html` (the post list, and per-tag pages)
 

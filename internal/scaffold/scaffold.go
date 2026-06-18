@@ -100,7 +100,9 @@ const authorYAML = `# An author is the byline shown to readers. A post's "author
 id: me
 name: "Me"
 bio: "Writes things."
-# avatar: avatar.png
+# avatar may be a data: URI, an https:// URL, or a file under a content source (e.g.
+# assets/avatar.png): a file path is published to /assets/<name> and resolves from every page.
+# avatar: assets/avatar.png
 # urls: ["https://example.com"]
 `
 

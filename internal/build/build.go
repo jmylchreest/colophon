@@ -238,6 +238,16 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	for i, p := range posts {
 		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "tags": tagLinks(p.Tags, basePath)}
 	}
+	// Publish file-path author avatars through the same asset pipeline as markdown embeds,
+	// emitting a depth-independent src (the topbar strip is built once for every page depth).
+	// This mutates cfg.Authors, so collectAuthors and authorVars below both read the resolved
+	// value. Dedup against the markdown refs already collected (keyed by output path).
+	seenAssets := make(map[string]bool, len(assets))
+	for _, a := range assets {
+		seenAssets[a.outPath] = true
+	}
+	assets = append(assets, resolveAuthorAvatars(cfg, uniqueSources(docs), router, basePath, seenAssets, opts.Log)...)
+
 	authorGroups := collectAuthors(cfg, posts, list, basePath)
 	authors := authorStrip(authorGroups)
 
