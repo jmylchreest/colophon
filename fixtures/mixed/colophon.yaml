@@ -87,10 +87,25 @@ environments:
       local:
         path: ./dist-text       # one `local` publisher, a distinct dir per environment
 
-  # Theme previews — `colophon serve` renders all of these at /main/<env>/ so you can
-  # compare them. press is the site default (production/preview/dist use it).
-  # (flux/signal/obsidian are community themes under contrib/themes/ — not built-in, so they're
-  # not previewed here; copy one into themes/<name>/ to use it.)
+  # Theme previews — `colophon serve` renders all of these at /main/<env>/ so you can compare them.
+  # press is the site default (production/preview/dist use it). flux/signal/obsidian are community
+  # themes from contrib/themes/, symlinked into themes/ by ./link-themes.sh (run it after checkout;
+  # themes/ is gitignored).
+  - name: flux
+    publish: [local]
+    include_drafts: true
+    theme: flux
+    overrides: { local: { path: ./dist-flux } }
+  - name: signal
+    publish: [local]
+    include_drafts: true
+    theme: signal
+    overrides: { local: { path: ./dist-signal } }
+  - name: obsidian
+    publish: [local]
+    include_drafts: true
+    theme: obsidian
+    overrides: { local: { path: ./dist-obsidian } }
   - name: press-gazette                # tokens-only theme that inherits press's chrome via base.css
     publish: [local]
     include_drafts: true

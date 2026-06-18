@@ -2,3 +2,6 @@
 /public/
 /.colophon/
 /dist/
+/dist-*/
+# contrib themes symlinked in for theme previews (see link-themes.sh); not committed
+/themes/
