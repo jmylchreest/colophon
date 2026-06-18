@@ -79,6 +79,13 @@ type Server struct {
 
 	clientMu sync.Mutex
 	clients  map[chan struct{}]bool
+
+	// shutdown is closed once when the server begins draining. SSE streams (handleReload)
+	// select on it so they return promptly instead of blocking Shutdown until its deadline —
+	// http.Server.Shutdown waits for in-flight handlers to return but never cancels their
+	// request context, so a long-lived stream would otherwise hold shutdown open.
+	shutdown     chan struct{}
+	shutdownOnce sync.Once
 }
 
 // New builds a Server from the loaded config.
@@ -88,12 +95,13 @@ func New(cfg *config.Config) (*Server, error) {
 		return nil, err
 	}
 	return &Server{
-		root:    cfg.Root,
-		cfg:     cfg,
-		site:    site,
-		targets: targets,
-		builds:  map[string]*buildState{},
-		clients: map[chan struct{}]bool{},
+		root:     cfg.Root,
+		cfg:      cfg,
+		site:     site,
+		targets:  targets,
+		builds:   map[string]*buildState{},
+		clients:  map[chan struct{}]bool{},
+		shutdown: make(chan struct{}),
 	}, nil
 }
 
@@ -147,7 +155,8 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 	// mid-write).
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go s.watch(ctx)
+	watchDone := make(chan struct{})
+	go func() { defer close(watchDone); s.watch(ctx) }()
 
 	fmt.Printf("colophon serve → http://localhost%s/\n", port(addr))
 	// One aligned key=value line per site/env, so a person or an agent can copy any URL directly.
@@ -190,6 +199,10 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 	go func() { errCh <- srv.ListenAndServe() }()
 	select {
 	case err := <-errCh:
+		// ListenAndServe failed before any signal (e.g. the port is taken). Cancel ctx so the
+		// watcher goroutine unwinds and closes its fsnotify handle before we return.
+		stop()
+		<-watchDone
 		if errors.Is(err, http.ErrServerClosed) {
 			return nil
 		}
@@ -197,9 +210,12 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 	case <-ctx.Done():
 		stop() // restore default signal handling: a second Ctrl-C aborts the drain
 		fmt.Fprintln(os.Stderr, "\ncolophon: shutting down…")
+		s.beginShutdown() // release live-reload streams so they don't hold Shutdown to its deadline
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		return srv.Shutdown(shutCtx)
+		err := srv.Shutdown(shutCtx)
+		<-watchDone // the watcher saw ctx cancel; wait for it to close the fsnotify watcher
+		return err
 	}
 }
 
@@ -444,6 +460,8 @@ func (s *Server) handleReload(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-s.shutdown: // server draining: release the stream so Shutdown doesn't block on it
+			return
 		case <-ch:
 			_, _ = fmt.Fprint(w, "data: reload\n\n")
 			flusher.Flush()
@@ -536,6 +554,12 @@ func (s *Server) reconfigure() {
 	}
 	fmt.Fprintln(os.Stderr, "colophon: config reloaded")
 	s.broadcast()
+}
+
+// beginShutdown signals every live-reload stream to return. Closing the channel once is safe
+// even if no streams are open and even if called more than once.
+func (s *Server) beginShutdown() {
+	s.shutdownOnce.Do(func() { close(s.shutdown) })
 }
 
 func (s *Server) addClient(ch chan struct{}) {
