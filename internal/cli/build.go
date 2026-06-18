@@ -6,6 +6,7 @@ import (
 
 	"github.com/jmylchreest/colophon/internal/build"
 	"github.com/jmylchreest/colophon/internal/config"
+	"github.com/jmylchreest/colophon/internal/profiling"
 )
 
 // BuildCmd renders content/ into the canonical static tree under public/. With --env
@@ -13,9 +14,11 @@ import (
 type BuildCmd struct {
 	Env     string `help:"Build a named environment (applies its overrides)"`
 	Verbose bool   `short:"v" help:"Log each step (sources, files, feeds)"`
+	Pprof   string `help:"Capture CPU+heap profiles to a dir (or 1 for cwd)" hidden:""`
 }
 
 func (c *BuildCmd) Run() error {
+	defer profiling.Capture(c.Pprof)()
 	root, err := findRoot()
 	if err != nil {
 		return err

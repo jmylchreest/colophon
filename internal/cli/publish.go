@@ -11,6 +11,7 @@ import (
 	"github.com/jmylchreest/colophon/internal/clog"
 	"github.com/jmylchreest/colophon/internal/config"
 	"github.com/jmylchreest/colophon/internal/core"
+	"github.com/jmylchreest/colophon/internal/profiling"
 	"github.com/jmylchreest/colophon/internal/publish"
 	"github.com/jmylchreest/colophon/internal/telemetry"
 )
@@ -23,9 +24,11 @@ type PublishCmd struct {
 	AllowPublish bool     `help:"Deploy environments that set allow_publish: false"`
 	Create       bool     `help:"Create the destination (e.g. a Pages project) if it doesn't exist"`
 	Verbose      bool     `short:"v" help:"Log each step (sources, files, publisher actions)"`
+	Pprof        string   `help:"Capture CPU+heap profiles to a dir (or 1 for cwd)" hidden:""`
 }
 
 func (c *PublishCmd) Run() error {
+	defer profiling.Capture(c.Pprof)()
 	root, err := findRoot()
 	if err != nil {
 		return err

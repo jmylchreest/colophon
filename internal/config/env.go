@@ -67,9 +67,10 @@ func yamlEscape(raw []byte, pos int, val []byte) []byte {
 	for i := 0; i < len(prefix); i++ {
 		switch c := prefix[i]; {
 		case inDouble:
-			if c == '\\' {
+			switch c {
+			case '\\':
 				i++ // skip the escaped char
-			} else if c == '"' {
+			case '"':
 				inDouble = false
 			}
 		case inSingle:
