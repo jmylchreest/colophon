@@ -64,5 +64,6 @@ node --test search.test.mjs   # analyzer + ranking parity against the fixture
 
 ## Status
 
-v1 is lexical (BM25). Fuzzy (trigram + Levenshtein) and semantic (embedding vectors) are designed
-as additive index types over the same substrate — see SPEC §10 and the design doc.
+Lexical (BM25) with **prefix** matching and opt-in **fuzzy** typo tolerance (trigram + bounded
+Levenshtein, `BuildOptions.Fuzzy` — SPEC §10). Semantic (embedding vectors) is still a reserved
+additive index type over the same substrate (SPEC §11).
