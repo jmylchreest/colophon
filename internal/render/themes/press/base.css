@@ -31,22 +31,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
   line-height: 1.7; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   overflow-x: hidden; transition: background 0.4s, color 0.4s; }
 
-/* ambient light — soft vertical strips glowing in from the left/right edges, gently breathing
-   (scaling larger/smaller). Driven by --glow-1/--glow-2 (transparent by default, so it's opt-in).
-   In "focus" mode — app.js adds .focus to <html> while you're scrolling — they fade out quickly so
-   they don't distract; focus ends after a few minutes of stillness and they ease back in. */
-body::before, body::after {
-  content: ""; position: fixed; top: 0; bottom: 0; width: 34vmax; z-index: -1;
-  pointer-events: none; will-change: transform;
-  animation: breathe 9s ease-in-out infinite;
-  transition: opacity 0.9s ease; /* gentle return when focus ends */
-}
-body::before { left: 0; transform-origin: left center;
-  background: radial-gradient(30vmax 78vmax at left center, var(--glow-1), transparent 62%); }
-body::after { right: 0; transform-origin: right center; animation-delay: -4.5s;
-  background: radial-gradient(30vmax 78vmax at right center, var(--glow-2), transparent 62%); }
-html.focus body::before, html.focus body::after { opacity: 0; transition: opacity 0.3s ease; }
-@keyframes breathe { 0%, 100% { transform: scaleX(0.82); } 50% { transform: scaleX(1.1); } }
+/* ambient edge-light effect removed for now; --glow-1/--glow-2 are defined but currently unused. */
 
 #progress { position: fixed; top: 0; left: 0; height: 2px; z-index: 50; width: 0;
   background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
@@ -319,7 +304,7 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, body::before, body::after { animation: none !important; transition: none !important; }
+  * { animation: none !important; transition: none !important; }
   .home-hero h1 { filter: none; } .home-hero h1::before { display: none; }
 }
 
