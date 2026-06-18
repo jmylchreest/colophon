@@ -35,28 +35,17 @@ func notImplemented(milestone string) error {
 	return fmt.Errorf("not implemented yet (planned for %s)", milestone)
 }
 
-// newLogger builds a progress logger whose label column fits the project's source,
-// publisher, and environment names (so columns align). Width is clamped to a sane range.
-func newLogger(cfg *config.Config, verbose bool) *clog.Logger {
-	w := len("content") // the default md-dir source id, used when none are configured
-	consider := func(s string) {
-		if len(s) > w {
-			w = len(s)
-		}
-	}
-	for _, s := range cfg.Sources {
-		consider(s.ID)
-	}
-	for _, p := range cfg.Publishers {
-		consider(p.ID)
-	}
-	for _, e := range cfg.Environments {
-		consider(e.Name)
-	}
-	if w > 24 {
-		w = 24
-	}
-	return clog.New(os.Stdout, verbose, w)
+// newLogger builds colophon's progress logger. --verbose drops the level to Debug; the
+// COLOPHON_LOG_FORMAT (text|json) and COLOPHON_LOG (RUST_LOG-style filter spec) env vars tune
+// the output format and per-attribute/source verbosity. Logs go to stderr so --json data on
+// stdout stays clean.
+func newLogger(verbose bool) *clog.Logger {
+	return clog.New(clog.Options{
+		Writer:  os.Stderr,
+		Verbose: verbose,
+		JSON:    strings.EqualFold(os.Getenv("COLOPHON_LOG_FORMAT"), "json"),
+		Filter:  os.Getenv("COLOPHON_LOG"),
+	})
 }
 
 // unknownEnvErr reports an unknown --env, listing the configured environments.

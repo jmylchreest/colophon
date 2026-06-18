@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/jmylchreest/colophon/internal/build"
@@ -28,7 +27,7 @@ func (c *SearchCmd) Run() error {
 	}
 	// A discard logger: indexing is a query-time means, not a build — its progress/warnings
 	// shouldn't print (and must never pollute --json on stdout).
-	quiet := clog.New(io.Discard, false, 8)
+	quiet := clog.Discard()
 	ix, err := build.SearchIndex(cfg, build.Options{Log: quiet})
 	if err != nil {
 		return err
