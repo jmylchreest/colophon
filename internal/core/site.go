@@ -25,11 +25,36 @@ type Site struct {
 	Routing []RouteRule `yaml:"routing,omitempty"`
 
 	Federation Federation `yaml:"federation,omitempty"`
-	// Search selects the visitor-facing on-site search: lexical | semantic | off.
-	Search string `yaml:"search,omitempty"`
+	// Search configures the visitor-facing on-site search.
+	Search SearchConfig `yaml:"search,omitempty"`
 	// Analytics configures privacy-respecting telemetry (statsfactory). Inert until keyed.
 	Analytics Analytics `yaml:"analytics,omitempty"`
 }
+
+// SearchConfig is the site's `search:` stanza. It accepts a string shorthand
+// (`search: lexical`, equivalent to `search: { mode: lexical }`) or the full map form:
+//
+//	search:
+//	  mode: lexical     # off (default) | lexical    [semantic reserved]
+//	  fuzzy: true       # typo-tolerant matching (trigram + Levenshtein); larger index
+type SearchConfig struct {
+	Mode  string `yaml:"mode,omitempty"`
+	Fuzzy bool   `yaml:"fuzzy,omitempty"`
+}
+
+// UnmarshalText decodes the string shorthand into Mode, so `search: lexical` keeps working
+// alongside the map form. (koanf's default decode hook applies this for a scalar value; a map
+// value decodes into the struct fields normally.)
+func (s *SearchConfig) UnmarshalText(b []byte) error {
+	s.Mode = string(b)
+	return nil
+}
+
+// Enabled reports whether visitor-facing search is on.
+func (s SearchConfig) Enabled() bool { return s.Mode == "lexical" || s.Mode == "semantic" }
+
+// FuzzyEnabled reports whether typo-tolerant matching is on (only meaningful when Enabled).
+func (s SearchConfig) FuzzyEnabled() bool { return s.Enabled() && s.Fuzzy }
 
 // RouteRule sends output matching Match to Publisher, rewriting matched URLs to
 // BaseURL when set.

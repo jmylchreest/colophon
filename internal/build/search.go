@@ -26,15 +26,8 @@ var readerJS []byte
 // searchBase is the output directory (and URL path) the static index + reader live under.
 const searchBase = "_search"
 
-// searchEnabled reports whether a site opts into visitor-facing search (Site.Search is
-// lexical|semantic|off; semantic falls back to the lexical index for now).
-func searchEnabled(site core.Site) bool {
-	switch site.Search {
-	case "lexical", "semantic":
-		return true
-	}
-	return false
-}
+// searchEnabled reports whether a site opts into visitor-facing search.
+func searchEnabled(site core.Site) bool { return site.Search.Enabled() }
 
 // writeSearchIndex emits the static search index and the browser reader under _search/ when the
 // site enables search. Index files are content-addressed, so the incremental publisher only
