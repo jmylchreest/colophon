@@ -152,7 +152,21 @@
     }
   }
 
+  // Ambient side-lights "focus" mode: while you're scrolling, fade the edge glows out so they
+  // don't distract, then ease them back after a stretch of stillness. Pure decoration — a no-op
+  // where --glow-1/--glow-2 are transparent (e.g. the broadsheet variant).
+  function initFocusLights() {
+    var root = document.documentElement, timer;
+    var IDLE = 3 * 60 * 1000; // focus ends after 3 minutes without scrolling
+    window.addEventListener('scroll', function () {
+      root.classList.add('focus');
+      clearTimeout(timer);
+      timer = setTimeout(function () { root.classList.remove('focus'); }, IDLE);
+    }, { passive: true });
+  }
+
   initTheme();
+  initFocusLights();
   initProgress();
   initAuthors();
   initTips();
