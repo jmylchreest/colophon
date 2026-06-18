@@ -17,7 +17,7 @@
 .tt { position: relative; width: 46px; height: 24px; flex-shrink: 0; padding: 0; cursor: pointer;
   border: 1px solid var(--border); border-radius: 999px; background: var(--surface2); transition: background 0.4s, border-color 0.4s; }
 .tt:hover { border-color: var(--cyan); }
-.tt-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+.tt-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; overflow: hidden;
   background: #f4c45a; box-shadow: 0 0 8px rgba(244,196,90,0.55);
   transition: transform 0.5s cubic-bezier(0.65,0,0.35,1), background 0.4s, box-shadow 0.4s; }
 .tt-knob::after { content: ""; position: absolute; top: -2px; right: -3px; width: 15px; height: 15px;
