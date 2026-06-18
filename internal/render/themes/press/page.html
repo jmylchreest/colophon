@@ -84,7 +84,7 @@
       <h1>{{ title }}</h1>
       {% if description %}<p class="dek">{{ description }}</p>{% endif %}
       <div class="byline">
-        <div class="av">{{ author_initials|default:"·" }}</div>
+        <div class="av">{% if author_avatar %}<img src="{{ author_avatar }}" alt="{{ author_name }}"{% if author_avatar_style %} style="{{ author_avatar_style }}"{% endif %}>{% else %}{{ author_initials|default:"·" }}{% endif %}</div>
         <div>
           <div class="nm">{{ author_name|default:site_title }}</div>
           <div class="mt">{% if date %}{{ date }} · {% endif %}{{ read_time }} min read</div>
@@ -100,7 +100,7 @@
       {% if tags %}<div class="tags">{% for tg in tags %}<a class="chip" href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</div>{% endif %}
       {% if author_name %}
       <div class="note">
-        <div class="av">{{ author_initials }}</div>
+        <div class="av">{% if author_avatar %}<img src="{{ author_avatar }}" alt="{{ author_name }}"{% if author_avatar_style %} style="{{ author_avatar_style }}"{% endif %}>{% else %}{{ author_initials }}{% endif %}</div>
         <div>
           <div class="nm">{{ author_name }}</div>
           {% if author_bio %}<div class="bio">{{ author_bio }}</div>{% endif %}

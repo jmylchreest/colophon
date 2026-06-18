@@ -64,11 +64,12 @@ func authorVars(a core.Author) map[string]any {
 		url = a.URLs[0]
 	}
 	return map[string]any{
-		"author_name":     a.Name,
-		"author_initials": initials(a.Name),
-		"author_bio":      a.Bio,
-		"author_url":      url,
-		"author_avatar":   a.Avatar,
+		"author_name":         a.Name,
+		"author_initials":     initials(a.Name),
+		"author_bio":          a.Bio,
+		"author_url":          url,
+		"author_avatar":       a.Avatar,
+		"author_avatar_style": imageStyle(a.AvatarFit, a.AvatarPosition),
 	}
 }
 
