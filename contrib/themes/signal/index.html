@@ -13,7 +13,6 @@
 <header class="site">
   <div class="site-bar">
     <a class="site-logo" href="{{ base_path }}">{{ site_title }}</a>
-    {% if nav_pages %}<nav class="site-nav" aria-label="Pages">{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% endfor %}</nav>{% endif %}
     <div class="bar-right">
       {% if search %}
       <div class="search" data-search data-search-base="{{ search_base }}" data-search-manifest="{{ search_manifest }}">
@@ -28,6 +27,11 @@
       <button class="tt" id="themeToggle" type="button" role="switch" aria-checked="true" aria-label="Toggle dark mode"><span class="tt-knob"></span></button>
     </div>
   </div>
+  {% if nav_pages %}
+  <div class="site-sub">
+    <nav class="site-nav" aria-label="Pages">{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% endfor %}</nav>
+  </div>
+  {% endif %}
 </header>
 
 <ul class="post-list">

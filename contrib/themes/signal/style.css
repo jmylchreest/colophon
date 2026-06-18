@@ -32,16 +32,19 @@ body { background: var(--bg); color: var(--text); font-family: 'JetBrains Mono',
 
 header.site { border-bottom: 1px solid var(--border); }
 .site-bar { max-width: 1100px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem 1rem; }
-.site-nav { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.8rem; }
+/* sub-header row below the bar: page links (terminal //comment style) and, on posts, the breadcrumb */
+.site-sub { max-width: 1100px; margin: 0 auto; padding: 0.55rem 2rem; display: flex; align-items: center; gap: 0.4rem 1.25rem; flex-wrap: wrap; border-top: 1px solid var(--border); }
+.site-nav { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; font-size: 0.8rem; min-width: 0; }
 .site-nav a { color: var(--text-muted); text-decoration: none; }
-.site-nav a::before { content: '/'; color: var(--border); margin-right: 0.15em; }
+.site-nav a::before { content: '//'; color: var(--green); margin-right: 0.25em; }
 .site-nav a:hover { color: var(--cyan); }
 .site-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; color: var(--green); text-decoration: none; letter-spacing: -0.03em; }
-.breadcrumb { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--text-muted); flex-wrap: wrap; }
-.breadcrumb a { color: var(--text-muted); text-decoration: none; }
+/* breadcrumb sits right of the page links; on overflow the current crumb truncates rather than wrapping */
+.breadcrumb { margin-left: auto; min-width: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--text-muted); }
+.breadcrumb a { color: var(--text-muted); text-decoration: none; white-space: nowrap; }
 .breadcrumb a:hover { color: var(--green); }
 .breadcrumb .sep { color: var(--border); }
-.breadcrumb .current { color: var(--cyan); }
+.breadcrumb .current { color: var(--cyan); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-right { display: flex; align-items: center; gap: 1.25rem; }
 
 /* search — progressive enhancement: the toggle only shows when JS is on */
@@ -67,7 +70,10 @@ header.site { border-bottom: 1px solid var(--border); }
 .search-hit-count { display: inline-block; color: var(--purple); font-size: 0.68rem; margin-top: 0.3rem; }
 .search-hit mark { background: rgba(57,208,216,0.22); color: var(--strong); border-radius: 2px; }
 .search-empty { color: var(--text-muted); font-size: 0.78rem; padding: 0.5rem; margin: 0; }
-@media (max-width: 600px) { .search-panel { position: fixed; left: 1rem; right: 1rem; width: auto; } }
+@media (max-width: 600px) {
+  .site-bar, .site-sub { padding-left: 1.25rem; padding-right: 1.25rem; }
+  .search-panel { position: fixed; left: 1rem; right: 1rem; width: auto; }
+}
 
 .hero-block { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
 .file-header { display: flex; align-items: stretch; border: 1px solid var(--border); border-radius: 6px; margin: 2rem 0; overflow: hidden; }
