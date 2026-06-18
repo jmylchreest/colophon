@@ -19,13 +19,14 @@ if (root) {
   list.setAttribute('role', 'listbox');
 
   let reader = null;
+  let lib = null; // the reader module, also exposing highlight()/snippet()/countMatches()
   let hits = [];
   let active = -1;
 
   async function ensureReader() {
     if (!reader) {
-      const mod = await import(base + 'search.js');
-      reader = mod.createReader({ base });
+      lib = await import(base + 'search.js');
+      reader = lib.createReader({ base });
     }
     return reader;
   }
@@ -101,6 +102,20 @@ if (root) {
     if (mine === seq) render(results, q); // ignore a stale response that resolved out of order
   }
 
+  // appendSegments renders { text, mark } segments from the reader as text + <mark>, building DOM
+  // (never innerHTML) so result content can't inject markup.
+  function appendSegments(parent, segments) {
+    for (const s of segments) {
+      if (s.mark) {
+        const mk = document.createElement('mark');
+        mk.textContent = s.text;
+        parent.append(mk);
+      } else {
+        parent.append(document.createTextNode(s.text));
+      }
+    }
+  }
+
   function render(results, q) {
     list.textContent = '';
     hits = [];
@@ -113,13 +128,26 @@ if (root) {
       a.className = 'search-hit';
       a.id = 'search-hit-' + i;
       a.setAttribute('role', 'option');
+
       const title = document.createElement('span');
       title.className = 'search-hit-title';
-      title.textContent = r.title || r.url;
+      appendSegments(title, lib.highlight(r.title || r.url, q));
+
       const ex = document.createElement('span');
       ex.className = 'search-hit-excerpt';
-      ex.textContent = r.excerpt || '';
+      appendSegments(ex, lib.snippet(r.text || r.excerpt || '', q));
+
       a.append(title, ex);
+
+      // Occurrence count, shown only when a result matches more than once.
+      const n = r.text ? lib.countMatches(r.text, q) : 0;
+      if (n > 1) {
+        const count = document.createElement('span');
+        count.className = 'search-hit-count';
+        count.textContent = n + ' matches';
+        a.append(count);
+      }
+
       a.addEventListener('mouseenter', () => setActive(i)); // hover and keyboard share the highlight
       const li = document.createElement('li');
       li.setAttribute('role', 'presentation');

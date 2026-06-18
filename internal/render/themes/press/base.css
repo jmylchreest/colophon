@@ -341,6 +341,17 @@ html.js .search-toggle {
   display: block; margin-top: 0.15rem; color: var(--muted); font-size: 0.85em;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* the snippet is one clamped line at rest; the active/hovered hit expands it into a small preview
+   card showing the full highlighted context. */
+.search-hit:hover .search-hit-excerpt, .search-hit.is-active .search-hit-excerpt {
+  white-space: normal; overflow: visible; margin-top: 0.3rem;
+}
+/* highlighted query matches — a highlighter band that reads on any row background. */
+.search-hit mark {
+  background: none; color: var(--accent); font-weight: 700;
+  text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 2px;
+}
+.search-hit-count { display: block; margin-top: 0.25rem; font-size: 0.7rem; color: var(--accent); opacity: 0.85; }
 .search-empty { margin: 0.4rem 0.2rem 0.2rem; color: var(--muted); font-size: 0.9em; }
 @media (max-width: 600px) {
   /* Full-width search on mobile. The toggle sits mid-topbar (feeds/menu are to its right), so a
