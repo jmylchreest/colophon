@@ -1,77 +1,171 @@
-// Package clog is colophon's human-facing progress log. Each line is:
+// Package clog is colophon's human-facing progress log: a thin, nil-safe adapter over
+// log/slog (via github.com/jmylchreest/slog-logfilter). Events are structured key=value
+// (logfmt text by default, JSON on request) so they never wrap into fixed-width columns,
+// and real levels drive verbosity:
 //
-//	CATEGORY  label      key=value key=value ...
+//	Step  → slog Info  (always visible at the default level)
+//	Detail→ slog Debug (visible under --verbose / debug)
 //
-// The CATEGORY and label are space-padded columns for easy scanning; the rest are
-// logfmt key=value fields (values with spaces are quoted) for easy machine parsing.
-// Step lines always show; Detail lines show only with --verbose.
+// The old CATEGORY/label columns survive as the "category" and "label" attributes, so
+// existing call sites keep their shape while output stays grep-friendly and terminal-safe.
 package clog
 
 import (
-	"fmt"
 	"io"
-	"strconv"
+	"log/slog"
+	"os"
 	"strings"
+
+	logfilter "github.com/jmylchreest/slog-logfilter"
 )
 
-// Logger writes aligned progress lines. A nil *Logger is a no-op, so callers without one
-// can pass nil freely. labelWidth is the label column width — the caller sizes it to the
-// longest label it will use (e.g. its source/publisher/env names), so columns line up.
+// Logger wraps a *slog.Logger with colophon's Step/Detail vocabulary. A nil *Logger is a
+// no-op, so callers without one (e.g. the serve path) can pass nil freely.
 type Logger struct {
-	w          io.Writer
-	verbose    bool
-	labelWidth int
+	slog    *slog.Logger
+	verbose bool
 }
 
-func New(w io.Writer, verbose bool, labelWidth int) *Logger {
-	if labelWidth < 1 {
-		labelWidth = 10
+// Options configure a Logger. New fills any zero fields with sane defaults (Info level,
+// logfmt text to stderr).
+type Options struct {
+	// Writer receives log lines. Defaults to os.Stderr so --json data on stdout stays clean.
+	Writer io.Writer
+	// Verbose drops the level to Debug (so Detail lines show).
+	Verbose bool
+	// JSON selects the JSON formatter instead of logfmt text.
+	JSON bool
+	// Filter is a RUST_LOG-style spec for per-module/attribute verbosity, applied via
+	// slog-logfilter. Empty means no filters. See ParseFilters.
+	Filter string
+}
+
+// New builds a Logger from Options. The level and filters live on slog-logfilter's global
+// handler, so the most recent New wins for any runtime SetLevel/SetFilters.
+func New(opts Options) *Logger {
+	w := opts.Writer
+	if w == nil {
+		w = os.Stderr
 	}
-	return &Logger{w: w, verbose: verbose, labelWidth: labelWidth}
+	level := slog.LevelInfo
+	if opts.Verbose {
+		level = slog.LevelDebug
+	}
+	format := "text"
+	if opts.JSON {
+		format = "json"
+	}
+	l := logfilter.New(
+		logfilter.WithLevel(level),
+		logfilter.WithFormat(format),
+		logfilter.WithOutput(w),
+		// Source file:line is noise in a build tool's progress log; attribute filters still
+		// work without it, so we favour clean, narrow output.
+		logfilter.WithSource(false),
+		logfilter.WithFilters(ParseFilters(opts.Filter)),
+	)
+	return &Logger{slog: l, verbose: opts.Verbose}
+}
+
+// Discard is a logger that drops everything — for query paths (e.g. search indexing) whose
+// progress must never reach the user or pollute --json stdout.
+func Discard() *Logger {
+	return &Logger{slog: slog.New(slog.DiscardHandler), verbose: false}
+}
+
+// Slog exposes the underlying *slog.Logger for code that wants to log directly. Nil-safe.
+func (l *Logger) Slog() *slog.Logger {
+	if l == nil {
+		return slog.New(slog.DiscardHandler)
+	}
+	return l.slog
 }
 
 func (l *Logger) Verbose() bool { return l != nil && l.verbose }
 
-// Step prints an always-visible line. kv is alternating key, value pairs.
+// Step records an always-visible event (slog Info). category and label become attributes;
+// kv is alternating key, value pairs appended after them.
 func (l *Logger) Step(category, label string, kv ...any) {
 	if l == nil {
 		return
 	}
-	_, _ = fmt.Fprintf(l.w, "%-8s %-*s %s\n", category, l.labelWidth, label, fields(kv))
+	l.slog.Info(category, attrs(category, label, kv)...)
 }
 
-// Detail prints a line only under --verbose (same format as Step).
+// Detail records a verbose-only event (slog Debug), same shape as Step.
 func (l *Logger) Detail(category, label string, kv ...any) {
-	if l == nil || !l.verbose {
+	if l == nil {
 		return
 	}
-	l.Step(category, label, kv...)
+	l.slog.Debug(category, attrs(category, label, kv)...)
 }
 
-func fields(kv []any) string {
-	var b strings.Builder
-	for i := 0; i+1 < len(kv); i += 2 {
-		if b.Len() > 0 {
-			b.WriteByte(' ')
+// attrs builds the slog argument list. category is the message and also re-emitted as an
+// attribute so JSON consumers and attribute filters can match on it uniformly.
+func attrs(category, label string, kv []any) []any {
+	out := make([]any, 0, len(kv)+4)
+	out = append(out, slog.String("category", category))
+	if label != "" {
+		out = append(out, slog.String("label", label))
+	}
+	return append(out, kv...)
+}
+
+// ParseFilters turns a RUST_LOG-style spec into slog-logfilter filters. The spec is a
+// comma-separated list of directives; first match wins. Each directive is one of:
+//
+//	level                  bare level → all events (attribute category=*) at that level
+//	attr=level             elevate/suppress events carrying that attribute, e.g. category=debug
+//	source:file:glob=level a source filter, e.g. source:file:internal/publish/*=debug
+//
+// The level is one of debug, info, warn, error. Malformed directives are skipped.
+func ParseFilters(spec string) []logfilter.LogFilter {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return nil
+	}
+	var filters []logfilter.LogFilter
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
 		}
-		fmt.Fprintf(&b, "%v=%s", kv[i], logfmtValue(kv[i+1]))
+		f, ok := parseFilter(part)
+		if ok {
+			filters = append(filters, f)
+		}
 	}
-	return b.String()
+	return filters
 }
 
-func logfmtValue(v any) string {
-	s := fmt.Sprint(v)
-	if s == "" {
-		return `""`
+func parseFilter(part string) (logfilter.LogFilter, bool) {
+	// A bare token is a level applied to the universal "category" attribute.
+	target, level := "category", part
+	if i := strings.LastIndex(part, "="); i >= 0 {
+		target, level = strings.TrimSpace(part[:i]), strings.TrimSpace(part[i+1:])
 	}
-	if strings.ContainsAny(s, " \t\"=") {
-		return strconv.Quote(s)
+	level = strings.ToLower(level)
+	switch level {
+	case "debug", "info", "warn", "error":
+	default:
+		return logfilter.LogFilter{}, false
 	}
-	return s
+	pattern := "*"
+	// source:file:<glob> / source:function:<glob> carry the glob inline; split it off.
+	if strings.HasPrefix(target, "source:") {
+		if k := strings.LastIndex(target, ":"); k > len("source") {
+			pattern = target[k+1:]
+			target = target[:k]
+		}
+	}
+	if target == "" {
+		return logfilter.LogFilter{}, false
+	}
+	return logfilter.LogFilter{Type: target, Pattern: pattern, Level: level, Enabled: true}, true
 }
 
-// Aware is an optional capability for drivers (publishers, sources) that want to emit
-// their own progress: the CLI calls SetLogger after constructing them.
+// Aware is an optional capability for drivers (publishers, sources) that want to emit their
+// own progress: the CLI calls SetLogger after constructing them.
 type Aware interface {
 	SetLogger(*Logger)
 }
