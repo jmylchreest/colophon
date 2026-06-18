@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/jmylchreest/colophon/internal/config"
 	"github.com/jmylchreest/colophon/internal/core"
@@ -71,7 +72,11 @@ func (p *Publisher) Deployed(ctx context.Context) (core.State, bool, error) {
 }
 
 func (p *Publisher) Hash(name string, b []byte) string { return publish.MD5Hex(b) }
-func (p *Publisher) Protected(name string) bool        { return false }
+
+// Protected exempts the content-addressed search index (_search/) from orphan-deletion, so
+// several environments publishing to one directory don't prune each other's shards (the shards
+// are immutable and deduped; only each env's own manifest differs).
+func (p *Publisher) Protected(name string) bool { return strings.HasPrefix(name, "_search/") }
 
 // Put writes a file under dest, creating parent directories.
 func (p *Publisher) Put(ctx context.Context, name string, b []byte) error {

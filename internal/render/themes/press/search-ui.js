@@ -26,7 +26,7 @@ if (root) {
   async function ensureReader() {
     if (!reader) {
       lib = await import(base + 'search.js');
-      reader = lib.createReader({ base });
+      reader = lib.createReader({ base, manifest: root.dataset.searchManifest || undefined });
     }
     return reader;
   }

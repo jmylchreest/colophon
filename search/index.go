@@ -33,10 +33,14 @@ func DefaultParams() Params { return Params{K1: 1.2, B: 0.75} }
 type Analyzer func(string) []string
 
 // BuildOptions configure index construction. The zero value is valid (simple analyzer, default
-// BM25).
+// BM25, "manifest.json").
 type BuildOptions struct {
 	Analyzer Analyzer
 	BM25     Params
+	// ManifestName is the emitted manifest filename. Defaults to "manifest.json". A caller that
+	// publishes several builds (environments) to one bucket gives each a distinct name so their
+	// mutable roots don't collide — shards/fragments are content-addressed and safely shared.
+	ManifestName string
 }
 
 func (o BuildOptions) withDefaults() BuildOptions {
@@ -45,6 +49,9 @@ func (o BuildOptions) withDefaults() BuildOptions {
 	}
 	if o.BM25 == (Params{}) {
 		o.BM25 = DefaultParams()
+	}
+	if o.ManifestName == "" {
+		o.ManifestName = "manifest.json"
 	}
 	return o
 }
@@ -68,12 +75,13 @@ type docMeta struct {
 // CLI query surface and the static-index emitter. Title and Body are indexed as one field in v1
 // (field weighting is future work).
 type Index struct {
-	params   Params
-	analyzer Analyzer
-	docs     []docMeta // interned int id → metadata
-	docLen   []int     // interned int id → token count
-	avgdl    float64
-	post     map[string][]posting // term → postings, sorted by doc
+	params       Params
+	analyzer     Analyzer
+	manifestName string
+	docs         []docMeta // interned int id → metadata
+	docLen       []int     // interned int id → token count
+	avgdl        float64
+	post         map[string][]posting // term → postings, sorted by doc
 }
 
 // NewIndex builds an in-memory index from docs. Integer doc ids are interned by sorted stable
@@ -84,7 +92,7 @@ func NewIndex(docs []Doc, opts BuildOptions) (*Index, error) {
 	sorted := append([]Doc(nil), docs...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
 
-	ix := &Index{params: opts.BM25, analyzer: opts.Analyzer, post: map[string][]posting{}}
+	ix := &Index{params: opts.BM25, analyzer: opts.Analyzer, manifestName: opts.ManifestName, post: map[string][]posting{}}
 	var totalLen int
 	for n, d := range sorted {
 		if d.ID == "" {

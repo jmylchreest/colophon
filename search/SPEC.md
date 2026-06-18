@@ -60,9 +60,14 @@ An index occupies a base directory (in colophon, `_search/`). All paths in the m
   fragment/<name>.json          # §6.? — one per document, plain JSON
 ```
 
-The directory names `index/` and `fragment/` and the file `manifest.json` are fixed. The
-`<name>` portion is opaque: a reader **MUST** use the exact `file`/`frag` strings from the
-manifest and **MUST NOT** derive paths itself.
+The directory names `index/` and `fragment/` are fixed. The manifest is conventionally
+`manifest.json`, but a reader is **told** its manifest filename (so it can default to
+`manifest.json`): a builder **MAY** emit several differently-named manifests into one index that
+**share** the same `index/` and `fragment/` files. This lets independent builds (e.g. site
+environments) coexist in one bucket — each is its own mutable root over the common, immutable,
+content-addressed shards/fragments, so they neither collide nor need to prune one another. The
+`<name>` portion of shard/fragment paths is opaque: a reader **MUST** use the exact `file`/`frag`
+strings from the manifest and **MUST NOT** derive paths itself.
 
 A reader fetches a path by resolving it against the manifest's location (e.g.
 `<base>/` + `file`). Manifest and fragments are plain JSON. **Shards are gzip-compressed at

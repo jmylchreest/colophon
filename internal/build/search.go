@@ -37,12 +37,12 @@ func searchEnabled(site core.Site) bool {
 // writeSearchIndex emits the static search index and the browser reader under _search/ when the
 // site enables search. Index files are content-addressed, so the incremental publisher only
 // uploads what changed; the reader is a fixed filename.
-func writeSearchIndex(write func(string, []byte) error, pages []page, site core.Site, basePath string, log *clog.Logger) error {
+func writeSearchIndex(write func(string, []byte) error, pages []page, site core.Site, basePath, env string, log *clog.Logger) error {
 	if !searchEnabled(site) {
 		return nil
 	}
 	docs := pagesToSearchDocs(pages, basePath)
-	man, err := search.Build(docs, searchWriter{write: write}, search.BuildOptions{})
+	man, err := search.Build(docs, searchWriter{write: write}, search.BuildOptions{ManifestName: searchManifestName(env)})
 	if err != nil {
 		return err
 	}
@@ -51,6 +51,27 @@ func writeSearchIndex(write func(string, []byte) error, pages []page, site core.
 	}
 	log.Step("BUILD", "", "search", len(docs), "shards", len(man.Shards))
 	return nil
+}
+
+// searchManifestName is the per-environment manifest filename. Builds for different environments
+// can publish to one object store; only the manifest (the mutable root) is environment-specific,
+// so their roots don't collide — the content-addressed shards/fragments are safely shared. The
+// default environment keeps the bare "manifest.json".
+func searchManifestName(env string) string {
+	env = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
+			return r
+		case r >= 'A' && r <= 'Z':
+			return r + ('a' - 'A')
+		default:
+			return '-'
+		}
+	}, env)
+	if env == "" {
+		return "manifest.json"
+	}
+	return "manifest-" + env + ".json"
 }
 
 // searchBaseURL is where the browser reader loads the index from. When _search/ is routed to an

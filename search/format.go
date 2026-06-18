@@ -167,7 +167,11 @@ func (ix *Index) Emit(dst Writer) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := dst.Put("manifest.json", b); err != nil {
+	name := ix.manifestName
+	if name == "" {
+		name = "manifest.json"
+	}
+	if err := dst.Put(name, b); err != nil {
 		return nil, err
 	}
 	return man, nil

@@ -156,7 +156,11 @@ func (p *Publisher) Hash(name string, b []byte) string { return publish.MD5Hex(b
 
 // Protected keeps the provenance manifest from being deleted as an orphan (the build tree
 // never contains it).
-func (p *Publisher) Protected(name string) bool { return strings.HasPrefix(name, ".well-known/") }
+// Protected keeps the provenance manifest and the content-addressed search index (_search/) from
+// orphan-deletion, so several environments can share one bucket without pruning each other (see r2).
+func (p *Publisher) Protected(name string) bool {
+	return strings.HasPrefix(name, ".well-known/") || strings.HasPrefix(name, "_search/")
+}
 
 func (p *Publisher) Commit(ctx context.Context, tree fs.FS, plan *core.Plan) (core.Result, error) {
 	if err := p.ensureCreds(); err != nil {

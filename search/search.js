@@ -96,6 +96,7 @@ export function countMatches(text, query) {
 // shard/fragment it loads.
 export function createReader(opts) {
   const base = opts.base.endsWith('/') ? opts.base : opts.base + '/';
+  const manifestName = opts.manifest || 'manifest.json'; // per-environment root, shards are shared
   const doFetch = opts.fetch || ((url) => fetch(url));
   const shardCache = new Map();
   const fragCache = new Map();
@@ -103,7 +104,7 @@ export function createReader(opts) {
 
   async function loadManifest() {
     if (!manifest) {
-      const res = await doFetch(base + 'manifest.json');
+      const res = await doFetch(base + manifestName);
       manifest = await res.json();
     }
     return manifest;

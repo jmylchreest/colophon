@@ -123,10 +123,13 @@ func (p *Publisher) Deployed(ctx context.Context) (core.State, bool, error) {
 // ETag for non-multipart PUTs, so unchanged objects skip re-upload (see publish.MD5Hex).
 func (p *Publisher) Hash(name string, b []byte) string { return publish.MD5Hex(b) }
 
-// Protected keeps the provenance manifest (.well-known/colophon.json, written by
-// WriteManifest) from being deleted as an orphan, since the build tree never contains it.
+// Protected keeps a file from being deleted as an orphan. It covers the provenance manifest
+// (.well-known/colophon.json, never in the build tree) and the content-addressed search index
+// under _search/ — the latter so several environments can share one bucket without each
+// orphan-deleting the others' shards (the shards are immutable and deduped; only each env's own
+// manifest file differs).
 func (p *Publisher) Protected(name string) bool {
-	return strings.HasPrefix(name, ".well-known/")
+	return strings.HasPrefix(name, ".well-known/") || strings.HasPrefix(name, "_search/")
 }
 
 func (p *Publisher) Commit(ctx context.Context, tree fs.FS, plan *core.Plan) (core.Result, error) {
