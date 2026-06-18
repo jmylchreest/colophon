@@ -222,8 +222,17 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 .auth-chev:hover:not(:disabled) { color: var(--accent); }
 .auth-chev:disabled { opacity: 0.3; cursor: default; }
 @media (max-width: 720px) { .auth-track { max-width: 38vw; } }
-.home-authors { display: flex; justify-content: flex-end; padding-bottom: 1.5rem; }
-.home-authors .auth-track { max-width: 100%; }
+/* on the home page the authors sit in a card spanning the story column (.wrap gives the width). */
+.home-authors { padding-bottom: 1.5rem; }
+.author-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.6rem 0.9rem; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px;
+}
+.author-card-label { color: var(--muted); font-size: 0.72rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+.author-card .authors { min-width: 0; }
+.author-card .auth-track { max-width: 100%; }
 
 /* ---------- nav menu: animated hamburger + popout dropdown ---------- */
 .menu { position: relative; display: flex; }

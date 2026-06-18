@@ -61,7 +61,9 @@
 
 {% if authors %}
 <nav class="home-authors wrap" aria-label="Authors">
-  <div class="authors">
+  <div class="author-card">
+    <span class="author-card-label">Authors</span>
+    <div class="authors">
     <button class="auth-chev prev" type="button" aria-label="Scroll authors left" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
     <div class="auth-track">
       {% for a in authors %}
@@ -71,6 +73,7 @@
       {% endfor %}
     </div>
     <button class="auth-chev next" type="button" aria-label="Scroll authors right" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg></button>
+    </div>
   </div>
 </nav>
 {% endif %}
