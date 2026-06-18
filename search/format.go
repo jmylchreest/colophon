@@ -41,8 +41,9 @@ type Manifest struct {
 	BM25     Params              `json:"bm25"`
 	DocCount int                 `json:"docCount"`
 	AvgDL    float64             `json:"avgdl"`
-	Docs     map[string]DocEntry `json:"docs"`   // stable doc ID → length + fragment file
-	Shards   []ShardEntry        `json:"shards"` // sorted by Lo
+	Docs     map[string]DocEntry `json:"docs"`               // stable doc ID → length + fragment file
+	Shards   []ShardEntry        `json:"shards"`             // sorted by Lo
+	Trigrams []ShardEntry        `json:"trigrams,omitempty"` // present iff fuzzy: trigram → terms shards
 }
 
 // DocEntry is a doc's BM25 length and its content-addressed fragment file.
@@ -163,6 +164,40 @@ func (ix *Index) Emit(dst Writer) (*Manifest, error) {
 	}
 	sort.Slice(man.Shards, func(i, j int) bool { return man.Shards[i].Lo < man.Shards[j].Lo })
 
+	// Trigram index (only when fuzzy): trigram → terms, content-addressed and bucketed by the
+	// trigram's first character, mirroring the postings shards.
+	if ix.fuzzy {
+		tbuckets := map[string]trigramData{}
+		for term := range ix.post {
+			for _, g := range trigrams(term) {
+				key := firstChar(g)
+				if tbuckets[key] == nil {
+					tbuckets[key] = trigramData{}
+				}
+				tbuckets[key][g] = append(tbuckets[key][g], term)
+			}
+		}
+		for key, data := range tbuckets {
+			for g := range data {
+				sort.Strings(data[g])
+			}
+			b, err := canonicalJSON(data)
+			if err != nil {
+				return nil, err
+			}
+			gz, err := gzipBytes(b)
+			if err != nil {
+				return nil, err
+			}
+			name := "trigram/" + contentHash(b) + ".json.gz"
+			if err := dst.Put(name, gz); err != nil {
+				return nil, err
+			}
+			man.Trigrams = append(man.Trigrams, ShardEntry{Lo: key, Hi: key, File: name})
+		}
+		sort.Slice(man.Trigrams, func(i, j int) bool { return man.Trigrams[i].Lo < man.Trigrams[j].Lo })
+	}
+
 	b, err := canonicalJSON(man)
 	if err != nil {
 		return nil, err
@@ -178,6 +213,9 @@ func (ix *Index) Emit(dst Writer) (*Manifest, error) {
 }
 
 type shardData map[string][]wirePosting
+
+// trigramData is a trigram shard: trigram → the terms that contain it (sorted).
+type trigramData map[string][]string
 
 // Open reconstructs a queryable Index from an emitted index rooted at fsys (so "manifest.json" is
 // at the root). It reads everything eagerly — the server-side/CLI query path; the browser reader
@@ -199,7 +237,7 @@ func Open(fsys fs.FS) (*Index, error) {
 		return nil, fmt.Errorf("search: index built with analyzer %q, this build only has %q", man.Analyzer, SimpleAnalyzerID)
 	}
 
-	ix := &Index{params: man.BM25, analyzer: Analyze, avgdl: man.AvgDL, post: map[string][]posting{}}
+	ix := &Index{params: man.BM25, analyzer: Analyze, avgdl: man.AvgDL, fuzzy: len(man.Trigrams) > 0, post: map[string][]posting{}}
 
 	// Intern doc IDs by sorted order so internal ints match the builder's convention.
 	ids := make([]string, 0, len(man.Docs))

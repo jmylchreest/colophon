@@ -268,23 +268,43 @@ code unit or byte.
 
 ---
 
-## 10. Reserved for future versions
+## 10. The `fuzzy` index type (optional)
 
-The following are designed extension points (see the design doc). They add new manifest sections
-and new files and **MUST NOT** alter `v: 1` semantics:
+An index **MAY** include a **trigram index** for typo-tolerant matching. It's present iff the
+manifest has a non-empty **`trigrams`** array (same `{lo,hi,file}` shard descriptors as `shards`,
+bucketed by the trigram's first character). Each trigram shard is a gzipped JSON object mapping a
+**trigram → the sorted terms that contain it**:
 
-- **`fuzzy`** — a character-trigram index (`trigram → terms`) enabling typo-tolerant matching via
-  trigram candidate generation + bounded Levenshtein distance.
-- **`semantic`** — per-document/chunk embedding vectors for hybrid recall, with an
-  *embedder-parity* contract analogous to the analyzer contract (the build-side and query-side
-  embedder must be the same model).
+```json
+{ "$ti": ["tigris"], "tig": ["tigris"], "igr": ["tigris"] }
+```
 
-A reader that does not implement an optional type ignores its manifest section and behaves as a
-lexical-only reader.
+**Trigrams of a term** (the shared contract — a builder inverts term→trigrams; the query side
+intersects a token's trigrams against the index): pad the term with a `$` sentinel (outside the
+analyzer's letter/number alphabet), then take every distinct length-3 window of **code points** of
+`$term$`. `go` → `["$go","go$"]`; `tigris` → `["$ti","tig","igr","gri","ris","is$"]`.
+
+**Edit distance** is rune-wise Levenshtein (insert/delete/substitute), and the **budget** is
+`maxEditDist(token) = 1 if len ≤ 4 else 2`. Both **MUST** match the reference (and the JS reader),
+guarded by test vectors like the analyzer.
+
+**Query (extends §7).** Fuzzy is a **fallback per token**, so clean queries stay exact: for a query
+token with *no* exact/prefix match (and only then), gather candidate terms = the union of
+`trigrams[g]` over the token's trigrams `g`, keep those with `levenshtein(token, term) ≤
+maxEditDist(token)`, and add them to the matched-term set — scored by their lexical postings
+exactly like any other matched term (§7.4). Because Go (in-memory) and the JS reader (trigram
+shards) derive the *same* candidate set and apply the *same* distance budget, fuzzy rankings match.
+
+## 11. The `semantic` index type (future)
+
+Reserved: per-document/chunk embedding vectors for hybrid recall, with an *embedder-parity*
+contract analogous to the analyzer contract (build-side and query-side embedder must be the same
+model). Not yet defined. A reader that doesn't implement an optional type ignores its manifest
+section and behaves as lexical-only.
 
 ---
 
-## 11. Conformance test vectors
+## 12. Conformance test vectors
 
 Two committed fixtures let any implementation self-check:
 

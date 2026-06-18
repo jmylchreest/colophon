@@ -91,6 +91,49 @@ export function countMatches(text, query) {
   return n;
 }
 
+// --- fuzzy helpers: mirror Go's trigram.go exactly (SPEC §10), shared by query + tests ---
+
+const TRIGRAM_PAD = '$';
+
+// trigrams returns a term's de-duplicated, sorted character trigrams over the padded term ($t$),
+// by code point. Mirrors Go trigrams().
+export function trigrams(term) {
+  const r = [TRIGRAM_PAD, ...term, TRIGRAM_PAD];
+  const seen = new Set();
+  const out = [];
+  for (let i = 0; i + 3 <= r.length; i++) {
+    const g = r.slice(i, i + 3).join('');
+    if (!seen.has(g)) {
+      seen.add(g);
+      out.push(g);
+    }
+  }
+  out.sort();
+  return out;
+}
+
+// levenshtein is the rune-wise edit distance. Mirrors Go levenshtein().
+export function levenshtein(a, b) {
+  const ra = [...a];
+  const rb = [...b];
+  let prev = Array.from({ length: rb.length + 1 }, (_, j) => j);
+  let cur = new Array(rb.length + 1);
+  for (let i = 1; i <= ra.length; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= rb.length; j++) {
+      const cost = ra[i - 1] === rb[j - 1] ? 0 : 1;
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+    }
+    [prev, cur] = [cur, prev];
+  }
+  return prev[rb.length];
+}
+
+// maxEditDist scales the fuzzy budget to token length. Mirrors Go maxEditDist().
+export function maxEditDist(term) {
+  return [...term].length <= 4 ? 1 : 2;
+}
+
 // createReader returns a search reader over an index whose manifest.json lives at opts.base.
 // opts.fetch overrides the global fetch (used in tests). The reader caches the manifest and every
 // shard/fragment it loads.
@@ -116,6 +159,30 @@ export function createReader(opts) {
       if (fc >= s.lo && fc <= s.hi) return s;
     }
     return null;
+  }
+
+  function trigramShardFor(m, gram) {
+    const fc = [...gram][0];
+    for (const s of m.trigrams || []) {
+      if (fc >= s.lo && fc <= s.hi) return s;
+    }
+    return null;
+  }
+
+  // fuzzyCandidates returns index terms within the edit-distance budget of a query token, gathered
+  // from the trigram shards — the same set the Go engine derives in-memory, so results match.
+  async function fuzzyCandidates(m, qt) {
+    const cand = new Set();
+    for (const g of trigrams(qt)) {
+      const sh = trigramShardFor(m, g);
+      if (!sh) continue;
+      const data = await loadShard(sh.file); // same gzip-json as postings shards
+      for (const t of data[g] || []) cand.add(t);
+    }
+    const budget = maxEditDist(qt);
+    const out = [];
+    for (const t of cand) if (levenshtein(qt, t) <= budget) out.push(t);
+    return out;
   }
 
   async function loadShard(file) {
@@ -153,10 +220,24 @@ export function createReader(opts) {
     const matched = new Map(); // index term → postings
     for (const term of terms) {
       const s = shardForTerm(m, term);
-      if (!s) continue;
-      const shard = await loadShard(s.file);
-      for (const indexTerm in shard) {
-        if (indexTerm.startsWith(term)) matched.set(indexTerm, shard[indexTerm]);
+      let hit = false;
+      if (s) {
+        const shard = await loadShard(s.file);
+        for (const indexTerm in shard) {
+          if (indexTerm.startsWith(term)) {
+            matched.set(indexTerm, shard[indexTerm]);
+            hit = true;
+          }
+        }
+      }
+      // Fuzzy fallback: only when the token had no exact/prefix match and the index has trigrams.
+      if (!hit && m.trigrams && m.trigrams.length) {
+        for (const cand of await fuzzyCandidates(m, term)) {
+          const cs = shardForTerm(m, cand);
+          if (!cs) continue;
+          const cshard = await loadShard(cs.file);
+          if (cshard[cand]) matched.set(cand, cshard[cand]);
+        }
       }
     }
 

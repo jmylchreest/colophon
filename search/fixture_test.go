@@ -19,13 +19,15 @@ var fixtureQueries = []string{
 	"go", "programming language", "go search", "bread recipe", "object storage", "nomatchxyz",
 	// prefix matching: "program" → "programming", "obj" → "object", "stor" → "storage".
 	"program", "obj", "stor",
+	// fuzzy fallback (the fixture is built with Fuzzy): "tigirs" → "tigris", "objet" → "object".
+	"tigirs", "objet",
 }
 
 // TestGenerateJSFixture (re)generates the deterministic fixture and expected results that the JS
 // parity test (search.test.mjs) consumes, so the browser reader is checked against the Go engine
 // on real emitted bytes. Output is deterministic, so the committed fixture stays stable across runs.
 func TestGenerateJSFixture(t *testing.T) {
-	ix, err := NewIndex(fixtureDocs(), BuildOptions{})
+	ix, err := NewIndex(fixtureDocs(), BuildOptions{Fuzzy: true})
 	if err != nil {
 		t.Fatal(err)
 	}

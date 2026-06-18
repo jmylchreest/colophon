@@ -41,6 +41,9 @@ type BuildOptions struct {
 	// publishes several builds (environments) to one bucket gives each a distinct name so their
 	// mutable roots don't collide — shards/fragments are content-addressed and safely shared.
 	ManifestName string
+	// Fuzzy enables typo-tolerant matching: the build emits a trigram index, and Search falls
+	// back to trigram + bounded-Levenshtein candidates when a token has no exact/prefix match.
+	Fuzzy bool
 }
 
 func (o BuildOptions) withDefaults() BuildOptions {
@@ -78,10 +81,12 @@ type Index struct {
 	params       Params
 	analyzer     Analyzer
 	manifestName string
+	fuzzy        bool
 	docs         []docMeta // interned int id → metadata
 	docLen       []int     // interned int id → token count
 	avgdl        float64
 	post         map[string][]posting // term → postings, sorted by doc
+	trigramIndex map[string][]string  // trigram → terms, built lazily for fuzzy lookup
 }
 
 // NewIndex builds an in-memory index from docs. Integer doc ids are interned by sorted stable
@@ -92,7 +97,7 @@ func NewIndex(docs []Doc, opts BuildOptions) (*Index, error) {
 	sorted := append([]Doc(nil), docs...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].ID < sorted[j].ID })
 
-	ix := &Index{params: opts.BM25, analyzer: opts.Analyzer, manifestName: opts.ManifestName, post: map[string][]posting{}}
+	ix := &Index{params: opts.BM25, analyzer: opts.Analyzer, manifestName: opts.ManifestName, fuzzy: opts.Fuzzy, post: map[string][]posting{}}
 	var totalLen int
 	for n, d := range sorted {
 		if d.ID == "" {
@@ -130,6 +135,35 @@ func NewIndex(docs []Doc, opts BuildOptions) (*Index, error) {
 // Len reports the number of indexed documents.
 func (ix *Index) Len() int { return len(ix.docs) }
 
+// fuzzyCandidates returns the index terms within the edit-distance budget of qt, gathered from
+// the trigram index — the same candidate set the JS reader derives from the emitted trigram
+// shards, so fuzzy results match across Go and JS.
+func (ix *Index) fuzzyCandidates(qt string) []string {
+	if ix.trigramIndex == nil {
+		ti := map[string][]string{}
+		for term := range ix.post {
+			for _, g := range trigrams(term) {
+				ti[g] = append(ti[g], term)
+			}
+		}
+		ix.trigramIndex = ti
+	}
+	cand := map[string]struct{}{}
+	for _, g := range trigrams(qt) {
+		for _, term := range ix.trigramIndex[g] {
+			cand[term] = struct{}{}
+		}
+	}
+	budget := maxEditDist(qt)
+	var out []string
+	for term := range cand {
+		if levenshtein(qt, term) <= budget {
+			out = append(out, term)
+		}
+	}
+	return out
+}
+
 // Result is one ranked hit. Text is the capped plain body (for query-aware snippets/highlighting);
 // Excerpt is a fixed leading snippet for cheap display.
 type Result struct {
@@ -153,8 +187,16 @@ func (ix *Index) Search(query string, limit int) []Result {
 
 	matched := map[string]struct{}{}
 	for _, qt := range ix.analyzer(query) {
+		hit := false
 		for term := range ix.post {
 			if strings.HasPrefix(term, qt) {
+				matched[term] = struct{}{}
+				hit = true
+			}
+		}
+		// Fuzzy fallback: only when a token has no exact/prefix match, so clean queries stay clean.
+		if !hit && ix.fuzzy {
+			for _, term := range ix.fuzzyCandidates(qt) {
 				matched[term] = struct{}{}
 			}
 		}

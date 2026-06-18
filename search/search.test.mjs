@@ -5,9 +5,18 @@ import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { analyze, createReader, highlight, snippet, countMatches } from './search.js';
+import { analyze, createReader, highlight, snippet, countMatches, trigrams, levenshtein, maxEditDist } from './search.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
+
+test('trigrams + levenshtein mirror Go', () => {
+  assert.deepEqual(trigrams('go'), ['$go', 'go$']);
+  assert.deepEqual(trigrams('aaa'), ['$aa', 'aa$', 'aaa']);
+  assert.equal(levenshtein('tigirs', 'tigris'), 2);
+  assert.equal(levenshtein('wikilnk', 'wikilink'), 1);
+  assert.equal(maxEditDist('cat'), 1);
+  assert.equal(maxEditDist('storage'), 2);
+});
 
 test('highlight marks prefix matches, losslessly', () => {
   const seg = highlight('Go and wikilinks', 'wiki');
