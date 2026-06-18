@@ -2,6 +2,7 @@ package build
 
 import (
 	"math"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -59,17 +60,64 @@ func pageCategory(p page) string {
 
 // authorVars builds the byline/h-card template fields from a persona (nil → empty).
 func authorVars(a core.Author) map[string]any {
-	url := ""
+	firstURL := ""
 	if len(a.URLs) > 0 {
-		url = a.URLs[0]
+		firstURL = a.URLs[0]
 	}
 	return map[string]any{
 		"author_name":         a.Name,
 		"author_initials":     initials(a.Name),
 		"author_bio":          a.Bio,
-		"author_url":          url,
+		"author_url":          firstURL,
 		"author_avatar":       a.Avatar,
 		"author_avatar_style": imageStyle(a.AvatarFit, a.AvatarPosition),
+		"author_links":        authorLinks(a),
+	}
+}
+
+// authorLinks turns an author's urls + email into renderable {url, label} pairs for the byline /
+// author card: each url is labelled by its platform (GitHub, Bluesky, …) or bare host, and the
+// email becomes a mailto. Order follows urls, with email last.
+func authorLinks(a core.Author) []map[string]any {
+	out := make([]map[string]any, 0, len(a.URLs)+1)
+	for _, u := range a.URLs {
+		if u = strings.TrimSpace(u); u != "" {
+			out = append(out, map[string]any{"url": u, "label": linkLabel(u)})
+		}
+	}
+	if e := strings.TrimSpace(a.Email); e != "" {
+		out = append(out, map[string]any{"url": "mailto:" + e, "label": "Email"})
+	}
+	return out
+}
+
+// linkLabel names a URL by its platform, falling back to the bare host (or the raw string if it
+// won't parse). Kept deliberately small — unknown hosts read fine as a domain.
+func linkLabel(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return raw
+	}
+	host := strings.ToLower(strings.TrimPrefix(u.Host, "www."))
+	switch host {
+	case "github.com":
+		return "GitHub"
+	case "gitlab.com":
+		return "GitLab"
+	case "x.com", "twitter.com":
+		return "X"
+	case "bsky.app":
+		return "Bluesky"
+	case "linkedin.com":
+		return "LinkedIn"
+	case "youtube.com", "youtu.be":
+		return "YouTube"
+	case "instagram.com":
+		return "Instagram"
+	case "mastodon.social", "hachyderm.io", "fosstodon.org":
+		return "Mastodon"
+	default:
+		return host
 	}
 }
 

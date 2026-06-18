@@ -104,6 +104,7 @@
         <div>
           <div class="nm">{{ author_name }}</div>
           {% if author_bio %}<div class="bio">{{ author_bio }}</div>{% endif %}
+          {% if author_links %}<div class="note-links">{% for l in author_links %}<a href="{{ l.url }}" rel="me">{{ l.label }}</a>{% endfor %}</div>{% endif %}
         </div>
       </div>
       {% endif %}
