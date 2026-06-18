@@ -150,22 +150,34 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 	go s.watch(ctx)
 
 	fmt.Printf("colophon serve → http://localhost%s/\n", port(addr))
+	// One aligned key=value line per site/env, so a person or an agent can copy any URL directly.
+	site := s.site
+	siteW, envW := len(site), 0
 	for _, t := range targets {
-		drafts := ""
-		if t.drafts {
-			drafts = "  (drafts)"
+		if len(t.name) > envW {
+			envW = len(t.name)
 		}
-		fmt.Printf("  http://localhost%s%s%s\n", port(addr), t.prefix, drafts)
 	}
-	if len(targets) > 0 {
-		s.printWellKnown(addr, targets[0])
-		if openTarget != "" {
-			if u, ok := s.resolveURL(addr, targets[0], openTarget); ok {
-				fmt.Printf("opening %s\n", u)
-				go openBrowserAfter(ctx, 300*time.Millisecond, u)
-			} else {
-				fmt.Printf("  (unknown --open target %q)\n", openTarget)
-			}
+	slug, hasLatest := s.latestSlug()
+	for _, t := range targets {
+		base := "http://localhost" + port(addr) + t.prefix
+		var kv strings.Builder
+		fmt.Fprintf(&kv, "url=%s", base)
+		if hasLatest {
+			fmt.Fprintf(&kv, " latest=%s%s/", base, slug)
+		}
+		fmt.Fprintf(&kv, " sitemap=%ssitemap.xml atom=%satom.xml rss=%srss.xml json=%sfeed.json", base, base, base, base)
+		if t.drafts {
+			kv.WriteString(" draft=true")
+		}
+		fmt.Printf("  %-*s  %-*s  %s\n", siteW, site, envW, t.name, kv.String())
+	}
+	if len(targets) > 0 && openTarget != "" {
+		if u, ok := s.resolveURL(addr, targets[0], openTarget); ok {
+			fmt.Printf("opening %s\n", u)
+			go openBrowserAfter(ctx, 300*time.Millisecond, u)
+		} else {
+			fmt.Printf("  (unknown --open target %q)\n", openTarget)
 		}
 	}
 
@@ -189,18 +201,6 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 		defer cancel()
 		return srv.Shutdown(shutCtx)
 	}
-}
-
-// printWellKnown lists the home/latest/sitemap/feed URLs for a target, so a person or an
-// agent (which can't open a browser) can copy them straight from serve's output.
-func (s *Server) printWellKnown(addr string, t target) {
-	base := "http://localhost" + port(addr) + t.prefix
-	fmt.Printf("  home     %s\n", base)
-	if slug, ok := s.latestSlug(); ok {
-		fmt.Printf("  latest   %s%s/\n", base, slug)
-	}
-	fmt.Printf("  sitemap  %ssitemap.xml\n", base)
-	fmt.Printf("  feeds    atom %satom.xml · rss %srss.xml · json %sfeed.json\n", base, base, base)
 }
 
 // resolveURL maps an --open target name to a full URL under the given environment.
