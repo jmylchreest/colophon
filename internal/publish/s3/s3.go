@@ -154,8 +154,6 @@ func (p *Publisher) Deployed(ctx context.Context) (core.State, bool, error) {
 // non-multipart PUTs, so unchanged objects skip re-upload (see publish.MD5Hex).
 func (p *Publisher) Hash(name string, b []byte) string { return publish.MD5Hex(b) }
 
-// Protected keeps the provenance manifest from being deleted as an orphan (the build tree
-// never contains it).
 // Protected keeps the provenance manifest and the content-addressed search index (_search/) from
 // orphan-deletion, so several environments can share one bucket without pruning each other (see r2).
 func (p *Publisher) Protected(name string) bool {
