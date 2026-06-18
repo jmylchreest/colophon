@@ -49,7 +49,10 @@ type PersonaContextCmd struct {
 	Persona string   `arg:"" optional:"" help:"Persona id (defaults to the only persona, or 'default')"`
 	Topic   string   `help:"Topic/outline to retrieve exemplars for (ranked by relevance)"`
 	Tag     []string `help:"Only draw exemplars tagged with this tag; repeatable"`
-	TopK    int      `name:"top-k" default:"3" help:"Number of exemplars to emit"`
+	TopK    int      `name:"top-k" default:"3" help:"Max number of exemplars to emit"`
+	Length  int      `help:"Per-exemplar character cap (0 = the default); ignored with --full"`
+	Full    bool     `help:"Emit each exemplar's full body (still bounded by --budget)"`
+	Budget  int      `default:"10000" help:"Total character budget across all exemplars"`
 	JSON    bool     `help:"Output JSON"`
 }
 
@@ -67,7 +70,14 @@ func (c *PersonaContextCmd) Run() error {
 			id = "default"
 		}
 	}
-	ctx, err := persona.BuildContext(cfg, id, c.Topic, c.TopK, c.Tag...)
+	ctx, err := persona.BuildContext(cfg, id, persona.ContextOptions{
+		Topic:  c.Topic,
+		Tags:   c.Tag,
+		TopK:   c.TopK,
+		Length: c.Length,
+		Full:   c.Full,
+		Budget: c.Budget,
+	})
 	if err != nil {
 		return err
 	}

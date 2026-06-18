@@ -38,16 +38,46 @@ type Context struct {
 	Exemplars  []Exemplar   `json:"exemplars"`
 }
 
-// BuildContext returns the write-as context for persona id: its style guide and references,
-// plus the top-k exemplars from its own content ranked by BM25 against topic (or the most
-// recent posts when topic is empty). topK <= 0 defaults to 3.
-func BuildContext(cfg *config.Config, id, topic string, topK int, tags ...string) (*Context, error) {
+// Defaults for ContextOptions when a field is left zero.
+const (
+	defaultTopK    = 3
+	defaultExcerpt = 1200  // per-exemplar character cap
+	defaultBudget  = 10000 // total characters across all exemplars
+)
+
+// ContextOptions tunes how much voice BuildContext pulls in. Zero fields take the defaults.
+type ContextOptions struct {
+	Topic  string   // rank exemplars against this; empty → most-recent
+	Tags   []string // only draw exemplars carrying one of these tags
+	TopK   int      // max number of exemplars (≤0 → defaultTopK)
+	Length int      // per-exemplar character cap (≤0 → defaultExcerpt; ignored when Full)
+	Full   bool     // emit each exemplar's full body (still bounded by Budget)
+	Budget int      // total character budget across all exemplars (≤0 → defaultBudget)
+}
+
+// BuildContext returns the write-as context for persona id: its style guide and references, plus
+// exemplars from its own content ranked by BM25 against opts.Topic (or the most recent posts when
+// the topic is empty). Each exemplar's text is bounded per-exemplar (opts.Length / opts.Full) and
+// the set is bounded in total (opts.Budget), so the caller controls how much voice to pull in.
+func BuildContext(cfg *config.Config, id string, opts ContextOptions) (*Context, error) {
 	p := Find(cfg, id)
 	if p == nil {
 		return nil, fmt.Errorf("unknown persona %q (have: %s)", id, strings.Join(IDs(cfg), ", "))
 	}
+	topK := opts.TopK
 	if topK <= 0 {
-		topK = 3
+		topK = defaultTopK
+	}
+	budget := opts.Budget
+	if budget <= 0 {
+		budget = defaultBudget
+	}
+	perCap := opts.Length // > 0 caps each exemplar; 0 means full body
+	switch {
+	case opts.Full:
+		perCap = 0
+	case perCap <= 0:
+		perCap = defaultExcerpt
 	}
 	corpus, err := build.Corpus(cfg)
 	if err != nil {
@@ -61,7 +91,7 @@ func BuildContext(cfg *config.Config, id, topic string, topK int, tags ...string
 		if d.PersonaID != id && (d.PersonaID != "" || !soleDefault) {
 			continue
 		}
-		if len(tags) > 0 && !hasAnyTag(d.Tags, tags) {
+		if len(opts.Tags) > 0 && !hasAnyTag(d.Tags, opts.Tags) {
 			continue // narrow the corpus to exemplars carrying one of the requested tags
 		}
 		mine = append(mine, d)
@@ -70,8 +100,8 @@ func BuildContext(cfg *config.Config, id, topic string, topK int, tags ...string
 		Persona:    *p,
 		Guide:      p.Style.Guide,
 		References: p.Style.References,
-		Topic:      topic,
-		Exemplars:  rank(mine, topic, topK),
+		Topic:      opts.Topic,
+		Exemplars:  rank(mine, opts.Topic, topK, perCap, budget),
 	}, nil
 }
 
@@ -106,9 +136,10 @@ func IDs(cfg *config.Config) []string {
 	return out
 }
 
-// rank selects the top-k exemplars. With a topic it scores by BM25; without one it returns
-// the most recent documents (the natural "show me this persona's latest voice").
-func rank(docs []build.CorpusDoc, topic string, k int) []Exemplar {
+// rank orders the docs by relevance (BM25 against topic, else most-recent) and packs their text
+// into the budget: each exemplar is clipped to perCap chars (perCap ≤ 0 → full body) and the
+// running total never exceeds budget — the last one is trimmed to fit. It stops at k exemplars.
+func rank(docs []build.CorpusDoc, topic string, k, perCap, budget int) []Exemplar {
 	if k > len(docs) {
 		k = len(docs)
 	}
@@ -133,15 +164,30 @@ func rank(docs []build.CorpusDoc, topic string, k int) []Exemplar {
 		sort.SliceStable(scored, func(i, j int) bool { return scored[i].d.Date.After(scored[j].d.Date) })
 	}
 	out := make([]Exemplar, 0, k)
-	for i := 0; i < k; i++ {
+	used := 0
+	for i := 0; i < len(scored) && len(out) < k; i++ {
 		d := scored[i].d
+		body := strings.TrimSpace(d.Body)
+		if body == "" {
+			continue // empty doc — try the next, don't waste a slot
+		}
+		room := budget - used
+		limit := perCap // 0 ⇒ full body; the remaining budget always caps it
+		if limit <= 0 || limit > room {
+			limit = room
+		}
+		text := clip(body, limit)
+		if len(text) > room {
+			break // not enough budget left for another exemplar
+		}
 		out = append(out, Exemplar{
 			Title:   d.Title,
 			Date:    d.Date,
 			Path:    d.SourcePath,
-			Excerpt: excerpt(d.Body),
+			Excerpt: text,
 			Score:   scored[i].s,
 		})
+		used += len(text)
 	}
 	return out
 }
@@ -191,8 +237,6 @@ func bm25(docs []build.CorpusDoc, terms []string) []float64 {
 
 var (
 	wordRE   = regexp.MustCompile(`[\p{L}\p{N}]+`)
-	mdNoise  = regexp.MustCompile(`[#>*_` + "`" + `~\[\]()!]+`)
-	wsRE     = regexp.MustCompile(`\s+`)
 	stopword = map[string]bool{
 		"the": true, "a": true, "an": true, "and": true, "or": true, "of": true, "to": true,
 		"in": true, "on": true, "for": true, "is": true, "it": true, "as": true, "at": true,
@@ -213,18 +257,22 @@ func tokenize(s string) []string {
 	return out
 }
 
-// excerpt returns a short, single-line plain-text preview of a markdown body.
-func excerpt(body string) string {
-	text := wsRE.ReplaceAllString(mdNoise.ReplaceAllString(body, ""), " ")
-	text = strings.TrimSpace(text)
-	const max = 280
-	if len(text) > max {
-		if i := strings.LastIndex(text[:max], " "); i > 0 {
-			text = text[:i]
-		} else {
-			text = text[:max]
-		}
-		text += "…"
+// clip trims body to at most max characters at a word/line boundary (max ≤ 0 → the whole body).
+// It keeps the markdown and paragraph structure intact — that is itself part of the voice — rather
+// than collapsing to a single plain-text line.
+func clip(body string, max int) string {
+	body = strings.TrimSpace(body)
+	if max <= 0 || len(body) <= max {
+		return body
 	}
-	return text
+	const ell = "…"
+	lim := max - len(ell) // reserve room so the result (incl. ellipsis) stays within max bytes
+	if lim < 0 {
+		lim = 0
+	}
+	cut := body[:lim]
+	if i := strings.LastIndexAny(cut, " \n\t"); i > 0 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " \n\t") + ell
 }

@@ -1,6 +1,7 @@
 package persona
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func TestRankByTopicPrefersRelevant(t *testing.T) {
 		mkDoc("p", "Kubernetes", "Pods and deployments and ingress controllers in a cluster.", 2),
 		mkDoc("p", "Cooking", "A simple basil pesto with garlic, oil and pine nuts.", 3),
 	}
-	ex := rank(docs, "kubernetes cluster ingress", 1)
+	ex := rank(docs, "kubernetes cluster ingress", 1, defaultExcerpt, defaultBudget)
 	if len(ex) != 1 {
 		t.Fatalf("want 1 exemplar, got %d", len(ex))
 	}
@@ -37,26 +38,42 @@ func TestRankNoTopicIsMostRecent(t *testing.T) {
 		mkDoc("p", "New", "y", 9),
 		mkDoc("p", "Mid", "z", 5),
 	}
-	ex := rank(docs, "", 2)
+	ex := rank(docs, "", 2, defaultExcerpt, defaultBudget)
 	if len(ex) != 2 || ex[0].Title != "New" || ex[1].Title != "Mid" {
 		t.Errorf("no-topic ranking should be most-recent-first, got %+v", titles(ex))
 	}
 }
 
-func TestRankTopKClampsAndExcerptTrims(t *testing.T) {
-	long := ""
-	for i := 0; i < 100; i++ {
-		long += "word "
-	}
-	ex := rank([]build.CorpusDoc{mkDoc("p", "T", "# Heading\n\n"+long, 1)}, "", 5)
+func TestRankClampsAndPerExemplarCap(t *testing.T) {
+	long := strings.Repeat("word ", 100) // 500 chars
+	ex := rank([]build.CorpusDoc{mkDoc("p", "T", "# Heading\n\n"+long, 1)}, "", 5, 100, defaultBudget)
 	if len(ex) != 1 {
 		t.Fatalf("top-k must clamp to available docs, got %d", len(ex))
 	}
-	if len([]rune(ex[0].Excerpt)) > 282 { // 280 + ellipsis budget
-		t.Errorf("excerpt should be trimmed, got %d runes", len([]rune(ex[0].Excerpt)))
+	if n := len(ex[0].Excerpt); n > 101 { // 100 + ellipsis
+		t.Errorf("per-exemplar cap should trim to ~100, got %d chars", n)
 	}
-	if got := ex[0].Excerpt; got == "" || got[0] == '#' {
-		t.Errorf("excerpt should strip markdown noise, got %q", got)
+	if !strings.HasPrefix(ex[0].Excerpt, "# Heading") { // clip preserves markdown structure
+		t.Errorf("clip should keep the markdown, got %q", ex[0].Excerpt)
+	}
+}
+
+func TestRankBudgetCapsTotalAndFull(t *testing.T) {
+	docs := []build.CorpusDoc{
+		mkDoc("p", "A", strings.Repeat("a ", 200), 3),
+		mkDoc("p", "B", strings.Repeat("b ", 200), 2),
+		mkDoc("p", "C", strings.Repeat("c ", 200), 1),
+	}
+	ex := rank(docs, "", 10, 0, 250) // full bodies (perCap 0), 250-char total budget
+	if len(ex) == 0 {
+		t.Fatal("expected at least one exemplar within budget")
+	}
+	total := 0
+	for _, e := range ex {
+		total += len(e.Excerpt)
+	}
+	if total > 250 {
+		t.Errorf("budget should cap total exemplar text, got %d", total)
 	}
 }
 
