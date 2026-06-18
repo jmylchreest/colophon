@@ -319,6 +319,36 @@ environments:
 
 Overrides also carry per-environment publisher tweaks like a Cloudflare Pages `branch`.
 
+## On-site search
+
+colophon builds a **static search index** at build time — a sharded, content-addressed BM25 index
+a tiny browser reader queries client-side (no server, no service). Enable it per site with the
+`search` stanza:
+
+```yaml
+sites:
+  - id: main
+    search:
+      mode: lexical     # off (default) | lexical
+      fuzzy: true       # opt-in typo tolerance (trigram + Levenshtein); roughly doubles the index
+```
+
+The string shorthand `search: lexical` still works (equivalent to `mode: lexical`, no fuzzy).
+
+- **`mode`** — `lexical` turns search on; omitted/`off` leaves it out entirely (no index, no box).
+- **`fuzzy`** — when on, a query token that finds no exact/**prefix** match falls back to
+  typo-tolerant matching (so "wikilnk" finds "wikilinks"). It's opt-in because the trigram index
+  it needs roughly doubles the index size — a cost a low-bandwidth search shouldn't pay unasked.
+
+Results are **prefix-matched** by default ("wiki" → "wikilinks"), with query-aware highlighting
+and an occurrence count. The index + reader ship only when search is on, under `_search/`; a theme
+renders the box (the `press` and `gazette` themes include one). `colophon search "<query>"` queries
+the same engine from the CLI (always fuzzy), in text or `--json`.
+
+For large sites, the index can be **routed to an object store** to keep it off a Pages-style file
+budget — see [Routing the search index](#routing-the-search-index) below (it also covers the CORS
+that a cross-origin index needs, set automatically by `--create`).
+
 ## Routing assets to an object store
 
 Shipping large or numerous images with a Pages/Workers deployment can exhaust its file
