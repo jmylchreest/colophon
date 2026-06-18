@@ -222,6 +222,8 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 .auth-chev:hover:not(:disabled) { color: var(--accent); }
 .auth-chev:disabled { opacity: 0.3; cursor: default; }
 @media (max-width: 720px) { .auth-track { max-width: 38vw; } }
+.home-authors { display: flex; justify-content: flex-end; padding-bottom: 1.5rem; }
+.home-authors .auth-track { max-width: 100%; }
 
 /* ---------- nav menu: animated hamburger + popout dropdown ---------- */
 .menu { position: relative; display: flex; }
@@ -309,13 +311,20 @@ pre.mermaid { background: none; border: 0; text-align: center; }
    custom-property palette so any theme built on this base inherits a working search box. */
 .search { position: relative; }
 .search-toggle { display: none; }
+/* match .feed / .auth exactly (circular bordered icon, accent-fill hover) so the topbar reads as
+   one consistent set of controls. */
 html.js .search-toggle {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 2.1rem; height: 2.1rem; padding: 0; border: 0; border-radius: 50%;
-  background: transparent; color: var(--muted); cursor: pointer;
+  position: relative; width: 30px; height: 30px; padding: 0; cursor: pointer;
+  display: grid; place-items: center; border-radius: 50%;
+  color: var(--muted); background: transparent; border: 1px solid var(--border);
+  transition: color 0.25s, background 0.25s, border-color 0.25s, transform 0.25s cubic-bezier(0.68,-0.55,0.27,1.55);
 }
-.search-toggle:hover { color: var(--text); }
-.search-toggle svg { width: 1.15rem; height: 1.15rem; }
+.search-toggle:hover { color: var(--on-accent); background: var(--accent); border-color: var(--accent); transform: translateY(-2px); }
+.search-toggle svg { width: 14px; height: 14px; }
+.topbar-right > .authors { order: 0; }
+.topbar-right > .feeds   { order: 1; }
+.topbar-right > .search  { order: 2; }
+.topbar-right > .menu    { order: 3; }
 /* mirror .menu-panel exactly (surface/border/radius/shadow/padding) so the two dropdowns match. */
 .search-panel {
   position: absolute; right: 0; top: calc(100% + 0.5rem); z-index: 50;
