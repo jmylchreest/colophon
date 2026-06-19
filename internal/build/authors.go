@@ -4,7 +4,6 @@ import (
 	"sort"
 
 	"github.com/jmylchreest/colophon/internal/config"
-	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/render"
 )
 
@@ -90,28 +89,13 @@ func authorStrip(groups []authorGroup) []map[string]any {
 // writeAuthorPages renders a listing page per persona at authors/<id>/, reusing the index
 // template (with a heading and that author's posts). Avatar links in the topbar point here,
 // so personas become cross-entry navigation, mirroring writeTagPages.
-func writeAuthorPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, searchURL, searchManifest, feedHead, favicon, analyticsListing string, authors, navPages []map[string]any, groups []authorGroup) error {
+func writeAuthorPages(write func(string, []byte) error, eng render.Engine, chrome listingChrome, groups []authorGroup) error {
 	for _, g := range groups {
-		html, err := eng.Render("index.html", map[string]any{
-			"lang":            defaultLang(site.Lang),
-			"site_title":      site.Title,
-			"base_url":        site.BaseURL,
-			"base_path":       basePath,
-			"feed_head":       feedHead,
-			"analytics_head":  analyticsListing,
-			"favicon":         favicon,
-			"heading":         "By " + g.name,
-			"authors":         authors,
-			"nav_pages":       navPages,
-			"pages":           g.items,
-			"search":          searchEnabled(site),
-			"search_base":     searchURL,
-			"search_manifest": searchManifest,
-		})
+		html, err := chrome.render(eng, "By "+g.name, g.items, nil)
 		if err != nil {
 			return err
 		}
-		if err := write("authors/"+g.id+"/index.html", []byte(html)); err != nil {
+		if err := write("authors/"+g.id+"/index.html", html); err != nil {
 			return err
 		}
 	}

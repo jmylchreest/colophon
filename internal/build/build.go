@@ -360,39 +360,30 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		}
 	}
 
-	index, err := eng.Render("index.html", map[string]any{
-		"lang":            siteLang,
-		"site_title":      site.Title,
-		"base_url":        site.BaseURL,
-		"base_path":       basePath,
-		"feed_head":       feedHead,
-		"analytics_head":  analyticsListing,
-		"favicon":         favicon,
-		"heading":         site.Title,
-		"feeds":           feedLinks(formats, basePath),
-		"authors":         authors,
-		"nav_pages":       navPages,
-		"pages":           list,
-		"search":          searchEnabled(site),
-		"search_base":     searchURL,
-		"search_manifest": searchManifest,
-	})
+	chrome := listingChrome{
+		lang: siteLang, siteTitle: site.Title, baseURL: site.BaseURL, basePath: basePath,
+		feedHead: feedHead, analyticsHead: analyticsListing, favicon: favicon,
+		search: searchEnabled(site), searchBase: searchURL, searchManifest: searchManifest,
+		authors: authors, navPages: navPages,
+	}
+
+	index, err := chrome.render(eng, site.Title, list, map[string]any{"feeds": feedLinks(formats, basePath)})
 	if err != nil {
 		return Result{}, err
 	}
-	if err := write("index.html", []byte(index)); err != nil {
+	if err := write("index.html", index); err != nil {
 		return Result{}, err
 	}
 
 	// Tag pages: one post listing per tag, reusing the index template with a heading. Tag
 	// chips on each post (page.html) link here, so tags become cross-entry navigation.
-	if err := writeTagPages(write, eng, site, basePath, searchURL, searchManifest, feedHead, favicon, analyticsListing, authors, navPages, posts, list); err != nil {
+	if err := writeTagPages(write, eng, chrome, posts, list); err != nil {
 		return Result{}, err
 	}
 
 	// Author pages: one post listing per persona at authors/<id>/, reached from the avatar
 	// widget. Same index template + heading, mirroring tag pages.
-	if err := writeAuthorPages(write, eng, site, basePath, searchURL, searchManifest, feedHead, favicon, analyticsListing, authors, navPages, authorGroups); err != nil {
+	if err := writeAuthorPages(write, eng, chrome, authorGroups); err != nil {
 		return Result{}, err
 	}
 
@@ -854,7 +845,48 @@ func tagLinks(tags []string, basePath string) []map[string]any {
 
 // writeTagPages renders a listing page per tag at tags/<slug>/, reusing the index template
 // (with a heading and the tag's posts). list[i] is the index-item map for pages[i].
-func writeTagPages(write func(string, []byte) error, eng render.Engine, site core.Site, basePath, searchURL, searchManifest, feedHead, favicon, analyticsListing string, authors, navPages []map[string]any, pages []page, list []map[string]any) error {
+// listingChrome is the site-wide context every listing page (home, per-tag, per-author) renders
+// the index template with. Only the heading and the post list vary between them, so bundling the
+// shared chrome here keeps that 13-key map in one place and spares the writers a long, position-
+// sensitive parameter list.
+type listingChrome struct {
+	lang, siteTitle, baseURL, basePath string
+	feedHead, analyticsHead, favicon   string
+	search                             bool
+	searchBase, searchManifest         string
+	authors, navPages                  []map[string]any
+}
+
+// render renders the index template for one listing page: the shared chrome plus this page's
+// heading and posts, overlaid with any extra keys (the home page's feed links).
+func (c listingChrome) render(eng render.Engine, heading string, pages []map[string]any, extra map[string]any) ([]byte, error) {
+	ctx := map[string]any{
+		"lang":            c.lang,
+		"site_title":      c.siteTitle,
+		"base_url":        c.baseURL,
+		"base_path":       c.basePath,
+		"feed_head":       c.feedHead,
+		"analytics_head":  c.analyticsHead,
+		"favicon":         c.favicon,
+		"heading":         heading,
+		"authors":         c.authors,
+		"nav_pages":       c.navPages,
+		"pages":           pages,
+		"search":          c.search,
+		"search_base":     c.searchBase,
+		"search_manifest": c.searchManifest,
+	}
+	for k, v := range extra {
+		ctx[k] = v
+	}
+	html, err := eng.Render("index.html", ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(html), nil
+}
+
+func writeTagPages(write func(string, []byte) error, eng render.Engine, chrome listingChrome, pages []page, list []map[string]any) error {
 	type group struct {
 		name  string
 		items []map[string]any
@@ -879,26 +911,11 @@ func writeTagPages(write func(string, []byte) error, eng render.Engine, site cor
 	sort.Strings(slugs)
 	for _, s := range slugs {
 		g := groups[s]
-		html, err := eng.Render("index.html", map[string]any{
-			"lang":            defaultLang(site.Lang),
-			"site_title":      site.Title,
-			"base_url":        site.BaseURL,
-			"base_path":       basePath,
-			"feed_head":       feedHead,
-			"analytics_head":  analyticsListing,
-			"favicon":         favicon,
-			"heading":         "Tagged “" + g.name + "”",
-			"authors":         authors,
-			"nav_pages":       navPages,
-			"pages":           g.items,
-			"search":          searchEnabled(site),
-			"search_base":     searchURL,
-			"search_manifest": searchManifest,
-		})
+		html, err := chrome.render(eng, "Tagged “"+g.name+"”", g.items, nil)
 		if err != nil {
 			return err
 		}
-		if err := write("tags/"+s+"/index.html", []byte(html)); err != nil {
+		if err := write("tags/"+s+"/index.html", html); err != nil {
 			return err
 		}
 	}
