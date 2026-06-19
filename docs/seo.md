@@ -32,7 +32,7 @@ Every field maps to exactly one piece of output, so what you set is what gets re
 | `<meta name="description">` | `seo.description` → `description` |
 | `<meta name="robots">` noindex | `seo.noindex`, or any draft/embargoed post |
 | `<meta name="keywords">` | `seo.keywords` → tags |
-| Open Graph (`og:type/site_name/url/title/description/image`) | `seo` → post fields; `og:title`/`description` prefer `seo.social.*` |
+| Open Graph (`og:type/site_name/url/title/description/image/locale`) | `seo` → post fields; `og:title`/`description` prefer `seo.social.*`; `og:image` is `seo.image` → the `image` field → the `hero` cover art; `og:locale` from the page/site `lang` |
 | `article:published_time` / `modified_time` / `tag` / `author` | the post date, tags, and persona |
 | Twitter card (`summary_large_image` when an image exists, else `summary`) | the resolved image |
 | `<script type="application/ld+json">` **BlogPosting** | headline, description, image, dates, keywords, `author` (persona → Person/Organization), `publisher` (site) |
@@ -53,3 +53,24 @@ title/description/tags/date/image/persona. Use `seo:` to:
 
 Generating a good `seo:` block from the article is what the planned **seo skill**
 ([skills.md](skills.md)) does.
+
+## Listing pages (home, tags, authors)
+
+The home page and every generated listing — `/tags/<tag>/` and `/authors/<id>/` — also carry
+their own metadata: a canonical URL, `description`, website-flavoured Open Graph + Twitter
+cards, `og:locale`, and schema.org JSON-LD (a `Blog` for the home page, a `CollectionPage` for
+tag/author listings). These draw on two optional site-level fields:
+
+```yaml
+sites:
+  - id: main
+    title: My Blog
+    base_url: https://example.com
+    description: One line that becomes the home page's meta/OG description.
+    image: /assets/social.png   # default share image (absolute URL, or resolved against base_url)
+```
+
+Both are optional — unset simply omits the corresponding tags. `description` feeds the listing
+pages' `<meta name="description">` and the JSON-LD; `image` is their default `og:image`/
+`twitter:image`. Per-tag and per-author listings reuse the same `description`/`image` with their
+own heading as the title.

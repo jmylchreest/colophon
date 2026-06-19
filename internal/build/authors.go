@@ -91,7 +91,10 @@ func authorStrip(groups []authorGroup) []map[string]any {
 // so personas become cross-entry navigation, mirroring writeTagPages.
 func writeAuthorPages(write func(string, []byte) error, eng render.Engine, chrome listingChrome, groups []authorGroup) error {
 	for _, g := range groups {
-		html, err := chrome.render(eng, "By "+g.name, g.items, nil)
+		heading := "By " + g.name
+		html, err := chrome.render(eng, heading, g.items, map[string]any{
+			"seo_head": chrome.seoHead("authors/"+g.id+"/", heading, false),
+		})
 		if err != nil {
 			return err
 		}

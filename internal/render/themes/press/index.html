@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>var d=document.documentElement;d.classList.add('js');try{var t=localStorage.getItem('press-theme');if(!t)t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';d.dataset.theme=t;}catch(e){}</script>
 <title>{{ heading|default:site_title }}</title>
+{{ seo_head|safe }}
 <link rel="stylesheet" href="{{ base_path }}style.css">
 {% if favicon %}<link rel="icon" href="{{ base_path }}{{ favicon }}">{% endif %}
 {{ feed_head|safe }}

@@ -108,6 +108,7 @@ type page struct {
 	GlossaryOff  bool   // post opted out of glossary decoration (frontmatter glossary: false)
 
 	Hero       string // hero banner URL: page-relative when co-located, absolute when routed
+	HeroAbs    string // absolute hero URL, used as the og:image fallback when no image: is set
 	HeroAlt    string // accessible alt text for the hero; empty → decorative (alt="")
 	HeroFit    string // CSS object-fit for the hero (cover|contain|…); empty → theme default
 	HeroPos    string // CSS object-position for the hero (e.g. "top"); empty → theme default
@@ -361,13 +362,18 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	}
 
 	chrome := listingChrome{
+		site: site,
 		lang: siteLang, siteTitle: site.Title, baseURL: site.BaseURL, basePath: basePath,
+		description: site.Description, shareImage: siteShareImage(site),
 		feedHead: feedHead, analyticsHead: analyticsListing, favicon: favicon,
 		search: searchEnabled(site), searchBase: searchURL, searchManifest: searchManifest,
 		authors: authors, navPages: navPages,
 	}
 
-	index, err := chrome.render(eng, site.Title, list, map[string]any{"feeds": feedLinks(formats, basePath)})
+	index, err := chrome.render(eng, site.Title, list, map[string]any{
+		"feeds":    feedLinks(formats, basePath),
+		"seo_head": chrome.seoHead("", site.Title, true),
+	})
 	if err != nil {
 		return Result{}, err
 	}
@@ -598,9 +604,10 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		if localRef(fm.Hero) {
 			out := path.Clean(path.Join(it.slug, fm.Hero))
 			if url := router.AssetURL(out); url != "" {
-				p.Hero = url // served from the object store
+				p.Hero, p.HeroAbs = url, url // served from the object store (already absolute)
 			} else {
 				p.Hero = fm.Hero // co-located beside the page, page-relative
+				p.HeroAbs = absURL(baseURL, out)
 			}
 		}
 		if localRef(fm.Image) {
@@ -850,11 +857,22 @@ func tagLinks(tags []string, basePath string) []map[string]any {
 // shared chrome here keeps that 13-key map in one place and spares the writers a long, position-
 // sensitive parameter list.
 type listingChrome struct {
+	site                               core.Site
 	lang, siteTitle, baseURL, basePath string
+	description, shareImage            string // site tagline + absolute default share image (og:)
 	feedHead, analyticsHead, favicon   string
 	search                             bool
 	searchBase, searchManifest         string
 	authors, navPages                  []map[string]any
+}
+
+// seoHead builds the SEO <head> block for one listing page. urlPath is the page's site-root-
+// relative path ("" for the home page, "tags/go/" for a tag index); title is its og:title
+// (the site title for home, the listing heading otherwise); home selects the Blog vs
+// CollectionPage JSON-LD. The canonical URL is the site base joined with urlPath.
+func (c listingChrome) seoHead(urlPath, title string, home bool) string {
+	canonical := strings.TrimRight(c.baseURL, "/") + "/" + strings.TrimLeft(urlPath, "/")
+	return listingSEOHead(c.site, canonical, title, c.description, c.shareImage, home)
 }
 
 // render renders the index template for one listing page: the shared chrome plus this page's
@@ -911,7 +929,10 @@ func writeTagPages(write func(string, []byte) error, eng render.Engine, chrome l
 	sort.Strings(slugs)
 	for _, s := range slugs {
 		g := groups[s]
-		html, err := chrome.render(eng, "Tagged “"+g.name+"”", g.items, nil)
+		heading := "Tagged “" + g.name + "”"
+		html, err := chrome.render(eng, heading, g.items, map[string]any{
+			"seo_head": chrome.seoHead("tags/"+s+"/", heading, false),
+		})
 		if err != nil {
 			return err
 		}
@@ -971,6 +992,15 @@ func absURL(base, p string) string {
 		return ""
 	}
 	return strings.TrimRight(base, "/") + "/" + strings.TrimLeft(p, "/")
+}
+
+// siteShareImage returns the absolute default social-share image for listing pages: site.Image
+// unchanged when it is already absolute, else resolved against base_url, else "".
+func siteShareImage(site core.Site) string {
+	if isAbsURL(site.Image) {
+		return site.Image
+	}
+	return absURL(site.BaseURL, site.Image)
 }
 
 func formatDate(t time.Time) string {

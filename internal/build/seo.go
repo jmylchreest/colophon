@@ -50,7 +50,9 @@ func seoHead(site core.Site, p page, author core.Author) string {
 	desc := firstNonEmpty(s.Description, p.Description)
 	ogTitle := firstNonEmpty(socialField(s, true), s.Title, p.Title)
 	ogDesc := firstNonEmpty(socialField(s, false), s.Description, p.Description)
-	image := p.ImageAbs
+	// og:image prefers an explicit preview image (image:), then the hero cover art (hero:), so a
+	// post that sets only a hero still gets a social preview; an absolute seo.image overrides both.
+	image := firstNonEmpty(p.ImageAbs, p.HeroAbs)
 	if isAbsURL(s.Image) {
 		image = s.Image
 	}
@@ -76,6 +78,7 @@ func seoHead(site core.Site, p page, author core.Author) string {
 	meta("property", "og:title", ogTitle)
 	meta("property", "og:description", ogDesc)
 	meta("property", "og:image", image)
+	meta("property", "og:locale", ogLocale(firstNonEmpty(p.Lang, site.Lang)))
 	if !p.Published.IsZero() {
 		iso := p.Published.UTC().Format(time.RFC3339)
 		meta("property", "article:published_time", iso)
@@ -176,4 +179,66 @@ func firstNonEmpty(vals ...string) string {
 
 func isAbsURL(s string) bool {
 	return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://")
+}
+
+// ogLocale converts a BCP-47 language tag to the underscore form Open Graph expects
+// (en-GB → en_GB). An empty tag defaults to "en".
+func ogLocale(lang string) string {
+	return strings.ReplaceAll(defaultLang(lang), "-", "_")
+}
+
+// listingSEOHead renders the SEO <head> block for a listing page — the home page, a tag index or
+// an author index. Listings carry no per-post metadata, so the markup draws on the site's title,
+// description and default share image. It emits canonical, description, website-flavoured Open
+// Graph + Twitter, og:locale, and a schema.org JSON-LD: a Blog for the home page (home true), a
+// CollectionPage for the narrower tag/author listings.
+func listingSEOHead(site core.Site, canonical, title, desc, image string, home bool) string {
+	var b strings.Builder
+	meta := func(kind, key, val string) {
+		if val != "" {
+			b.WriteString(`<meta ` + kind + `="` + key + `" content="` + html.EscapeString(val) + "\">\n")
+		}
+	}
+	b.WriteString(`<link rel="canonical" href="` + html.EscapeString(canonical) + "\">\n")
+	meta("name", "description", desc)
+	meta("property", "og:type", "website")
+	meta("property", "og:site_name", site.Title)
+	meta("property", "og:url", canonical)
+	meta("property", "og:title", title)
+	meta("property", "og:description", desc)
+	meta("property", "og:image", image)
+	meta("property", "og:locale", ogLocale(site.Lang))
+
+	card := "summary"
+	if image != "" {
+		card = "summary_large_image"
+	}
+	meta("name", "twitter:card", card)
+	meta("name", "twitter:title", title)
+	meta("name", "twitter:description", desc)
+	meta("name", "twitter:image", image)
+
+	typ := "CollectionPage"
+	if home {
+		typ = "Blog"
+	}
+	doc := map[string]any{
+		"@context": "https://schema.org",
+		"@type":    typ,
+		"name":     title,
+		"url":      canonical,
+	}
+	if desc != "" {
+		doc["description"] = desc
+	}
+	if image != "" {
+		doc["image"] = image
+	}
+	if site.Title != "" {
+		doc["publisher"] = map[string]any{"@type": "Organization", "name": site.Title}
+	}
+	if out, err := json.Marshal(doc); err == nil {
+		b.WriteString(`<script type="application/ld+json">` + string(out) + "</script>\n")
+	}
+	return b.String()
 }

@@ -78,3 +78,50 @@ func TestSEOAuthorIsPerson(t *testing.T) {
 		t.Errorf("author should map to a Person\n%s", out)
 	}
 }
+
+// TestSEOHeroFallback asserts a post with only a hero (no image:) still gets og:image,
+// twitter:image and a JSON-LD image from the hero, and that og:locale comes from the lang.
+func TestSEOHeroFallback(t *testing.T) {
+	site := core.Site{Title: "B", BaseURL: "https://e.com", Lang: "en-GB"}
+	p := page{Title: "T", URL: "p/", HeroAbs: "https://e.com/p/cover.png"}
+	out := seoHead(site, p, core.Author{})
+	for _, want := range []string{
+		`<meta property="og:image" content="https://e.com/p/cover.png">`,
+		`<meta name="twitter:image" content="https://e.com/p/cover.png">`,
+		`<meta name="twitter:card" content="summary_large_image">`,
+		`<meta property="og:locale" content="en_GB">`,
+		`"image":"https://e.com/p/cover.png"`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("seoHead missing %s\n%s", want, out)
+		}
+	}
+}
+
+// TestListingSEOHead asserts the home page and the narrower listings get the right canonical,
+// website Open Graph, og:locale, and the Blog vs CollectionPage JSON-LD.
+func TestListingSEOHead(t *testing.T) {
+	site := core.Site{Title: "My Blog", BaseURL: "https://example.com", Lang: "en"}
+
+	home := listingSEOHead(site, "https://example.com/", "My Blog", "A blog.", "https://example.com/og.png", true)
+	for _, want := range []string{
+		`<link rel="canonical" href="https://example.com/">`,
+		`<meta property="og:type" content="website">`,
+		`<meta property="og:description" content="A blog.">`,
+		`<meta property="og:image" content="https://example.com/og.png">`,
+		`<meta property="og:locale" content="en">`,
+		`"@type":"Blog"`,
+	} {
+		if !strings.Contains(home, want) {
+			t.Errorf("home listing head missing %s\n%s", want, home)
+		}
+	}
+
+	tag := listingSEOHead(site, "https://example.com/tags/go/", "Tagged go", "A blog.", "", false)
+	if !strings.Contains(tag, `"@type":"CollectionPage"`) {
+		t.Errorf("tag listing should be a CollectionPage\n%s", tag)
+	}
+	if !strings.Contains(tag, `<meta name="twitter:card" content="summary">`) {
+		t.Errorf("no image → summary card\n%s", tag)
+	}
+}

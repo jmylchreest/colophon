@@ -7,6 +7,12 @@ type Site struct {
 	Title   string `yaml:"title"`
 	BaseURL string `yaml:"base_url"`
 	Theme   string `yaml:"theme"`
+	// Description is the site's tagline, used as the home/listing pages' meta description and
+	// Open Graph/Twitter description and in the WebSite/Blog JSON-LD. Empty omits those.
+	Description string `yaml:"description,omitempty"`
+	// Image is the default social-share image for listing pages (og:image/twitter:image): an
+	// absolute URL, or a site-root-relative path resolved against base_url. Empty omits it.
+	Image string `yaml:"image,omitempty"`
 	// Lang is the site's BCP-47 language tag (e.g. "en", "en-GB", "fr"), emitted as
 	// <html lang>. A post may override it per-page. Empty defaults to "en".
 	Lang string `yaml:"lang,omitempty"`
