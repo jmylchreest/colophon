@@ -20,6 +20,9 @@ type Entry struct {
 	Tags       []string  `json:"tags,omitempty"`
 	Draft      bool      `json:"draft"`
 	Date       time.Time `json:"date,omitempty"`
+	// Predecessor is the raw frontmatter `predecessor:` (slug/filename of the preceding post in a
+	// series), unresolved — tooling (doctor) resolves it against the slug set.
+	Predecessor string `json:"predecessor,omitempty"`
 }
 
 // Entries gathers every content document across the configured sources and resolves each to
@@ -38,16 +41,17 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 		}
 		slug := slugFor(d.doc.SourcePath, fm.Slug)
 		out = append(out, Entry{
-			SourcePath: d.doc.SourcePath,
-			Slug:       slug,
-			URL:        slug + "/",
-			Title:      fm.Title,
-			Type:       resolvePageType(fm),
-			Author:     fm.Author,
-			Persona:    persona,
-			Tags:       fm.Tags,
-			Draft:      fm.Draft,
-			Date:       fm.Date,
+			SourcePath:  d.doc.SourcePath,
+			Slug:        slug,
+			URL:         slug + "/",
+			Title:       fm.Title,
+			Type:        resolvePageType(fm),
+			Author:      fm.Author,
+			Persona:     persona,
+			Tags:        fm.Tags,
+			Draft:       fm.Draft,
+			Date:        fm.Date,
+			Predecessor: fm.Predecessor,
 		})
 	}
 	return out, nil

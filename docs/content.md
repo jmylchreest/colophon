@@ -40,6 +40,8 @@ All fields are optional unless noted.
 | `draft` | `true` keeps the post out of production builds (shown in preview/serve). |
 | `publish` | Obsidian whitelist flag, honoured when a source sets `publish_required: true`. |
 | `publish_after` | Embargo: not published until this time (ISO 8601, e.g. `2026-07-01T09:00:00Z`). |
+| `predecessor` | The slug (or bare filename) of the post that *immediately precedes* this one in a series — see [Post series](#post-series). |
+| `series` | Optional series **title**. Latest-wins: the newest post in the chain that sets it names the series. |
 
 Slugs are normalised: each path segment is lower-cased and non-alphanumerics collapse to
 single hyphens, so `Archive/My Post.md` → `archive/my-post`.
@@ -68,6 +70,38 @@ type: project        # a custom type; styled by a theme's project.html if it has
 - A custom type (e.g. `project`) is listed like a post, but a theme can give it its own look —
   see [Themes → Page types](themes.md#page-types). This `type` is unrelated to `seo.type`
   (the schema.org type).
+
+## Post series
+
+A post can declare that it follows an earlier post with a single **backward** link, and
+colophon reconstructs the whole ordered series from those links — adding "Part N of M" /
+previous / next navigation to **every** member.
+
+```yaml
+---
+title: "Building a Widget, Part Two"
+date: 2026-06-11
+predecessor: building-a-widget-part-one   # the post just before this one
+---
+```
+
+- **`predecessor:`** pins the slug (or bare filename, resolved like a `[[wikilink]]`) of the
+  immediately preceding post. It's a single linear chain — a post is in at most one series.
+- **`series:`** is the optional title. It's **latest-wins**: the name is taken from the *newest*
+  post in the chain that sets it; if no member sets it, the series is untitled.
+
+Because colophon rebuilds the whole site every time, a backward pointer is enough — **you never
+edit old posts**. Publishing Part Two (which points back at Part One) is what gives Part One its
+forward link to Part Two; the engine walks the chain and regenerates both. The series renders
+oldest→newest, and the current post is highlighted in the list.
+
+Themes get per-post variables (`series_name`, `series_total`, `series_index`,
+`series_parts`, `series_prev`, `series_next`) — set only for posts in a series of two or more —
+and a `series` flag on each post-list item. The bundled **press** theme shows the series in the
+left rail and marks series entries on the index; other themes can adopt the variables.
+
+`colophon doctor` warns (without failing) when a `predecessor:` doesn't resolve to a known post,
+when the links form a cycle, or when two posts name the same predecessor (a branch).
 
 ## Markdown support
 

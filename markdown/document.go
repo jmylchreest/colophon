@@ -28,6 +28,15 @@ type Frontmatter struct {
 	// distinct from seo.type (the schema.org type).
 	Type string `yaml:"type,omitempty"`
 
+	// Predecessor pins the slug (or bare filename, resolved like a wikilink) of the post that
+	// immediately precedes this one in a series — a single backward link. The engine walks these
+	// edges to reconstruct the whole ordered chain and regenerate every member with series nav, so
+	// older posts never need editing. A post is in at most one series.
+	Predecessor string `yaml:"predecessor,omitempty"`
+	// Series is the optional series title. Latest-wins: the name is taken from the newest post in
+	// the chain that sets it; if no member sets it, the series is untitled.
+	Series string `yaml:"series,omitempty"`
+
 	// Hero is a banner image shown at the top of the post; Image is the preview/social
 	// card image (Open Graph, index thumbnail). Both are source-relative paths (an
 	// Obsidian [[embed]] is accepted too) that the build copies beside the page.

@@ -95,6 +95,7 @@ type page struct {
 	Published    time.Time // raw frontmatter date, for feeds/sitemap
 	Description  string    // frontmatter description or derived excerpt
 	URL          string    // base_path-relative, e.g. posts/hello/
+	Slug         string    // resolved slug (URL without the trailing slash), the series/wikilink key
 	Out          string    // path under public/, e.g. posts/hello/index.html
 	SourcePath   string    // origin file (for diagnostics, e.g. slug-collision warnings)
 	HTML         string
@@ -124,6 +125,13 @@ type page struct {
 	HasMath    bool // page uses math — theme loads KaTeX only when true
 	HasMermaid bool // page has a mermaid diagram — theme loads Mermaid only when true
 	HasCode    bool // page has a code block — theme loads the highlighter only when true
+
+	// Predecessor is the raw frontmatter `predecessor:` (a slug/filename of the immediately
+	// preceding post); SeriesTitle is this post's own `series:` title (latest-wins across the
+	// chain). Series, below, is the computed series state, set only for posts in a series of ≥2.
+	Predecessor string
+	SeriesTitle string
+	Series      *seriesInfo
 }
 
 // Run builds the first configured site into opts.OutDir, applying any environment
@@ -225,6 +233,18 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// the nav menu rather than the chronological list/feeds. Posts drive the list, tags,
 	// authors and feeds; every page (post or static) still renders its own document.
 	navPages := navLinks(pages, basePath)
+
+	// Reconstruct post series from backward predecessor links, attaching each member's computed
+	// series state to its page (in place, so the posts copies + list maps below carry it). Only
+	// chronological posts participate; standing pages are skipped.
+	seriesPosts := make([]*page, 0, len(pages))
+	for i := range pages {
+		if !pages[i].Static {
+			seriesPosts = append(seriesPosts, &pages[i])
+		}
+	}
+	computeSeries(seriesPosts, opts.Log)
+
 	posts := make([]page, 0, len(pages))
 	for _, p := range pages {
 		if !p.Static {
@@ -236,7 +256,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// post, most-recent-first) are built up front so every page's header can show the strip.
 	list := make([]map[string]any, len(posts))
 	for i, p := range posts {
-		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "tags": tagLinks(p.Tags, basePath)}
+		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "tags": tagLinks(p.Tags, basePath), "series": seriesListName(&posts[i])}
 	}
 	// Publish file-path author avatars through the same asset pipeline as markdown embeds,
 	// emitting a depth-independent src (the topbar strip is built once for every page depth).
@@ -316,6 +336,11 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"search_manifest": searchManifest,
 		}
 		for k, v := range authorVars(author) {
+			ctx[k] = v
+		}
+		// Series nav (set only when this post is in a series of ≥2). Left unset otherwise, so a
+		// theme's {% if series_parts %} stays false.
+		for k, v := range seriesVars(&p, basePath) {
 			ctx[k] = v
 		}
 		html, err := eng.Render(templateFor(eng, p.Type), ctx)
@@ -569,6 +594,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 			Published:   fm.Date,
 			Description: desc,
 			URL:         it.slug + "/", // base_path-relative; templates prepend base_path
+			Slug:        it.slug,
 			Out:         filepath.Join(filepath.FromSlash(it.slug), "index.html"),
 			SourcePath:  it.c.SourcePath,
 			HTML:        html,
@@ -609,6 +635,8 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		p.Author = fm.Author
 		p.Persona = fm.Persona
 		p.SEO = fm.SEO
+		p.Predecessor = fm.Predecessor
+		p.SeriesTitle = fm.Series
 		pages = append(pages, p)
 	}
 

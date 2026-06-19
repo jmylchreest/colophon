@@ -208,6 +208,90 @@ func checkContent(cfg *config.Config, r *report) {
 			r.warn("post %q names unknown persona %q", e.Title, e.Persona)
 		}
 	}
+	checkSeries(entries, r)
+}
+
+// checkSeries validates post-series `predecessor:` links, matching the build's non-fatal tier:
+// an unresolved predecessor, a cycle (A→B→…→A) or a branch (two posts naming the same
+// predecessor) all warn — the build warns and recovers from each too.
+func checkSeries(entries []build.Entry, r *report) {
+	// slug→entry under both the full slug and its bare filename, so `predecessor: hello` and
+	// `predecessor: posts/hello` both resolve, mirroring the build's wikilink-style keying.
+	bySlug := map[string]*build.Entry{}
+	for i := range entries {
+		e := &entries[i]
+		for _, k := range []string{e.Slug, baseSegment(e.Slug)} {
+			k = strings.ToLower(k)
+			if k == "" {
+				continue
+			}
+			if _, ok := bySlug[k]; !ok {
+				bySlug[k] = e
+			}
+		}
+	}
+
+	prev := map[*build.Entry]*build.Entry{}
+	succ := map[*build.Entry][]string{}
+	for i := range entries {
+		e := &entries[i]
+		ref := strings.TrimSpace(e.Predecessor)
+		if ref == "" {
+			continue
+		}
+		pred := bySlug[strings.ToLower(ref)]
+		switch pred {
+		case nil:
+			r.warn("post %q names predecessor %q which is not a known post (it won't be part of a series)", e.Title, ref)
+		case e:
+			r.warn("post %q names itself as predecessor", e.Title)
+		default:
+			prev[e] = pred
+			succ[pred] = append(succ[pred], e.Title)
+		}
+	}
+
+	// Cycles: walk back from each post; a revisit means a loop.
+	for i := range entries {
+		e := &entries[i]
+		seen := map[*build.Entry]bool{e: true}
+		for cur := e; ; {
+			n := prev[cur]
+			if n == nil {
+				break
+			}
+			if seen[n] {
+				r.warn("predecessor cycle in series at %q → %q", cur.Title, n.Title)
+				break
+			}
+			seen[n] = true
+			cur = n
+		}
+	}
+
+	// Branches: two or more posts naming the same predecessor.
+	for pred, kids := range succ {
+		if len(kids) > 1 {
+			sort.Strings(kids)
+			r.warn("posts %s share predecessor %q (a branched series)", strings.Join(quoteAll(kids), ", "), pred.Title)
+		}
+	}
+}
+
+// baseSegment returns the last "/"-segment of a slug (its bare filename key).
+func baseSegment(s string) string {
+	if i := strings.LastIndex(s, "/"); i >= 0 {
+		return s[i+1:]
+	}
+	return s
+}
+
+func quoteAll(ss []string) []string {
+	out := make([]string, len(ss))
+	for i, s := range ss {
+		out[i] = fmt.Sprintf("%q", s)
+	}
+	return out
 }
 
 func toSet(ss []string) map[string]bool {

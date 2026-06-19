@@ -105,6 +105,7 @@ a { color: inherit; }
 .chip { font-size: 0.74rem; color: var(--muted); border: 1px solid var(--border); border-radius: 999px;
   padding: 0.1rem 0.6rem; text-decoration: none; transition: all 0.2s; }
 .chip:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.chip-series { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 28%, transparent); background: var(--accent-soft); }
 .post-list { list-style: none; padding: 2rem 0 5rem; }
 .post-row { text-decoration: none; padding: 1.6rem 0; border-top: 1px solid var(--border);
   display: grid; grid-template-columns: 7rem 1fr; gap: 1.5rem; align-items: baseline; transition: opacity 0.2s; }
@@ -122,16 +123,25 @@ a { color: inherit; }
    reading width instead of leaving an empty gutter on the left. */
 .post-wrap.solo { grid-template-columns: 1fr; }
 .post-wrap.solo .post-main { width: 100%; margin: 0 auto; }
-.toc { position: sticky; top: 5.5rem; }
-.toc-title { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--faint); margin-bottom: 0.8rem; }
+/* the left rail holds the TOC and/or the series nav; either may be absent. */
+.rail { position: sticky; top: 5.5rem; display: flex; flex-direction: column; gap: 1.8rem; }
+.toc-title, .series-title { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--faint); margin-bottom: 0.8rem; }
 .toc a { display: block; color: var(--muted); text-decoration: none; font-size: 0.82rem; line-height: 1.35;
   padding: 0.25rem 0 0.25rem 0.8rem; border-left: 1px solid var(--border); transition: all 0.2s; }
 .toc a:hover { color: var(--accent); border-color: var(--accent); }
 .toc a.lvl-3 { padding-left: 1.6rem; }
+/* series nav: mirror the TOC look; the current post's entry is highlighted. */
+.series-list { list-style: none; margin: 0; padding: 0; }
+.series-list a { display: block; color: var(--muted); text-decoration: none; font-size: 0.82rem; line-height: 1.35;
+  padding: 0.25rem 0 0.25rem 0.8rem; border-left: 1px solid var(--border); transition: all 0.2s; }
+.series-list a:hover { color: var(--accent); border-color: var(--accent); }
+.series-list a.active { color: var(--text); border-left-color: var(--accent); font-weight: 500; }
+.series-num { color: var(--faint); }
+.series-list a.active .series-num { color: var(--accent); }
 /* single column: fill the track up to the reading max (width:100%), then centre. Without
    width:100% the auto margins make the grid item shrink to its content — which squeezed
    short pages (e.g. About) into a narrow centred sliver. */
-@media (max-width: 1040px) { .post-wrap { grid-template-columns: 1fr; gap: 0; } .toc { display: none; } .post-main { width: 100%; margin: 0 auto; } }
+@media (max-width: 1040px) { .post-wrap { grid-template-columns: 1fr; gap: 0; } .rail { display: none; } .post-main { width: 100%; margin: 0 auto; } }
 
 .post-hero { padding: 3.5rem 0 1rem; }
 .back { color: var(--muted); text-decoration: none; font-size: 0.85rem; }

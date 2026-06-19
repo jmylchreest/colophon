@@ -65,12 +65,24 @@
   </div>
 </header>
 
-<div class="post-wrap{% if not toc %} solo{% endif %}">
-  {% if toc %}
-  <nav class="toc">
-    <div class="toc-title">Contents</div>
-    {% for h in toc %}<a class="lvl-{{ h.level }}" href="#{{ h.id }}">{{ h.text }}</a>{% endfor %}
-  </nav>
+<div class="post-wrap{% if not toc and not series_parts %} solo{% endif %}">
+  {% if toc or series_parts %}
+  <aside class="rail">
+    {% if toc %}
+    <nav class="toc">
+      <div class="toc-title">Contents</div>
+      {% for h in toc %}<a class="lvl-{{ h.level }}" href="#{{ h.id }}">{{ h.text }}</a>{% endfor %}
+    </nav>
+    {% endif %}
+    {% if series_parts %}
+    <nav class="series-nav" aria-label="Series">
+      <div class="series-title">{{ series_name|default:"In this series" }}</div>
+      <ol class="series-list">
+        {% for s in series_parts %}<li><a href="{{ s.url }}"{% if s.active %} class="active" aria-current="page"{% endif %}><span class="series-num">{{ s.number }}.</span> {{ s.title }}</a></li>{% endfor %}
+      </ol>
+    </nav>
+    {% endif %}
+  </aside>
   {% endif %}
 
   <main id="main" class="post-main">

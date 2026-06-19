@@ -85,7 +85,7 @@
       <time>{% if p.date %}{{ p.date }}{% endif %}</time>
       <div>
         <div class="pt">{{ p.title }}</div>
-        <div class="badges">{% if p.draft %}<span class="chip">draft</span>{% endif %}{% if p.embargoed %}<span class="chip">embargoed</span>{% endif %}{% for tg in p.tags %}<span class="chip">#{{ tg.name }}</span>{% endfor %}</div>
+        <div class="badges">{% if p.draft %}<span class="chip">draft</span>{% endif %}{% if p.embargoed %}<span class="chip">embargoed</span>{% endif %}{% if p.series %}<span class="chip chip-series">series</span>{% endif %}{% for tg in p.tags %}<span class="chip">#{{ tg.name }}</span>{% endfor %}</div>
       </div>
     </a>
   {% endfor %}
