@@ -560,11 +560,9 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		})
 	}
 	for _, it := range items {
-		for _, ref := range imageRefs(it.c.Body) {
-			addAsset(it, ref)
+		for _, r := range docRefs(it.c) {
+			addAsset(it, r.Ref)
 		}
-		addAsset(it, it.c.Frontmatter.Hero)  // hero banner
-		addAsset(it, it.c.Frontmatter.Image) // preview/OG image
 	}
 
 	md := sharedMarkdown
@@ -685,6 +683,25 @@ func imageRefs(body string) []string {
 			ref = m[2]
 		}
 		refs = append(refs, ref)
+	}
+	return refs
+}
+
+// docRef is one local file a document points at, tagged with what role it plays (for
+// diagnostics). Ref is the reference exactly as written — callers apply localRef themselves.
+type docRef struct{ Kind, Ref string }
+
+// docRefs returns every file a document references — its markdown image embeds and its
+// hero/image frontmatter. It is the single source of truth for "what does this post point
+// at", shared by asset publishing (buildPages) and doctor's preflight (MissingAssets) so the
+// two can't drift as new reference-bearing fields are added.
+func docRefs(doc core.Content) []docRef {
+	fm := doc.Frontmatter
+	embeds := imageRefs(doc.Body)
+	refs := make([]docRef, 0, len(embeds)+2)
+	refs = append(refs, docRef{Kind: "hero", Ref: fm.Hero}, docRef{Kind: "image", Ref: fm.Image})
+	for _, r := range embeds {
+		refs = append(refs, docRef{Kind: "embed", Ref: r})
 	}
 	return refs
 }

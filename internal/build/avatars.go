@@ -141,18 +141,13 @@ func MissingAssets(cfg *config.Config) ([]MissingRef, error) {
 			owner = sd.doc.SourcePath
 		}
 		dir := path.Dir(sd.doc.SourcePath)
-		check := func(kind, ref string) {
-			if ref == "" || !localRef(ref) {
-				return
+		for _, r := range docRefs(sd.doc) {
+			if !localRef(r.Ref) {
+				continue // unset, data:/http(s) — nothing to source
 			}
-			if _, ok := sd.src.Resolve(ctx, path.Clean(path.Join(dir, ref))); !ok {
-				missing = append(missing, MissingRef{Kind: kind, Owner: owner, Ref: ref})
+			if _, ok := sd.src.Resolve(ctx, path.Clean(path.Join(dir, r.Ref))); !ok {
+				missing = append(missing, MissingRef{Kind: r.Kind, Owner: owner, Ref: r.Ref})
 			}
-		}
-		check("hero", sd.doc.Frontmatter.Hero)
-		check("image", sd.doc.Frontmatter.Image)
-		for _, ref := range imageRefs(sd.doc.Body) {
-			check("embed", ref)
 		}
 	}
 	return missing, nil
