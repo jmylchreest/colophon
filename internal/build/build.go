@@ -642,6 +642,18 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 	return pages, assets, next, nil
 }
 
+// resolvePersona returns the persona a document is written as: an explicit `persona:` wins, else
+// the persona of its first publication (the write-as target), else "".
+func resolvePersona(fm markdown.Frontmatter) string {
+	if fm.Persona != "" {
+		return fm.Persona
+	}
+	if len(fm.Publications) > 0 {
+		return fm.Publications[0].Persona
+	}
+	return ""
+}
+
 // resolvePageType returns a page's type: an explicit frontmatter `type:` wins, else it is
 // derived from the presence of a date — dated → "post", dateless → "page". The date heuristic
 // stays the default and `type:` overrides it.

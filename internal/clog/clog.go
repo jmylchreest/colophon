@@ -95,14 +95,6 @@ func Discard() *Logger {
 	return &Logger{slog: slog.New(slog.DiscardHandler)}
 }
 
-// Slog exposes the underlying *slog.Logger for code that wants to log directly. Nil-safe.
-func (l *Logger) Slog() *slog.Logger {
-	if l == nil {
-		return slog.New(slog.DiscardHandler)
-	}
-	return l.slog
-}
-
 func (l *Logger) Verbose() bool { return l != nil && l.verbose }
 
 // Step records an always-visible event (slog Info). category becomes the message; label and

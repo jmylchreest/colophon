@@ -146,7 +146,7 @@ func pickWriteTarget(cfg *config.Config, inID string) writeTarget {
 			}
 		}
 	}
-	get := func(k string) string { v, _ := chosen.Settings[k].(string); return strings.TrimSpace(v) }
+	get := func(k string) string { return setting(chosen.Settings, k) }
 	t := writeTarget{sourceID: chosen.ID, driver: chosen.Driver}
 	switch chosen.Driver {
 	case "obsidian":

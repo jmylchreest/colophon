@@ -44,7 +44,8 @@ func init() { source.Register("obsidian", New) }
 // `publish: true` whitelist gates (`publish_required`, default true). An empty `vault` (e.g.
 // an unset `{env:VAR:-}`) yields no documents, so an env-driven optional source stays inert.
 func New(root string, cfg config.SourceConfig) (core.Source, error) {
-	vault := resolveDir(root, str(cfg.Settings["vault"]))
+	vaultSetting, _ := cfg.Settings["vault"].(string)
+	vault := resolveDir(root, vaultSetting)
 
 	s := &Source{id: cfg.ID, vault: vault, publishRequired: true}
 	if v, ok := cfg.Settings["publish_required"].(bool); ok {
@@ -135,8 +136,6 @@ func expandHome(p string) string {
 	}
 	return p
 }
-
-func str(v any) string { s, _ := v.(string); return s }
 
 // strList reads a config value that may be a scalar string or a list of strings, and also
 // splits comma-separated values, trimming blanks. So `tag: blog`, `tag: [blog, essay]`, and a

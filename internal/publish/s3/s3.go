@@ -71,8 +71,8 @@ func New(root string, cfg config.PublisherConfig) (core.Publisher, error) {
 		if region == "" {
 			region = "auto"
 		}
-		accessKey = firstEnv("TIGRIS_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID")
-		secretKey = firstEnv("TIGRIS_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY")
+		accessKey = publish.FirstEnv("TIGRIS_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID")
+		secretKey = publish.FirstEnv("TIGRIS_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY")
 	default: // "s3"
 		if endpoint == "" {
 			return nil, fmt.Errorf("s3 publisher %q: 'endpoint' is required (e.g. https://s3.us-east-1.amazonaws.com)", cfg.ID)
@@ -230,13 +230,4 @@ func (p *Publisher) Provision(ctx context.Context) (bool, error) {
 		p.log.Step("PUBLISH", p.id, "warning", "could not set CORS policy (cross-origin fetch may fail): "+err.Error())
 	}
 	return created, nil
-}
-
-func firstEnv(keys ...string) string {
-	for _, k := range keys {
-		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
-			return v
-		}
-	}
-	return ""
 }

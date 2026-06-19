@@ -29,12 +29,8 @@ func Corpus(cfg *config.Config) ([]CorpusDoc, error) {
 	out := make([]CorpusDoc, 0, len(docs))
 	for _, d := range docs {
 		fm := d.doc.Frontmatter
-		pid := fm.Persona
-		if pid == "" && len(fm.Publications) > 0 {
-			pid = fm.Publications[0].Persona
-		}
 		out = append(out, CorpusDoc{
-			PersonaID:  pid,
+			PersonaID:  resolvePersona(fm),
 			Title:      fm.Title,
 			Date:       fm.Date,
 			SourcePath: d.doc.SourcePath,

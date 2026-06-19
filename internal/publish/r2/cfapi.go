@@ -33,7 +33,6 @@ type cfEnvelope struct {
 }
 
 type cfError struct {
-	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 

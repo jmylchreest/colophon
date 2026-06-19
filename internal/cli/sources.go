@@ -44,7 +44,7 @@ func describeSources(cfg *config.Config) []sourceInfo {
 	}
 	out := make([]sourceInfo, 0, len(srcs))
 	for _, s := range srcs {
-		get := func(k string) string { v, _ := s.Settings[k].(string); return strings.TrimSpace(v) }
+		get := func(k string) string { return setting(s.Settings, k) }
 		info := sourceInfo{ID: s.ID, Driver: s.Driver}
 		switch s.Driver {
 		case "md-dir":

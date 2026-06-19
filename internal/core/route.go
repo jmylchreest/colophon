@@ -84,8 +84,11 @@ func (r *Router) Keep(publisher, outPath string) bool {
 	if r == nil || len(r.routes) == 0 {
 		return true
 	}
-	matchedAny := false
+	matchedAny, owns := false, false
 	for _, c := range r.routes {
+		if c.publisher == publisher {
+			owns = true
+		}
 		if c.re.MatchString(outPath) {
 			if c.publisher == publisher {
 				return true
@@ -93,7 +96,7 @@ func (r *Router) Keep(publisher, outPath string) bool {
 			matchedAny = true
 		}
 	}
-	if r.Owns(publisher) {
+	if owns {
 		return false // a route-target publisher gets only its own routed files
 	}
 	return !matchedAny // a default publisher gets only unrouted files

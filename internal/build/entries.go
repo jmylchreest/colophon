@@ -35,10 +35,6 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 	out := make([]Entry, 0, len(docs))
 	for _, d := range docs {
 		fm := d.doc.Frontmatter
-		persona := fm.Persona
-		if persona == "" && len(fm.Publications) > 0 {
-			persona = fm.Publications[0].Persona
-		}
 		slug := slugFor(d.doc.SourcePath, fm.Slug)
 		out = append(out, Entry{
 			SourcePath:  d.doc.SourcePath,
@@ -47,7 +43,7 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 			Title:       fm.Title,
 			Type:        resolvePageType(fm),
 			Author:      fm.Author,
-			Persona:     persona,
+			Persona:     resolvePersona(fm),
 			Tags:        fm.Tags,
 			Draft:       fm.Draft,
 			Date:        fm.Date,

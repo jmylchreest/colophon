@@ -63,8 +63,8 @@ func New(root string, cfg config.PublisherConfig) (core.Publisher, error) {
 		deleteOrphaned = v
 	}
 	s3 := s3common.New(endpoint, bucket, region,
-		firstEnv("R2_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
-		firstEnv("R2_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"))
+		publish.FirstEnv("R2_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
+		publish.FirstEnv("R2_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"))
 	s3.Name = cfg.ID
 	p := &Publisher{
 		id:             cfg.ID,
@@ -221,13 +221,4 @@ func (p *Publisher) Provision(ctx context.Context) (bool, error) {
 		p.log.Step("PUBLISH", p.id, "warning", "could not set CORS policy (cross-origin fetch of routed search/assets may fail): "+err.Error())
 	}
 	return created, nil
-}
-
-func firstEnv(keys ...string) string {
-	for _, k := range keys {
-		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
-			return v
-		}
-	}
-	return ""
 }

@@ -230,7 +230,7 @@ func writeTree(tree fs.FS, dir string) (int, int64, error) {
 func authFor(repoURL string) (transport.AuthMethod, error) {
 	switch {
 	case strings.HasPrefix(repoURL, "http://"), strings.HasPrefix(repoURL, "https://"):
-		if tok := firstEnv("GITHUB_TOKEN", "GH_TOKEN", "GIT_TOKEN"); tok != "" {
+		if tok := publish.FirstEnv("GITHUB_TOKEN", "GH_TOKEN", "GIT_TOKEN"); tok != "" {
 			return &githttp.BasicAuth{Username: "x-access-token", Password: tok}, nil
 		}
 		return nil, nil
@@ -250,13 +250,4 @@ func authFor(repoURL string) (transport.AuthMethod, error) {
 		}
 		return a, nil
 	}
-}
-
-func firstEnv(keys ...string) string {
-	for _, k := range keys {
-		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
-			return v
-		}
-	}
-	return ""
 }
