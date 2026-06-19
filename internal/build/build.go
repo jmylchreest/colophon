@@ -887,6 +887,7 @@ func (c listingChrome) render(eng render.Engine, heading string, pages []map[str
 		"analytics_head":  c.analyticsHead,
 		"favicon":         c.favicon,
 		"heading":         heading,
+		"tagline":         c.site.Tagline,
 		"authors":         c.authors,
 		"nav_pages":       c.navPages,
 		"pages":           pages,

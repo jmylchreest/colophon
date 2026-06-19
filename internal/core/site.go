@@ -7,9 +7,13 @@ type Site struct {
 	Title   string `yaml:"title"`
 	BaseURL string `yaml:"base_url"`
 	Theme   string `yaml:"theme"`
-	// Description is the site's tagline, used as the home/listing pages' meta description and
-	// Open Graph/Twitter description and in the WebSite/Blog JSON-LD. Empty omits those.
+	// Description is the site's one-line summary for search and social: the home/listing pages'
+	// meta description, Open Graph/Twitter description, and WebSite/Blog JSON-LD. Empty omits those.
 	Description string `yaml:"description,omitempty"`
+	// Tagline is the short hero line a theme may show under the site title on the home page (the
+	// press theme's lede). Purely presentational, distinct from the SEO Description. Empty: a
+	// theme renders no lede.
+	Tagline string `yaml:"tagline,omitempty"`
 	// Image is the default social-share image for listing pages (og:image/twitter:image): an
 	// absolute URL, or a site-root-relative path resolved against base_url. Empty omits it.
 	Image string `yaml:"image,omitempty"`

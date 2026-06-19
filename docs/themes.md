@@ -9,7 +9,9 @@ assets. Three themes ship built in:
 - **`press`** — colophon.blog's brand theme. Literary-modern (Fraunces over Inter), light &
   dark, drifting glow, ink-blob title reveal, feed popouts. It *inherits* `default` (see
   [base themes](#base-themes-inheriting-another-theme)), so it reuses the same vendored
-  libraries and fonts without shipping its own copy.
+  libraries and fonts without shipping its own copy. The home-page lede under the title comes
+  from the site's optional `tagline:` (presentational, distinct from the SEO `description:`);
+  unset renders no lede.
 - **`minimal`** — plain, readable text. No JavaScript and no web fonts; rich blocks show as
   their raw source (the [raw-block contract](content.md#the-raw-block-contract-progressive-enhancement)).
 
@@ -215,6 +217,8 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 |----------|-------------|
 | `lang`, `site_title`, `base_path`, `base_url`, `feed_head`, `favicon`, `analytics_head` | As above. (Listing pages carry no prose, so no `glossary_head`.) |
 | `heading` | Page heading — the site title on the home page, or `Tagged “<name>”` on a tag page. |
+| `tagline` | The site's optional `tagline:`, for a hero lede under the title. Empty when unset — guard with `{% if tagline %}`. |
+| `seo_head` | The listing's SEO `<head>` block (canonical, Open Graph/Twitter, JSON-LD). Emit with `{{ seo_head\|safe }}`. |
 | `feeds` | List of `{label, href}` for subscribe links. |
 | `pages` | List of posts: `{title, url, date, draft, embargoed, embargo_until, image, tags}`. Prefix `url` with `base_path`. |
 

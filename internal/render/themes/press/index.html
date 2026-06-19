@@ -57,7 +57,7 @@
 
 <section class="home-hero">
   <h1 class="ink">{{ heading|default:site_title }}</h1>
-  <p class="lede">Write it once. Own it forever. Publish anywhere.</p>
+  {% if tagline %}<p class="lede">{{ tagline }}</p>{% endif %}
 </section>
 
 {% if authors %}
