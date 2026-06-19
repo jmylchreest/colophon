@@ -40,8 +40,22 @@ type Source struct {
 func (s *Source) ID() string     { return s.id }
 func (s *Source) Driver() string { return "md-dir" }
 
+// Resolve finds a source-relative ref under the source dir (plain dir-relative), returning its
+// path if it stats as a file — without reading it.
+func (s *Source) Resolve(ctx context.Context, ref string) (string, bool) {
+	p := filepath.Join(s.dir, filepath.FromSlash(ref))
+	if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+		return p, true
+	}
+	return "", false
+}
+
 func (s *Source) Open(ctx context.Context, ref string) (io.ReadCloser, error) {
-	return os.Open(filepath.Join(s.dir, filepath.FromSlash(ref)))
+	p, ok := s.Resolve(ctx, ref)
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+	return os.Open(p)
 }
 
 // Documents walks the directory and parses every .md file. A missing directory yields

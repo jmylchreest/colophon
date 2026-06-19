@@ -11,6 +11,25 @@ import (
 	_ "github.com/jmylchreest/colophon/internal/source/mddir" // register the md-dir driver
 )
 
+// missingKinds returns the {Kind: Ref} pairs MissingAssets reports for the project at root, so a
+// test can assert on the set without depending on slice order.
+func missingKinds(t *testing.T, root string) map[string]string {
+	t.Helper()
+	cfg, err := config.Load(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missing, err := MissingAssets(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, m := range missing {
+		got[m.Kind] = m.Ref
+	}
+	return got
+}
+
 // avatarPNG is an 8x8 PNG — a self-contained byte the build can publish and route.
 var avatarPNG = []byte{
 	0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
@@ -156,5 +175,54 @@ func TestAvatarMissingWarns(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(out, "assets", "does-not-exist.png")); err == nil {
 		t.Error("missing avatar should not publish a file")
+	}
+}
+
+// TestAvatarRootFallback asserts a project-level avatar that lives at the project root (not under
+// any content source) still resolves via the sources-then-root fallback, so the same `avatar:`
+// value is portable across drivers. The byte sits at <root>/assets/rootface.png — the md-dir
+// source (rooted at content/) can't see it; only the project-root fallback can.
+func TestAvatarRootFallback(t *testing.T) {
+	root := writeAvatarFixture(t, "assets/rootface.png")
+	full := filepath.Join(root, "assets", "rootface.png")
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, avatarPNG, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	out := buildTo(t, root, Options{})
+
+	if _, err := os.ReadFile(filepath.Join(out, "assets", "rootface.png")); err != nil {
+		t.Fatalf("root-fallback avatar not published to public/assets/rootface.png: %v", err)
+	}
+	const want = `src="/assets/rootface.png"`
+	html := read(t, filepath.Join(out, "index.html"))
+	if !strings.Contains(html, want) {
+		t.Errorf("root-fallback avatar src not emitted; want %q", want)
+	}
+}
+
+// TestMissingAssets covers the dry-resolve doctor uses: a resolvable avatar reports nothing, a
+// data:/http(s) avatar is skipped (passthrough, never "missing"), and a broken file-path avatar
+// is reported as a missing "avatar" ref.
+func TestMissingAssets(t *testing.T) {
+	// Resolvable: the avatar lives under the content source.
+	if got := missingKinds(t, writeAvatarFixture(t, "assets/face.png")); len(got) != 0 {
+		t.Errorf("resolvable avatar should report nothing missing, got %v", got)
+	}
+
+	// Passthrough: data:/http(s) avatars are never local refs, so never "missing".
+	for _, avatar := range []string{`"data:image/png;base64,iVBORw0KGgo="`, `https://cdn.example.com/sam.png`} {
+		if got := missingKinds(t, writeAvatarFixture(t, avatar)); len(got) != 0 {
+			t.Errorf("passthrough avatar %q should report nothing missing, got %v", avatar, got)
+		}
+	}
+
+	// Broken: a file-path avatar nothing can source is reported.
+	got := missingKinds(t, writeAvatarFixture(t, "assets/nope.png"))
+	if got["avatar"] != "assets/nope.png" {
+		t.Errorf("broken avatar not reported; got %v", got)
 	}
 }

@@ -23,6 +23,13 @@ type Source interface {
 	// source-relative path. A filesystem source reads a file; an API source (Notion,
 	// WebDAV) fetches it. The caller closes the reader; a missing asset is an error.
 	Open(ctx context.Context, ref string) (io.ReadCloser, error)
+	// Resolve reports whether a source-relative ref can be sourced and, if so, its qualified
+	// (canonical) location — the same place Open would read from — without reading it. It is
+	// the cheap "does this reference resolve?" check (used by doctor and by avatar/asset
+	// publishing): a filesystem source stats; an API source would do a metadata lookup. The
+	// resolution semantics mirror the driver's own embed handling (e.g. obsidian searches its
+	// scan roots + vault; md-dir is plain dir-relative).
+	Resolve(ctx context.Context, ref string) (qualified string, ok bool)
 }
 
 // Warner is an optional Source capability: after Documents, the build collects and logs any

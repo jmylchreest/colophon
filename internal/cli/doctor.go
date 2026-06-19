@@ -47,6 +47,7 @@ func (c *DoctorCmd) Run() error {
 	checkCredentials(cfg, r)
 	checkEnvRefs(cfg, r)
 	checkContent(cfg, r)
+	checkAssets(cfg, r)
 
 	fmt.Println(root)
 	fmt.Printf("  sites %d · publishers %d · environments %d (%s) · personas %d · authors %d\n",
@@ -176,6 +177,20 @@ func checkEnvRefs(cfg *config.Config, r *report) {
 	if len(unset) > 0 {
 		sort.Strings(unset)
 		r.warn("config references unset env vars: %s (a default applies where given; may be intentional)", strings.Join(unset, ", "))
+	}
+}
+
+// checkAssets warns about any DEFINED file reference — an author avatar, a post hero/image, a
+// markdown image embed — that can't be sourced (a likely broken link, no silent 404). An
+// undefined reference is fine: it just means none was wanted. data:/http(s) refs pass through.
+func checkAssets(cfg *config.Config, r *report) {
+	missing, err := build.MissingAssets(cfg)
+	if err != nil {
+		r.warn("asset checks skipped: %v", err)
+		return
+	}
+	for _, m := range missing {
+		r.warn("%s for %q references a file that can't be sourced: %q", m.Kind, m.Owner, m.Ref)
 	}
 }
 

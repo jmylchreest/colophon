@@ -97,20 +97,30 @@ func (s *Source) Driver() string { return "obsidian" }
 // matched by more than one path). It satisfies core.Warner.
 func (s *Source) Warnings() []string { return s.warnings }
 
-// Open resolves a source-relative ref (a note or an asset path, possibly with "../" reaching
-// elsewhere in the vault) against each scan root and the vault root, returning the first
-// that opens.
-func (s *Source) Open(ctx context.Context, ref string) (io.ReadCloser, error) {
+// Resolve finds a source-relative ref (a note or asset path, possibly with "../" reaching
+// elsewhere in the vault) against each scan root then the vault root, returning the first that
+// stats as a file — without reading it.
+func (s *Source) Resolve(ctx context.Context, ref string) (string, bool) {
 	roots := append(append([]string{}, s.scanRoots...), s.vault)
 	for _, root := range roots {
 		if root == "" {
 			continue
 		}
-		if f, err := os.Open(filepath.Join(root, filepath.FromSlash(ref))); err == nil {
-			return f, nil
+		p := filepath.Join(root, filepath.FromSlash(ref))
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			return p, true
 		}
 	}
-	return nil, os.ErrNotExist
+	return "", false
+}
+
+// Open returns the bytes of a ref, reading from the location Resolve found.
+func (s *Source) Open(ctx context.Context, ref string) (io.ReadCloser, error) {
+	p, ok := s.Resolve(ctx, ref)
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+	return os.Open(p)
 }
 
 func (s *Source) warnf(format string, args ...any) {

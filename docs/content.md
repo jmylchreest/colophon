@@ -157,6 +157,23 @@ configuration. When routing is active the build rewrites those image URLs to the
 public base, so the page references `https://assets.example.com/…` while the bytes are
 uploaded to the store rather than your HTML host.
 
+### How file references resolve
+
+Two kinds of reference resolve differently:
+
+- **Per-post references** — markdown embeds/images, and a post's `hero`/`image` — resolve
+  against *that post's own source* (its driver's rules: a vault searches its scan roots and the
+  vault, an `md-dir` resolves dir-relative). They stay driver-relative so a missing embed is a
+  real error, not silently masked by another source.
+- **Project-level references** — an author `avatar` — resolve across *every* content source and
+  then fall back to the **project root**. The same `avatar: assets/me.png` therefore works whether
+  the file lives in a content dir, a vault, or the project's own `assets/` — portable across
+  drivers.
+
+`colophon doctor` dry-resolves every *defined* reference through the same machinery and warns when
+one can't be sourced (a likely broken link). An *undefined* reference is fine — it just means none
+was wanted. `data:`/`http(s)://` references always pass through untouched.
+
 ## Glossary
 
 Drop a `glossary.yaml` (term → definition) at the project root and colophon publishes it as
