@@ -10,17 +10,17 @@ import (
 	"github.com/jmylchreest/colophon/internal/publish/s3common"
 )
 
-func TestDetectProvider(t *testing.T) {
-	cases := map[string]providerName{
-		"https://abc123.r2.cloudflarestorage.com":         providerR2,
-		"https://abc123.eu.r2.cloudflarestorage.com":      providerR2, // EU jurisdiction
-		"https://abc123.fedramp.r2.cloudflarestorage.com": providerR2, // FedRAMP
-		"https://s3.us-east-1.amazonaws.com":              providerUnknown,
-		"http://localhost:9000":                           providerUnknown,
+func TestIsR2Endpoint(t *testing.T) {
+	cases := map[string]bool{
+		"https://abc123.r2.cloudflarestorage.com":         true,
+		"https://abc123.eu.r2.cloudflarestorage.com":      true,  // EU jurisdiction
+		"https://abc123.fedramp.r2.cloudflarestorage.com": true,  // FedRAMP
+		"https://s3.us-east-1.amazonaws.com":              false, // generic S3
+		"http://localhost:9000":                           false, // MinIO
 	}
 	for endpoint, want := range cases {
-		if got := detectProvider(endpoint); got != want {
-			t.Errorf("detectProvider(%q) = %q, want %q", endpoint, got, want)
+		if got := isR2Endpoint(endpoint); got != want {
+			t.Errorf("isR2Endpoint(%q) = %v, want %v", endpoint, got, want)
 		}
 	}
 }

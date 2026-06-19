@@ -6,43 +6,32 @@ import (
 	"path"
 )
 
-// providerOps is a recognised backend's control-plane behaviour. A nil hook means the step
-// is unsupported, so the driver falls back to explicit config and plain S3.
-type providerOps struct {
-	// publicURL discovers the bucket's browser-facing base URL (absolute, no trailing slash).
-	publicURL func(ctx context.Context, p *Publisher) (string, error)
-	// provision runs after the bucket is created, to expose it (e.g. enable the r2.dev URL).
-	provision func(ctx context.Context, p *Publisher) error
-}
+// r2HostGlob matches a Cloudflare R2 endpoint host — the standard host and the jurisdiction
+// variants (<acct>.eu… / <acct>.fedramp…), since the * spans the extra label.
+const r2HostGlob = "*.r2.cloudflarestorage.com"
 
-var providerBehaviour = map[providerName]providerOps{
-	providerR2: {publicURL: r2PublicURL, provision: r2EnablePublicAccess},
-}
-
-// detectProvider resolves the provider for an endpoint via the host glob table.
-func detectProvider(endpoint string) providerName {
+// isR2Endpoint reports whether endpoint is a Cloudflare R2 host. The driver speaks plain S3 to
+// every backend; only a real R2 endpoint additionally gets R2's control-plane features (public-
+// URL discovery, r2.dev enablement), so a generic S3/MinIO endpoint skips those Cloudflare calls.
+// (If a second backend ever needs its own control-plane path, reintroduce a host→provider table.)
+func isR2Endpoint(endpoint string) bool {
 	host := ""
 	if u, err := url.Parse(endpoint); err == nil {
 		host = u.Hostname()
 	}
-	for _, e := range endpointProviders {
-		if ok, _ := path.Match(e.hostGlob, host); ok {
-			return e.provider
-		}
-	}
-	return providerUnknown
+	ok, _ := path.Match(r2HostGlob, host)
+	return ok
 }
 
-func (p *Publisher) ops() providerOps { return providerBehaviour[detectProvider(p.s3.Endpoint)] }
-
-// resolvePublicURL returns the configured public_url, else asks the matching provider to
-// discover one, else "" — in which case routing stays inert and assets remain co-located.
+// resolvePublicURL returns the configured public_url, else asks R2 to discover one (a custom or
+// managed domain) when the endpoint is R2, else "" — in which case routing stays inert and assets
+// remain co-located.
 func (p *Publisher) resolvePublicURL(ctx context.Context) (string, error) {
 	if p.publicURL != "" {
 		return p.publicURL, nil
 	}
-	if f := p.ops().publicURL; f != nil {
-		return f(ctx, p)
+	if isR2Endpoint(p.s3.Endpoint) {
+		return r2PublicURL(ctx, p)
 	}
 	return "", nil
 }

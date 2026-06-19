@@ -206,11 +206,11 @@ func (p *Publisher) Provision(ctx context.Context) (bool, error) {
 		}
 		created = true
 	}
-	// Ensure the bucket is publicly reachable (the provider enables r2.dev only when nothing
-	// already exposes it — see r2EnablePublicAccess). Runs for an existing bucket too, and a
-	// failure doesn't undo the create — warn and continue.
-	if prov := p.ops().provision; prov != nil {
-		if err := prov(ctx, p); err != nil {
+	// Ensure the bucket is publicly reachable (R2 enables r2.dev only when nothing already
+	// exposes it — see r2EnablePublicAccess). Runs for an existing bucket too, and a failure
+	// doesn't undo the create — warn and continue. Non-R2 endpoints have no such control plane.
+	if isR2Endpoint(p.s3.Endpoint) {
+		if err := r2EnablePublicAccess(ctx, p); err != nil {
 			p.log.Step("PUBLISH", p.id, "warning",
 				"could not enable public access (CLOUDFLARE_API_TOKEN needs R2 Admin Read & Write): "+err.Error())
 		}
