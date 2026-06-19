@@ -187,16 +187,28 @@ func Load(root string) (*Config, error) {
 	return &cfg, nil
 }
 
-func loadPersonas(dir string) ([]core.Persona, error) {
+// parseYAML interpolates {env:VAR} in raw and parses it as YAML into a koanf instance. noun/p
+// name the kind and file in the error so callers don't each rebuild the same message.
+func parseYAML(raw []byte, noun, p string) (*koanf.Koanf, error) {
+	k := koanf.New(".")
+	if err := k.Load(rawbytes.Provider(interpolateEnv(raw)), yaml.Parser()); err != nil {
+		return nil, fmt.Errorf("parse %s %s: %w", noun, p, err)
+	}
+	return k, nil
+}
+
+// loadYAMLDir decodes every *.yaml file in dir into a T (with {env:VAR} interpolation), applies
+// fixup to each (e.g. default an id from the filename), and sorts the result by keyOf. A missing
+// dir yields nil, so the directory is optional; noun names the kind in error messages.
+func loadYAMLDir[T any](dir, noun string, fixup func(*T, string), keyOf func(*T) string) ([]T, error) {
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read personas dir %s: %w", dir, err)
+		return nil, fmt.Errorf("read %s dir %s: %w", noun, dir, err)
 	}
-
-	var personas []core.Persona
+	var out []T
 	for _, e := range entries {
 		if e.IsDir() || filepath.Ext(e.Name()) != ".yaml" {
 			continue
@@ -204,56 +216,38 @@ func loadPersonas(dir string) ([]core.Persona, error) {
 		p := filepath.Join(dir, e.Name())
 		raw, err := os.ReadFile(p)
 		if err != nil {
-			return nil, fmt.Errorf("read persona %s: %w", p, err)
+			return nil, fmt.Errorf("read %s %s: %w", noun, p, err)
 		}
-		k := koanf.New(".")
-		if err := k.Load(rawbytes.Provider(interpolateEnv(raw)), yaml.Parser()); err != nil {
-			return nil, fmt.Errorf("parse persona %s: %w", p, err)
+		k, err := parseYAML(raw, noun, p)
+		if err != nil {
+			return nil, err
 		}
-		var persona core.Persona
-		if err := k.UnmarshalWithConf("", &persona, unmarshalConf); err != nil {
-			return nil, fmt.Errorf("decode persona %s: %w", p, err)
+		var v T
+		if err := k.UnmarshalWithConf("", &v, unmarshalConf); err != nil {
+			return nil, fmt.Errorf("decode %s %s: %w", noun, p, err)
 		}
-		personas = append(personas, persona)
+		if fixup != nil {
+			fixup(&v, e.Name())
+		}
+		out = append(out, v)
 	}
-	sort.Slice(personas, func(i, j int) bool { return personas[i].ID < personas[j].ID })
-	return personas, nil
+	sort.Slice(out, func(i, j int) bool { return keyOf(&out[i]) < keyOf(&out[j]) })
+	return out, nil
+}
+
+func loadPersonas(dir string) ([]core.Persona, error) {
+	return loadYAMLDir(dir, "persona", nil, func(p *core.Persona) string { return p.ID })
 }
 
 func loadAuthors(dir string) ([]core.Author, error) {
-	entries, err := os.ReadDir(dir)
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("read authors dir %s: %w", dir, err)
-	}
-	var authors []core.Author
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".yaml" {
-			continue
-		}
-		p := filepath.Join(dir, e.Name())
-		raw, err := os.ReadFile(p)
-		if err != nil {
-			return nil, fmt.Errorf("read author %s: %w", p, err)
-		}
-		k := koanf.New(".")
-		if err := k.Load(rawbytes.Provider(interpolateEnv(raw)), yaml.Parser()); err != nil {
-			return nil, fmt.Errorf("parse author %s: %w", p, err)
-		}
-		var author core.Author
-		if err := k.UnmarshalWithConf("", &author, unmarshalConf); err != nil {
-			return nil, fmt.Errorf("decode author %s: %w", p, err)
-		}
+	return loadYAMLDir(dir, "author",
 		// Default the id to the file stem (so authors/john.yaml → id "john").
-		if author.ID == "" {
-			author.ID = strings.TrimSuffix(e.Name(), ".yaml")
-		}
-		authors = append(authors, author)
-	}
-	sort.Slice(authors, func(i, j int) bool { return authors[i].ID < authors[j].ID })
-	return authors, nil
+		func(a *core.Author, name string) {
+			if a.ID == "" {
+				a.ID = strings.TrimSuffix(name, ".yaml")
+			}
+		},
+		func(a *core.Author) string { return a.ID })
 }
 
 // loadGlossary reads a flat term→definition map from glossary.yaml (with {env:VAR}
@@ -266,9 +260,9 @@ func loadGlossary(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read glossary %s: %w", path, err)
 	}
-	k := koanf.New(".")
-	if err := k.Load(rawbytes.Provider(interpolateEnv(raw)), yaml.Parser()); err != nil {
-		return nil, fmt.Errorf("parse glossary %s: %w", path, err)
+	k, err := parseYAML(raw, "glossary", path)
+	if err != nil {
+		return nil, err
 	}
 	out := map[string]string{}
 	for _, key := range k.Keys() {
