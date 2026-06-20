@@ -1,0 +1,4 @@
+description: "Press — a clean editorial broadsheet theme with a restrained, print-inspired palette."
+image:
+  genai:
+    system_prompt: "editorial illustration in a restrained, print-inspired style; muted palette, soft depth, considered composition, no text or lettering"

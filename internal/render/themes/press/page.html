@@ -104,6 +104,8 @@
       </div>
     </header>
 
+    {% if has_audio %}<figure class="post-audio" data-audioplayer data-src="{{ audio }}" data-label-play="{{ audio_play }}" data-label-pause="{{ audio_pause }}"><figcaption>{{ audio_listen }}</figcaption><audio controls preload="none" src="{{ audio }}"></audio></figure>{% endif %}
+
     {% if hero %}<figure class="cover"><img src="{{ hero }}" alt="{{ hero_alt }}"{% if hero_style %} style="{{ hero_style }}"{% endif %}></figure>{% endif %}
 
     <article class="prose">{{ content|safe }}</article>
@@ -127,6 +129,7 @@
 <footer class="foot"><span>Published with colophon</span></footer>
 
 <script defer src="{{ base_path }}app.js"></script>
+{% if has_audio %}<script defer src="{{ base_path }}player.js"></script>{% endif %}
 {% if search %}<script type="module" src="{{ base_path }}search-ui.js"></script>{% endif %}
 {% if has_code %}
 <link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css">

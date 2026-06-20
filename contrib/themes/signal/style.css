@@ -141,3 +141,19 @@ header.site { border-bottom: 1px solid var(--border); }
 .callout-warning .callout-title { color: var(--yellow); }
 .math-display { display: block; overflow-x: auto; margin: 1.25rem 0; text-align: center; }
 pre.mermaid { background: none; border: none; text-align: center; }
+
+.post-audio { --accent: var(--text); }
+/* audio player (script is engine-provided: player.js) */
+.post-audio { margin: 1.5rem 0 2rem; }
+.post-audio figcaption { font-size: .74rem; color: var(--muted, var(--text-muted, currentColor)); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .5rem; opacity: .85; }
+.post-audio audio { width: 100%; }
+.post-audio.ap-ready { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 10px; padding: .65rem .85rem; background: var(--surface, transparent); }
+.post-audio.ap-ready figcaption { flex-basis: 100%; margin: 0; }
+.post-audio.ap-ready audio { display: none; }
+.ap-toggle { flex: 0 0 auto; width: 2.4rem; height: 2.4rem; border-radius: 50%; border: 1px solid var(--border); cursor: pointer; background: var(--accent); color: var(--bg, #fff); font-size: .85rem; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; }
+.ap-toggle:hover { opacity: .85; }
+.ap-wave { flex: 1 1 140px; min-width: 100px; height: 44px; cursor: pointer; }
+.ap-time { flex: 0 0 auto; font-size: .78rem; color: var(--muted, var(--text-muted, currentColor)); font-variant-numeric: tabular-nums; }
+
+/* speech markup: <notts>/<tts> are transparent for layout */
+notts, tts { display: contents; }

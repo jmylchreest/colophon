@@ -60,7 +60,7 @@
   {% if tagline %}<p class="lede">{{ tagline }}</p>{% endif %}
 </section>
 
-{% if authors %}
+{% if authors|length > 1 %}
 <nav class="home-authors wrap" aria-label="Authors">
   <div class="author-card">
     <span class="author-card-label">Authors</span>
@@ -82,13 +82,13 @@
 <main id="main" class="wrap">
   <ul class="post-list" data-reveal="8">
   {% for p in pages %}
-    <a class="post-row" href="{{ base_path }}{{ p.url }}">
+    <li class="post-row">
       <time>{% if p.date %}{{ p.date }}{% endif %}</time>
       <div>
-        <div class="pt">{{ p.title }}</div>
-        <div class="badges">{% if p.draft %}<span class="chip">draft</span>{% endif %}{% if p.embargoed %}<span class="chip">embargoed</span>{% endif %}{% if p.series %}<span class="chip chip-series">series</span>{% endif %}{% for tg in p.tags %}<span class="chip">#{{ tg.name }}</span>{% endfor %}</div>
+        <div class="pt"><a class="post-row-link" href="{{ base_path }}{{ p.url }}">{{ p.title }}</a></div>
+        <div class="badges">{% if p.draft %}<span class="chip">draft</span>{% endif %}{% if p.embargoed %}<span class="chip">embargoed</span>{% endif %}{% if p.series %}<span class="chip chip-series">series</span>{% endif %}{% for tg in p.tags %}<a class="chip" href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</div>
       </div>
-    </a>
+    </li>
   {% endfor %}
   </ul>
   <div class="reveal-sentinel" aria-hidden="true"></div>

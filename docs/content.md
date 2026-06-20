@@ -30,11 +30,14 @@ All fields are optional unless noted.
 | `tags`, `categories` | Lists for organisation/feeds. |
 | `author` | The byline — an `authors/<id>.yaml` id. Defaults to the first author, else "Anonymous". See [Authors & personas](personas.md). |
 | `persona` | The hidden writing *voice* (a `personas/<id>.yaml` id) used by the agent; never shown. |
-| `hero` | Banner image shown at the top of the post. A path or an Obsidian `"[[image.png]]"`. |
-| `image` | Preview/social-card image (`og:image` + index thumbnail). |
+| `hero` | Banner image shown at the top of the post. A path, an Obsidian `"[[image.png]]"`, or a `"gen:<prompt>"` to generate one — see [Image generation](image-generation.md). |
+| `image` | Preview/social-card image (`og:image` + index thumbnail). Accepts a path or a `"gen:<prompt>"`. |
 | `hero_alt`, `image_alt` | Alt text for those images. Empty = decorative (`alt=""`); set it when the image carries meaning. |
 | `hero_fit`, `image_fit` | How the image fills its box — CSS `object-fit`: `cover` (crop, default), `contain` (letterbox), `fill`, `scale-down`, `none`. |
 | `hero_position`, `image_position` | Which part shows when cropping — CSS `object-position`, e.g. `top` or `50% 20%`. |
+| `audio` | `true` generates a spoken (TTS) reading of the post — needs `generation.speech`. See [Image & audio generation](image-generation.md). |
+| `audio_file` | Attach a pre-recorded audio file (a path or `[[embed]]`) instead of generating one — no AI. Wins over `audio`. |
+| `audio_voice` | Override the reading voice id (generated audio only); else the author's/persona's `voice`, else the site default. |
 | `lang` | Per-post language (BCP-47, e.g. `fr`), overriding the site `lang`. Emitted as `<html lang>`. |
 | `glossary` | `false` turns off automatic [glossary](#glossary) decoration for this post; an explicit `<abbr>` still works. |
 | `draft` | `true` keeps the post out of production builds (shown in preview/serve). |
@@ -148,6 +151,9 @@ Notes:
   copied next to the page.
 - `![](relative.png)` images are copied beside the page so the relative `src` resolves;
   external (`https://…`) images are left untouched.
+- **Generated images** — `![alt](<gen:a prompt here>)` produces the image with an AI provider
+  and caches it. Wrap the prompt in `<…>` when it contains spaces. See
+  [Image generation](image-generation.md).
 
 ### Images and object storage
 

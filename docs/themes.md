@@ -106,6 +106,7 @@ Because on-disk themes inherit `default`, a contrib theme only carries its own t
 | `index.html` | Renders the site index (post list). |
 | `<type>.html` | *Optional.* Renders entries of page type `<type>` (e.g. `project.html`); falls back to `page.html`. See [Page types](#page-types). |
 | `favicon.svg` | Default site icon (override per-site with `favicon:` pointing at a project file). |
+| `theme.yaml` | *Optional.* Theme metadata — a `description`, and `image.genai.system_prompt` (the house style for [generated images](image-generation.md#house-style-theme-system-prompt)). Not copied to the output. |
 | *anything else* | Any non-`.html` file is copied verbatim to the output root (CSS, JS, fonts, images). |
 
 Static assets keep their relative path: `themes/mytheme/vendor/app.js` is written to

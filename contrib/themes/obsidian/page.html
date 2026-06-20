@@ -55,6 +55,7 @@
 </div>
 
 <div class="article-wrap">
+  {% if has_audio %}<figure class="post-audio" data-audioplayer data-src="{{ audio }}" data-label-play="{{ audio_play }}" data-label-pause="{{ audio_pause }}"><figcaption>{{ audio_listen }}</figcaption><audio controls preload="none" src="{{ audio }}"></audio></figure>{% endif %}
   <div class="prose">
     {{ content|safe }}
   </div>
@@ -102,6 +103,7 @@ window.addEventListener('scroll', () => { const d = document.documentElement; do
 {% if has_math %}<link rel="stylesheet" href="{{ base_path }}vendor/katex/katex.min.css"><script defer src="{{ base_path }}vendor/katex/katex.min.js"></script><script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.math').forEach(function(el){try{katex.render(el.textContent,el,{displayMode:el.classList.contains('math-display'),throwOnError:false});}catch(e){}});});</script>{% endif %}
 {% if has_mermaid %}<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:'dark'})"></script>{% endif %}
 {% if search %}<script type="module" src="{{ base_path }}search-ui.js"></script>{% endif %}
+{% if has_audio %}<script defer src="{{ base_path }}player.js"></script>{% endif %}
 {% if glossary_head %}{{ glossary_head|safe }}{% endif %}
 {% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>

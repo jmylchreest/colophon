@@ -78,3 +78,6 @@ pre.mermaid { text-align: center; background: none; }
   .embargo { background: #3a3000; color: #f0d97a; }
   .draft { background: #2a2d30; color: #b6bcc2; }
 }
+
+/* speech markup: <notts>/<tts> are transparent for layout */
+notts, tts { display: contents; }

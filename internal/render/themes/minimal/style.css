@@ -19,3 +19,6 @@ img { max-width: 100%; height: auto; }
 pre { white-space: pre-wrap; padding: .75rem; background: rgba(127,127,127,.1); overflow-x: auto; }
 code { font-family: monospace; }
 blockquote { border-left: 3px solid rgba(127,127,127,.4); margin: 0; padding-left: 1rem; }
+
+/* speech markup: <notts>/<tts> are transparent for layout */
+notts, tts { display: contents; }

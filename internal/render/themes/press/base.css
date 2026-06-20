@@ -107,12 +107,27 @@ a { color: inherit; }
 .chip:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .chip-series { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 28%, transparent); background: var(--accent-soft); }
 .post-list { list-style: none; padding: 2rem 0 5rem; }
-.post-row { text-decoration: none; padding: 1.6rem 0; border-top: 1px solid var(--border);
+.post-row { position: relative; padding: 1.6rem 0; border-top: 1px solid var(--border);
   display: grid; grid-template-columns: 7rem 1fr; gap: 1.5rem; align-items: baseline; transition: opacity 0.2s; }
 .post-row:hover { opacity: 0.62; }
 .post-row time { color: var(--faint); font-size: 0.82rem; padding-top: 0.35rem; }
 .post-row .pt { font-family: var(--serif); font-weight: 500; font-size: 1.4rem; line-height: 1.25; letter-spacing: -0.01em; }
-.post-row .badges { margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+/* The title is a stretched link covering the whole row; tag chips sit above it (z-index) so
+   they stay individually clickable instead of triggering the row's post link. */
+.post-row-link { color: inherit; text-decoration: none; }
+.post-row-link::after { content: ""; position: absolute; inset: 0; }
+.post-row .badges { position: relative; z-index: 1; margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.post-audio { margin: 1.5rem 0 2rem; }
+.post-audio figcaption { font-size: 0.74rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+.post-audio audio { width: 100%; } /* native fallback when JS is off */
+/* Enhanced player: a play/pause control, a scrubbable waveform, and the time, full-width. */
+.post-audio.ap-ready { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 10px; padding: 0.65rem 0.85rem; }
+.post-audio.ap-ready figcaption { flex-basis: 100%; margin: 0; }
+.post-audio.ap-ready audio { display: none; }
+.ap-toggle { flex: 0 0 auto; width: 2.4rem; height: 2.4rem; border-radius: 50%; border: none; cursor: pointer; background: var(--accent); color: #fff; font-size: 0.85rem; line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; transition: opacity 0.2s; }
+.ap-toggle:hover { opacity: 0.85; }
+.ap-wave { flex: 1 1 140px; min-width: 100px; height: 44px; cursor: pointer; }
+.ap-time { flex: 0 0 auto; font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 600px) { .post-row { grid-template-columns: 1fr; gap: 0.4rem; } }
 
 /* ---------- post: TOC sidebar ---------- */
@@ -383,3 +398,6 @@ html.js .search-toggle:hover { color: var(--on-accent); background: var(--accent
   .search { position: static; }
   .search-panel { left: 0.5rem; right: 0.5rem; width: auto; }
 }
+
+/* speech markup: <notts>/<tts> are transparent for layout */
+notts, tts { display: contents; }

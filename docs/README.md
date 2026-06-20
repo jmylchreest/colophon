@@ -8,6 +8,8 @@ End-user guides for authoring, theming and publishing a colophon site.
   overriding a theme, the template variables, and progressive enhancement.
 - **[SEO & social](seo.md)** — the `seo:` frontmatter block and the canonical / Open Graph /
   Twitter / JSON-LD metadata colophon emits.
+- **[Image & audio generation](image-generation.md)** — `gen:` image prompts, AI or recorded
+  post audio (podcast feeds), providers, the `--generate-ai` step, the kill switch, and pruning.
 - **[Authors & personas](personas.md)** — the **author** (the shown byline + h-card) vs the
   **persona** (a hidden, shareable writing voice), and the `persona context` command that emits
   write-as context (style guide + relevant exemplars) for an AI author.
