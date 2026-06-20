@@ -204,13 +204,15 @@ mapping:
 title: Release Notes
 attachments:
   - changelog.txt                                   # label defaults to the file name
-  - { path: build.sh, label: "Build script" }       # custom link text
-  - { path: dataset.zip, label: "Dataset", feed: true }
+  - { path: build.sh, label: "Build script", description: "Sets up the toolchain" }
+  - { path: dataset.zip, label: "Dataset", description: "Raw measurements", feed: true }
 ---
 ```
 
 - Paths resolve **relative to the post** (same rules as an image embed); `[[embed]]` works too.
-- `label` sets the link text (defaults to the file name); the rendered size is shown automatically.
+- `label` sets the link text (defaults to the file name); `description` adds a one-line note
+  beneath it. The file's **size** and a short **filetype** badge (ZIP, PDF, MP4…) are shown
+  automatically.
 - `feed: true` also lists the file as a feed enclosure/attachment (see below). Without it, the
   file is downloadable on the page but stays out of the feeds.
 - Posts with attachments get a small paperclip marker in the listing (alongside the audio

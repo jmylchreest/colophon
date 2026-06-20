@@ -213,7 +213,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `author_name`, `author_initials`, `author_bio`, `author_url`, `author_avatar` | Author h-card fields for the byline (empty when unset). `author_avatar` is a ready-to-use `src`: a file-path avatar is published to `/assets/<name>` and emitted root-anchored (or as the object-store URL when routed); `data:`/`http(s)://` avatars pass through. |
 | `has_audio`, `audio`, `audio_type` | True when the post has an audio reading (recorded or generated TTS); `audio` is its URL and `audio_type` its MIME. See [Audio, video & downloads](#audio-video--downloads). |
 | `audio_listen`, `audio_play`, `audio_pause` | Localised player UI strings (figcaption + play/pause aria-labels), in the page's language. Present only when `has_audio`. |
-| `has_attachments`, `attachments` | True when the post ships downloadable files; `attachments` is a list of `{url, label, name, type, size, bytes}` (`size` is human-readable, may be empty). See [Audio, video & downloads](#audio-video--downloads). |
+| `has_attachments`, `attachments`, `attachments_html` | Downloads. `attachments_html` is a ready-to-drop-in, no-JS block (`{{ attachments_html\|safe }}`); `attachments` is the structured list — `{url, label, description, name, type, type_label, size, bytes}` — if you'd rather build your own. `has_attachments` is the flag. See [Audio, video & downloads](#audio-video--downloads). |
 
 ### `index.html` (the post list, and per-tag pages)
 
@@ -285,19 +285,29 @@ with JS off the native `<audio>` still plays. Style the enhanced parts via `.pos
 > code/diagrams/tables, and `<notts>`/`<tts>` to hide or force text. Those are an author concern,
 > documented in [Authoring content](content.md); a theme doesn't handle them.
 
-**3. The downloads block.** When `has_attachments` is set, loop `attachments` to render the
-post's downloadable files (each has `url`, `label`, `name`, `type`, `size`, `bytes`):
+**3. The downloads block.** The engine renders the whole Downloads list for you — a no-JS,
+semantic fragment with stable classes. Drop it in wherever you like (the bundled themes put it
+below the author box) and style it with CSS:
 
 ```html
-{% if attachments %}
-<aside class="post-downloads" aria-label="Downloads">
-  <ul class="downloads-list">
-    {% for f in attachments %}
-    <li><a class="dl" href="{{ f.url }}" download>{{ f.label }}{% if f.size %} <span class="dl-meta">{{ f.size }}</span>{% endif %}</a></li>
-    {% endfor %}
-  </ul>
-</aside>
-{% endif %}
+{{ attachments_html|safe }}   {# empty when the post has none, so no guard needed #}
+```
+
+It emits `.post-downloads > .downloads-title + .downloads-list > .dl-item > a.dl`, each row with
+`.dl-ico` (paperclip), `.dl-main` (`.dl-label` + optional `.dl-desc`) and `.dl-meta`
+(`.dl-type` badge + `.dl-size`). Style those classes to taste.
+
+Prefer your own markup? Ignore the fragment and loop the structured `attachments` list instead —
+each entry has `url`, `label`, `description`, `name`, `type`, `type_label`, `size`, `bytes`:
+
+```html
+{% if attachments %}<ul class="my-downloads">
+  {% for f in attachments %}
+  <li><a href="{{ f.url }}" download>{{ f.label }}</a>
+      {% if f.description %}<p>{{ f.description }}</p>{% endif %}
+      <span>{{ f.type_label }} · {{ f.size }}</span></li>
+  {% endfor %}
+</ul>{% endif %}
 ```
 
 **4. Listing markers.** On `index.html`, each `pages` entry carries `has_audio` and
