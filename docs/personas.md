@@ -18,7 +18,7 @@ JSON-LD `author`:
 id: ada                       # the id (defaults to the file stem, e.g. authors/ada.yaml)
 name: "Ada Lovelace"          # the byline shown to readers
 bio: "Writes about distributed systems."
-avatar: assets/avatar.png     # see below — a content-source file, a data: URI, or an https:// URL
+avatar: assets/avatar.png     # see below — a file, a data:/https:// URL, or `gravatar`
 urls: ["https://example.com"]
 email: ada@example.com
 ```
@@ -29,11 +29,14 @@ The `avatar` may be:
   markdown image embed is — the first source that can open it wins). It is published once to
   `/assets/<name>` and the byline/topbar `src` is root-anchored, so it renders from every page
   depth (and is rewritten to the object-store URL when an `assets/**` route is active).
-- a **`data:` URI** (a self-contained inline image), or
-- a fully-qualified **`http(s)://` URL** (a hosted image).
+- a **`data:` URI** (a self-contained inline image),
+- a fully-qualified **`http(s)://` URL** (a hosted image), or
+- **Gravatar** — `avatar: gravatar` uses this author's `email:`, or `avatar: "gravatar:me@example.com"`
+  carries the address inline. It resolves to the author's Gravatar image. Append Gravatar options
+  after a `?` to override the defaults (`s=200&d=mp`), e.g. `"gravatar:me@example.com?d=identicon&s=256"`.
 
-`data:` and `http(s)://` avatars pass through untouched; a file path that no source can open
-is warned about (no broken `src` is emitted).
+`data:`, `http(s)://` and resolved `gravatar` avatars pass through untouched; a file path that no
+source can open is warned about (no broken `src` is emitted).
 
 A post names one with `author: ada`. If a post sets no `author:`, the **first configured
 author** is the default; with no authors at all, the byline is **"Anonymous"** (a post

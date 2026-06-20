@@ -1,6 +1,45 @@
 package core
 
-import "strings"
+import (
+	"crypto/md5" //nolint:gosec // Gravatar's documented hash is MD5 of the email; not a security use.
+	"encoding/hex"
+	"strings"
+)
+
+// GravatarURL resolves a `gravatar` avatar reference to a Gravatar image URL, or returns
+// ok=false for any other value (a path, a data:/http(s) URL, or empty — left as-is). Two forms
+// are accepted: `gravatar:<email>` carries the address inline, and a bare `gravatar` uses the
+// author's own `email:`. Optional Gravatar query options pass through after a `?`
+// (e.g. `gravatar:me@x.com?d=identicon&s=256`); when none are given a crisp retina size and a
+// neutral "mystery person" fallback are used, so a missing Gravatar degrades to a silhouette
+// rather than the Gravatar logo. The email is hashed per the spec: trimmed, lower-cased, MD5 hex.
+func GravatarURL(value, fallbackEmail string) (string, bool) {
+	var rest string
+	switch {
+	case value == "gravatar":
+		rest = ""
+	case strings.HasPrefix(value, "gravatar:"):
+		rest = value[len("gravatar:"):]
+	default:
+		return "", false
+	}
+	email, query := rest, ""
+	if i := strings.IndexByte(rest, '?'); i >= 0 {
+		email, query = rest[:i], rest[i+1:]
+	}
+	email = strings.TrimSpace(email)
+	if email == "" {
+		email = strings.TrimSpace(fallbackEmail)
+	}
+	if email == "" {
+		return "", false // nothing to hash — leave the reference untouched
+	}
+	sum := md5.Sum([]byte(strings.ToLower(email))) //nolint:gosec // see import note
+	if query == "" {
+		query = "s=200&d=mp"
+	}
+	return "https://www.gravatar.com/avatar/" + hex.EncodeToString(sum[:]) + "?" + query, true
+}
 
 // Author is the byline shown to readers — who wrote a post. A post names one via `author:`
 // (defaulting to the first configured author, else "Anonymous"). Authors live in

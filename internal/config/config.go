@@ -245,10 +245,15 @@ func loadPersonas(dir string) ([]core.Persona, error) {
 
 func loadAuthors(dir string) ([]core.Author, error) {
 	return loadYAMLDir(dir, "author",
-		// Default the id to the file stem (so authors/john.yaml → id "john").
+		// Default the id to the file stem (so authors/john.yaml → id "john"), and resolve a
+		// `gravatar`/`gravatar:<email>` avatar to its Gravatar URL so the rest of the pipeline
+		// treats it as an ordinary hosted avatar.
 		func(a *core.Author, name string) {
 			if a.ID == "" {
 				a.ID = strings.TrimSuffix(name, ".yaml")
+			}
+			if u, ok := core.GravatarURL(a.Avatar, a.Email); ok {
+				a.Avatar = u
 			}
 		},
 		func(a *core.Author) string { return a.ID })
