@@ -92,13 +92,13 @@ func barThickness(img image.Image, edge string) int {
 	w, h := b.Dx(), b.Dy()
 	switch edge {
 	case "top":
-		return scanBars(maxInt(1, int(float64(h)*maxTrimFraction)), func(i int) bool { return rowDark(img, b.Min.Y+i) })
+		return scanBars(max(1, int(float64(h)*maxTrimFraction)), func(i int) bool { return rowDark(img, b.Min.Y+i) })
 	case "bottom":
-		return scanBars(maxInt(1, int(float64(h)*maxTrimFraction)), func(i int) bool { return rowDark(img, b.Max.Y-1-i) })
+		return scanBars(max(1, int(float64(h)*maxTrimFraction)), func(i int) bool { return rowDark(img, b.Max.Y-1-i) })
 	case "left":
-		return scanBars(maxInt(1, int(float64(w)*maxTrimFraction)), func(i int) bool { return colDark(img, b.Min.X+i) })
+		return scanBars(max(1, int(float64(w)*maxTrimFraction)), func(i int) bool { return colDark(img, b.Min.X+i) })
 	default: // right
-		return scanBars(maxInt(1, int(float64(w)*maxTrimFraction)), func(i int) bool { return colDark(img, b.Max.X-1-i) })
+		return scanBars(max(1, int(float64(w)*maxTrimFraction)), func(i int) bool { return colDark(img, b.Max.X-1-i) })
 	}
 }
 
@@ -175,11 +175,4 @@ func aspectValue(params map[string]string) float64 {
 		return v
 	}
 	return 0
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

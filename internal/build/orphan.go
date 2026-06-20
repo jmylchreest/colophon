@@ -32,7 +32,7 @@ func OrphanedGenerated(cfg *config.Config) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(tmp)
+	defer func() { _ = os.RemoveAll(tmp) }()
 	// Drafts/embargoed included so their (still-referenced) assets aren't seen as orphans.
 	res, err := Run(cfg, Options{OutDir: tmp, IncludeDrafts: true, GenerateAI: false, Log: clog.Discard()})
 	if err != nil {

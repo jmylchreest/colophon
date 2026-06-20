@@ -55,7 +55,7 @@ func postJSON(ctx context.Context, url string, headers map[string]string, body, 
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("%s: %s", resp.Status, truncate(data, 400))
@@ -77,7 +77,7 @@ func fetchBytes(ctx context.Context, url string) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, "", fmt.Errorf("fetch image: %s", resp.Status)
 	}
