@@ -15,7 +15,8 @@ h1 { line-height: 1.2; }
 .meta { font-size: .85rem; opacity: .65; }
 .note { font-style: italic; opacity: .75; }
 ul { padding-left: 1.2rem; }
-img { max-width: 100%; height: auto; }
+img, video { max-width: 100%; height: auto; }
+.post-inline-audio { width: 100%; }
 pre { white-space: pre-wrap; padding: .75rem; background: rgba(127,127,127,.1); overflow-x: auto; }
 code { font-family: monospace; }
 blockquote { border-left: 3px solid rgba(127,127,127,.4); margin: 0; padding-left: 1rem; }

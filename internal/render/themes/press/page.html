@@ -110,6 +110,17 @@
 
     <article class="prose">{{ content|safe }}</article>
 
+    {% if attachments %}
+    <aside class="post-downloads" aria-label="Downloads">
+      <div class="downloads-title">Downloads</div>
+      <ul class="downloads-list">
+        {% for f in attachments %}
+        <li><a class="dl" href="{{ f.url }}" download><svg class="dl-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span class="dl-label">{{ f.label }}</span>{% if f.size %}<span class="dl-meta">{{ f.size }}</span>{% endif %}</a></li>
+        {% endfor %}
+      </ul>
+    </aside>
+    {% endif %}
+
     <footer class="post-foot">
       {% if tags %}<div class="tags">{% for tg in tags %}<a class="chip" href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</div>{% endif %}
       {% if author_name %}

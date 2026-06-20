@@ -101,11 +101,22 @@ body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', 
 /* index */
 .post-list { list-style: none; margin-top: 2rem; }
 .post-list li { position: relative; padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
-/* inert "has audio" mark, top-right; not a control — the title link opens the post + its player */
-.post-audio-flag { position: absolute; top: 1.25rem; right: 0; pointer-events: none; display: inline-flex;
-  align-items: center; justify-content: center; width: 1.65rem; height: 1.65rem; border-radius: 50%;
-  color: var(--accent); background: var(--accent-bg); }
-.post-audio-flag svg { width: 0.95rem; height: 0.95rem; }
+/* inert media marks, top-right (speaker = audio, paperclip = attachments); not controls — the
+   title link opens the post + its player/downloads */
+.post-flags { position: absolute; top: 1.25rem; right: 0; pointer-events: none; display: inline-flex; gap: 0.4rem; }
+.post-flags .pf { display: inline-flex; align-items: center; justify-content: center; width: 1.65rem; height: 1.65rem;
+  border-radius: 50%; color: var(--accent); background: var(--accent-bg); }
+.post-flags .pf svg { width: 0.95rem; height: 0.95rem; }
+/* inline media embeds + downloads */
+.prose .post-video { display: block; max-width: 100%; height: auto; margin: 1.75rem 0; border-radius: 4px; }
+.prose .post-inline-audio { display: block; width: 100%; margin: 1.75rem 0; }
+.post-downloads { margin: 2rem 0; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0; padding: 0.85rem 1.25rem; }
+.post-downloads .downloads-title { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.5rem; }
+.downloads-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.downloads-list .dl { display: inline-flex; align-items: center; gap: 0.55rem; color: var(--text); text-decoration: none; padding: 0.3rem 0; }
+.downloads-list .dl:hover { color: var(--accent); }
+.downloads-list .dl-ico { width: 1rem; height: 1rem; flex: 0 0 auto; color: var(--accent); }
+.downloads-list .dl-meta { margin-left: auto; color: var(--text2); font-size: 0.8rem; }
 .post-list a.title { font-family: 'Libre Baskerville', serif; font-size: 1.35rem; color: var(--text); text-decoration: none; }
 .post-list a.title:hover { color: var(--accent); }
 .post-list .meta { font-size: 0.82rem; color: var(--text2); margin-top: 0.3rem; }

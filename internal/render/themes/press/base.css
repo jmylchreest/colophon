@@ -106,14 +106,15 @@ a { color: inherit; }
   padding: 0.1rem 0.6rem; text-decoration: none; transition: all 0.2s; }
 .chip:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .chip-series { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 28%, transparent); background: var(--accent-soft); }
-/* audio indicator: an inert accent speaker mark in the row's top-right corner. It signals "this
-   post has an audio reading" but is not a control — pointer-events:none lets the click fall through
-   to the row's stretched post link, so clicking it (or anywhere on the row) opens the post where
-   the real player lives. No JS or <audio> on the listing page. */
-.post-audio-flag { position: absolute; top: 1.55rem; right: 0; pointer-events: none;
-  display: inline-flex; align-items: center; justify-content: center; width: 1.65rem; height: 1.65rem;
-  border-radius: 50%; color: var(--accent); background: var(--accent-soft); }
-.post-audio-flag svg { width: 0.95rem; height: 0.95rem; }
+/* media indicators: inert accent marks in the row's top-right corner — a speaker for an audio
+   reading, a paperclip for downloadable attachments. They signal, they are not controls:
+   pointer-events:none lets the click fall through to the row's stretched post link, so clicking
+   one (or anywhere on the row) opens the post. No JS or <audio> on the listing page. */
+.post-flags { position: absolute; top: 1.55rem; right: 0; pointer-events: none;
+  display: inline-flex; gap: 0.35rem; }
+.post-flags .pf { display: inline-flex; align-items: center; justify-content: center;
+  width: 1.65rem; height: 1.65rem; border-radius: 50%; color: var(--accent); background: var(--accent-soft); }
+.post-flags .pf svg { width: 0.95rem; height: 0.95rem; }
 .post-list { list-style: none; padding: 2rem 0 5rem; }
 .post-row { position: relative; padding: 1.6rem 0; border-top: 1px solid var(--border);
   display: grid; grid-template-columns: 7rem 1fr; gap: 1.5rem; align-items: baseline; transition: opacity 0.2s; }
@@ -136,6 +137,17 @@ a { color: inherit; }
 .ap-toggle:hover { opacity: 0.85; }
 .ap-wave { flex: 1 1 140px; min-width: 100px; height: 44px; cursor: pointer; }
 .ap-time { flex: 0 0 auto; font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* inline media embeds (![](clip.mp4) / ![](song.mp3)) render as players, not images */
+.prose .post-video { display: block; max-width: 100%; height: auto; margin: 1.5rem 0; border-radius: 8px; }
+.prose .post-inline-audio { display: block; width: 100%; margin: 1.5rem 0; }
+/* downloads: attachments shipped with the post */
+.post-downloads { margin: 2rem 0; border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; }
+.post-downloads .downloads-title { font-size: 0.74rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.55rem; }
+.downloads-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.downloads-list .dl { display: inline-flex; align-items: center; gap: 0.55rem; color: var(--text); text-decoration: none; padding: 0.35rem 0.4rem; border-radius: 6px; transition: background 0.15s; }
+.downloads-list .dl:hover { background: var(--accent-soft); color: var(--accent); }
+.downloads-list .dl-ico { width: 1rem; height: 1rem; flex: 0 0 auto; color: var(--accent); }
+.downloads-list .dl-meta { margin-left: auto; font-size: 0.78rem; color: var(--faint); font-variant-numeric: tabular-nums; }
 @media (max-width: 600px) { .post-row { grid-template-columns: 1fr; gap: 0.4rem; } }
 
 /* ---------- post: TOC sidebar ---------- */

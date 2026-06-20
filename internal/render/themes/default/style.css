@@ -42,6 +42,15 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .
 pre code { font-size: .85em; }
 blockquote { margin: 0 0 1rem; padding-left: 1rem; border-left: 3px solid rgba(127,127,127,.4); opacity: .85; }
 article img { max-width: 100%; height: auto; border-radius: 6px; }
+article .post-video { display: block; max-width: 100%; height: auto; border-radius: 6px; margin: 1.5rem 0; }
+article .post-inline-audio { display: block; width: 100%; margin: 1.5rem 0; }
+.post-downloads { margin: 2rem 0; border: 1px solid #ddd; border-radius: 8px; padding: 0.75rem 1rem; }
+.post-downloads .downloads-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.7; margin-bottom: 0.5rem; }
+.downloads-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.downloads-list .dl { display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; padding: 0.25rem 0; }
+.downloads-list .dl:hover { text-decoration: underline; }
+.downloads-list .dl-ico { width: 1rem; height: 1rem; flex: 0 0 auto; }
+.downloads-list .dl-meta { margin-left: auto; opacity: 0.6; font-size: 0.82rem; }
 
 /* Hero banner + index thumbnails */
 .hero { display: block; width: 100%; max-height: 22rem; object-fit: cover; margin: 0 0 1.5rem; }
