@@ -143,11 +143,16 @@ a { color: inherit; }
 /* downloads: attachments shipped with the post */
 .post-downloads { margin: 2rem 0; border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; }
 .post-downloads .downloads-title { font-size: 0.74rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.55rem; }
-.downloads-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
-.downloads-list .dl { display: inline-flex; align-items: center; gap: 0.55rem; color: var(--text); text-decoration: none; padding: 0.35rem 0.4rem; border-radius: 6px; transition: background 0.15s; }
+.downloads-list { list-style: none; display: flex; flex-direction: column; gap: 0.15rem; }
+.downloads-list .dl { display: flex; align-items: flex-start; gap: 0.6rem; color: var(--text); text-decoration: none; padding: 0.45rem 0.5rem; border-radius: 6px; transition: background 0.15s; }
 .downloads-list .dl:hover { background: var(--accent-soft); color: var(--accent); }
-.downloads-list .dl-ico { width: 1rem; height: 1rem; flex: 0 0 auto; color: var(--accent); }
-.downloads-list .dl-meta { margin-left: auto; font-size: 0.78rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+.downloads-list .dl-ico { width: 1rem; height: 1rem; flex: 0 0 auto; margin-top: 0.15rem; color: var(--accent); }
+.downloads-list .dl-main { display: flex; flex-direction: column; min-width: 0; }
+.downloads-list .dl-label { font-weight: 500; }
+.downloads-list .dl-desc { font-size: 0.82rem; color: var(--muted); }
+.downloads-list .dl-meta { margin-left: auto; flex: 0 0 auto; display: flex; align-items: center; gap: 0.5rem; padding-top: 0.1rem; }
+.downloads-list .dl-type { font-size: 0.66rem; letter-spacing: 0.04em; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 4px; padding: 0.02rem 0.32rem; }
+.downloads-list .dl-size { font-size: 0.78rem; color: var(--faint); font-variant-numeric: tabular-nums; }
 @media (max-width: 600px) { .post-row { grid-template-columns: 1fr; gap: 0.4rem; } }
 
 /* ---------- post: TOC sidebar ---------- */

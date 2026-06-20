@@ -19,17 +19,9 @@
 {% if date %}<p class="meta"><time datetime="{{ date }}">{{ date }}</time></p>{% endif %}
 {# Minimal theme: no client-side JS. colophon's raw blocks (code/math/mermaid) show as plain text. #}
 {{ content|safe }}
-{% if attachments %}
-<section aria-label="Downloads">
-  <p class="meta">Downloads:</p>
-  <ul>
-    {% for f in attachments %}
-    <li><a href="{{ f.url }}" download>{{ f.label }}</a>{% if f.size %} ({{ f.size }}){% endif %}</li>
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
 {% if tags %}<p class="meta">Tags:{% for tg in tags %} <a href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</p>{% endif %}
+{# Engine-rendered Downloads list (no JS). Drop-in; or build your own from the `attachments` list. #}
+{{ attachments_html|safe }}
 </article>
 </main>
 <footer><a href="{{ base_path }}">← {{ site_title }}</a></footer>

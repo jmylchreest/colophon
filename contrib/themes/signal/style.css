@@ -139,11 +139,14 @@ header.site { border-bottom: 1px solid var(--border); }
 .prose .post-inline-audio { display: block; width: 100%; margin: 1.5rem 0; }
 .post-downloads { margin: 1.5rem 0; border: 1px solid var(--border); padding: 0.75rem 1rem; }
 .post-downloads .downloads-title { color: var(--green); font-size: 0.78rem; margin-bottom: 0.5rem; }
-.downloads-list { list-style: none; display: flex; flex-direction: column; gap: 0.25rem; }
-.downloads-list .dl { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--cyan); text-decoration: none; padding: 0.2rem 0; }
+.downloads-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }
+.downloads-list .dl { display: flex; align-items: flex-start; gap: 0.5rem; color: var(--cyan); text-decoration: none; padding: 0.2rem 0; }
 .downloads-list .dl:hover { text-decoration: underline; }
-.downloads-list .dl-ico { width: 0.95rem; height: 0.95rem; flex: 0 0 auto; }
-.downloads-list .dl-meta { margin-left: auto; color: var(--text-muted); font-size: 0.78rem; }
+.downloads-list .dl-ico { width: 0.95rem; height: 0.95rem; flex: 0 0 auto; margin-top: 0.15rem; }
+.downloads-list .dl-main { display: flex; flex-direction: column; min-width: 0; }
+.downloads-list .dl-desc { color: var(--text-muted); font-size: 0.78rem; }
+.downloads-list .dl-meta { margin-left: auto; flex: 0 0 auto; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); font-size: 0.78rem; }
+.downloads-list .dl-type { color: var(--green); }
 .post-list a.title { color: var(--cyan); text-decoration: none; font-size: 1rem; }
 .post-list a.title::before { content: '> '; color: var(--green); }
 .post-list .meta { color: var(--text-muted); font-size: 0.78rem; margin-top: 0.25rem; }
