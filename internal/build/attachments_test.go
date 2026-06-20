@@ -36,7 +36,7 @@ func TestResolveAttachments(t *testing.T) {
 	doc := core.Content{SourcePath: "posts/media.md"}
 	doc.Frontmatter = markdown.Frontmatter{Attachments: []markdown.Attachment{
 		{Path: "run.sh"},
-		{Path: "data.zip", Label: "Dataset", Feed: true},
+		{Path: "data.zip", Label: "Dataset", Description: "Raw measurements", Feed: true},
 	}}
 	it := included{c: doc, src: src, slug: "posts/media"}
 
@@ -77,6 +77,36 @@ func TestResolveAttachments(t *testing.T) {
 	}
 	if data.Bytes != 2048 || data.Size == "" {
 		t.Errorf("size: got %d (%q)", data.Bytes, data.Size)
+	}
+	if data.Desc != "Raw measurements" {
+		t.Errorf("description: got %q", data.Desc)
+	}
+	if data.TypeLabel != "ZIP" || run.TypeLabel != "SH" {
+		t.Errorf("type labels: got %q / %q", data.TypeLabel, run.TypeLabel)
+	}
+}
+
+func TestAttachmentsHTML(t *testing.T) {
+	if got := attachmentsHTML(nil); got != "" {
+		t.Errorf("empty attachments should render nothing, got %q", got)
+	}
+	as := []pageAttachment{
+		{URL: "/posts/p/run.sh", Label: "Build script", Desc: "Sets up the toolchain", TypeLabel: "SH", Size: "2.9 KB"},
+		{URL: "/posts/p/data.zip", Label: "Dataset", TypeLabel: "ZIP", Size: "2.3 MB"},
+	}
+	out := attachmentsHTML(as)
+	for _, want := range []string{
+		`class="post-downloads"`, `<a class="dl" href="/posts/p/run.sh" download>`,
+		`class="dl-label">Build script<`, `class="dl-desc">Sets up the toolchain<`,
+		`class="dl-type">SH<`, `class="dl-size">2.9 KB<`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("fragment missing %q in:\n%s", want, out)
+		}
+	}
+	// The second item has no description, so no dl-desc span should be emitted for it.
+	if strings.Count(out, "dl-desc") != 1 {
+		t.Errorf("expected exactly one dl-desc, got %d:\n%s", strings.Count(out, "dl-desc"), out)
 	}
 }
 

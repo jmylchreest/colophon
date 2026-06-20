@@ -126,9 +126,10 @@ type SEOSocial struct {
 // authoring convenience: a bare scalar path (- foo.zip) or a mapping (- {path: foo.zip,
 // label: "Download", feed: true}).
 type Attachment struct {
-	Path  string `yaml:"path"`            // source-relative path or [[embed]]
-	Label string `yaml:"label,omitempty"` // link text; defaults to the file name
-	Feed  bool   `yaml:"feed,omitempty"`  // also emit as a feed enclosure/attachment
+	Path        string `yaml:"path"`                  // source-relative path or [[embed]]
+	Label       string `yaml:"label,omitempty"`       // link text; defaults to the file name
+	Description string `yaml:"description,omitempty"` // one-line description shown under the label
+	Feed        bool   `yaml:"feed,omitempty"`        // also emit as a feed enclosure/attachment
 }
 
 // UnmarshalYAML accepts either a scalar path or a {path,label,feed} mapping.

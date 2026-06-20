@@ -3,6 +3,7 @@ package build
 import (
 	"context"
 	"fmt"
+	"html"
 	"io"
 	"mime"
 	"path"
@@ -16,14 +17,16 @@ import (
 // its absolute URL for feeds, display metadata, and whether it should appear as a feed
 // enclosure/attachment.
 type pageAttachment struct {
-	URL   string // page link (root-relative when co-located, absolute when routed/external)
-	Abs   string // absolute URL, for feed enclosures
-	Label string // link text
-	Name  string // file base name (e.g. dataset.zip)
-	Type  string // MIME type
-	Bytes int64  // file size, 0 if unknown (external link)
-	Size  string // human-readable size, "" if unknown
-	Feed  bool   // also list as a feed enclosure/attachment
+	URL       string // page link (root-relative when co-located, absolute when routed/external)
+	Abs       string // absolute URL, for feed enclosures
+	Label     string // link text
+	Desc      string // optional one-line description
+	Name      string // file base name (e.g. dataset.zip)
+	Type      string // MIME type
+	TypeLabel string // short human filetype badge (e.g. ZIP, PDF, MP4)
+	Bytes     int64  // file size, 0 if unknown (external link)
+	Size      string // human-readable size, "" if unknown
+	Feed      bool   // also list as a feed enclosure/attachment
 }
 
 // resolveAttachments turns a post's frontmatter attachments into copied+routed download links.
@@ -40,8 +43,9 @@ func resolveAttachments(ctx context.Context, it included, basePath, baseURL stri
 		}
 		if !localRef(ref) {
 			out = append(out, pageAttachment{
-				URL: ref, Abs: ref, Label: attachmentLabel(a, ref),
-				Name: path.Base(ref), Type: mimeForName(ref), Feed: a.Feed,
+				URL: ref, Abs: ref, Label: attachmentLabel(a, ref), Desc: a.Description,
+				Name: path.Base(ref), Type: mimeForName(ref), TypeLabel: typeLabel(ref),
+				Feed: a.Feed,
 			})
 			continue
 		}
@@ -54,24 +58,74 @@ func resolveAttachments(ctx context.Context, it included, basePath, baseURL stri
 		}
 		sz := attachmentSize(ctx, it.src, path.Clean(path.Join(path.Dir(it.c.SourcePath), ref)))
 		out = append(out, pageAttachment{
-			URL: url, Abs: abs, Label: attachmentLabel(a, ref), Name: path.Base(ref),
-			Type: mimeForName(ref), Bytes: sz, Size: humanSize(sz), Feed: a.Feed,
+			URL: url, Abs: abs, Label: attachmentLabel(a, ref), Desc: a.Description,
+			Name: path.Base(ref), Type: mimeForName(ref), TypeLabel: typeLabel(ref),
+			Bytes: sz, Size: humanSize(sz), Feed: a.Feed,
 		})
 	}
 	return out
 }
 
-// attachmentVars projects resolved attachments into the template context for the themes'
-// Downloads block.
+// attachmentVars projects resolved attachments into the template context as a structured list,
+// so a theme can build its own download UI (the `attachments` variable). Themes that just want
+// the batteries-included markup use `attachments_html` instead.
 func attachmentVars(as []pageAttachment) []map[string]any {
 	out := make([]map[string]any, len(as))
 	for i, a := range as {
 		out[i] = map[string]any{
-			"url": a.URL, "label": a.Label, "name": a.Name,
-			"type": a.Type, "size": a.Size, "bytes": a.Bytes,
+			"url": a.URL, "label": a.Label, "description": a.Desc, "name": a.Name,
+			"type": a.Type, "type_label": a.TypeLabel, "size": a.Size, "bytes": a.Bytes,
 		}
 	}
 	return out
+}
+
+// attachmentsHTML renders the engine's ready-made Downloads block — a no-JS, semantic fragment
+// with stable classes a theme styles via CSS (or ignores in favour of the `attachments` list).
+// Returns "" when there are none, so a theme can `{{ attachments_html|safe }}` unconditionally.
+func attachmentsHTML(as []pageAttachment) string {
+	if len(as) == 0 {
+		return ""
+	}
+	const clip = `<svg class="dl-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`
+	var b strings.Builder
+	b.WriteString(`<aside class="post-downloads" aria-label="Downloads">`)
+	b.WriteString(`<div class="downloads-title">Downloads</div>`)
+	b.WriteString(`<ul class="downloads-list">`)
+	for _, a := range as {
+		b.WriteString(`<li class="dl-item"><a class="dl" href="`)
+		b.WriteString(html.EscapeString(a.URL))
+		b.WriteString(`" download>`)
+		b.WriteString(clip)
+		b.WriteString(`<span class="dl-main"><span class="dl-label">`)
+		b.WriteString(html.EscapeString(a.Label))
+		b.WriteString(`</span>`)
+		if a.Desc != "" {
+			b.WriteString(`<span class="dl-desc">`)
+			b.WriteString(html.EscapeString(a.Desc))
+			b.WriteString(`</span>`)
+		}
+		b.WriteString(`</span><span class="dl-meta">`)
+		if a.TypeLabel != "" {
+			b.WriteString(`<span class="dl-type">`)
+			b.WriteString(html.EscapeString(a.TypeLabel))
+			b.WriteString(`</span>`)
+		}
+		if a.Size != "" {
+			b.WriteString(`<span class="dl-size">`)
+			b.WriteString(html.EscapeString(a.Size))
+			b.WriteString(`</span>`)
+		}
+		b.WriteString(`</span></a></li>`)
+	}
+	b.WriteString(`</ul></aside>`)
+	return b.String()
+}
+
+// typeLabel is a short uppercase filetype badge derived from the file extension (e.g. "ZIP",
+// "PDF", "MP4"), or "" when there is no extension.
+func typeLabel(name string) string {
+	return strings.ToUpper(strings.TrimPrefix(path.Ext(name), "."))
 }
 
 func attachmentLabel(a markdown.Attachment, ref string) string {
