@@ -38,6 +38,7 @@ All fields are optional unless noted.
 | `audio` | Spoken (TTS) reading of the post. Omit to follow the site default (on when a speech provider is configured); set `true`/`false` to force it. Needs `generation.speech`. See [Image & audio generation](image-generation.md). |
 | `audio_file` | Attach a pre-recorded audio file (a path or `[[embed]]`) instead of generating one — no AI. Wins over `audio`. |
 | `audio_voice` | Override the reading voice id (generated audio only); else the author's/persona's `voice`, else the site default. |
+| `attachments` | Downloadable files shipped with the post (scripts, archives, datasets, PDFs…). A list of paths or `{path, label, feed}` mappings — see [Attachments (downloads)](#attachments-downloads). |
 | `lang` | Per-post language (BCP-47, e.g. `fr`), overriding the site `lang`. Emitted as `<html lang>`. |
 | `glossary` | `false` turns off automatic [glossary](#glossary) decoration for this post; an explicit `<abbr>` still works. |
 | `draft` | `true` keeps the post out of production builds (shown in preview/serve). |
@@ -154,6 +155,11 @@ Notes:
 - **Generated images** — `![alt](<gen:a prompt here>)` produces the image with an AI provider
   and caches it. Wrap the prompt in `<…>` when it contains spaces. See
   [Image generation](image-generation.md).
+- **Video & audio embeds** — an image embed whose target is a media file renders as a player,
+  not a broken image. `![A short demo](demo.mp4)` becomes a `<video controls>`; `![](clip.mp3)`
+  becomes an `<audio controls>`. The file is copied/routed exactly like an image (so object
+  storage works the same), and the embed's alt text becomes the player's `aria-label`. See
+  [Embedding video and audio](#embedding-video-and-audio).
 
 ### Images and object storage
 
@@ -162,6 +168,61 @@ images (or any path glob) to an object store (e.g. Cloudflare R2) instead — se
 configuration. When routing is active the build rewrites those image URLs to the store's
 public base, so the page references `https://assets.example.com/…` while the bytes are
 uploaded to the store rather than your HTML host.
+
+### Embedding video and audio
+
+There is **no new syntax** — use the markdown image embed you already know, pointing at a media
+file. colophon recognises the extension and renders a player instead of an `<img>`:
+
+```markdown
+![A short demo](demo.mp4)     <!-- → <video controls>, with the alt as its aria-label -->
+![[demo.mp4]]                  <!-- Obsidian embeds work too -->
+![](interview.mp3)            <!-- → <audio controls> -->
+```
+
+- **Video**: `.mp4`, `.webm`, `.mov`, `.m4v`, `.ogv`. **Audio**: `.mp3`, `.m4a`, `.aac`,
+  `.oga`, `.ogg`, `.wav`, `.flac`, `.opus`.
+- The file is discovered, copied beside the page, and **routed to object storage** exactly like
+  an image — self-hosting "just works", including via R2.
+- A direct **external** file URL plays too (e.g. `![](https://cdn.example.com/clip.mp4)`); it is
+  left untouched and not copied.
+- This is independent of `audio_file:`/`audio:`, which attach a single *podcast-style reading* of
+  the whole post (with the themed player and feed enclosure). Inline embeds are just media in the
+  body.
+
+> Big files belong in object storage or a CDN, not your Git host. Route a `**/*.mp4` glob to R2
+> (see the publisher config) and the embed URL is rewritten automatically.
+
+### Attachments (downloads)
+
+List downloadable files in frontmatter and colophon copies/routes them like images and renders a
+**Downloads** block on the post. Each entry is either a bare path or a `{path, label, feed}`
+mapping:
+
+```yaml
+---
+title: Release Notes
+attachments:
+  - changelog.txt                                   # label defaults to the file name
+  - { path: build.sh, label: "Build script" }       # custom link text
+  - { path: dataset.zip, label: "Dataset", feed: true }
+---
+```
+
+- Paths resolve **relative to the post** (same rules as an image embed); `[[embed]]` works too.
+- `label` sets the link text (defaults to the file name); the rendered size is shown automatically.
+- `feed: true` also lists the file as a feed enclosure/attachment (see below). Without it, the
+  file is downloadable on the page but stays out of the feeds.
+- Posts with attachments get a small paperclip marker in the listing (alongside the audio
+  speaker), in the press and contrib themes.
+
+**Attachments in feeds.** A post's audio reading and any `feed: true` attachment are emitted to
+the syndication feeds so podcast/feed clients can fetch them:
+
+- **JSON Feed** — every item appears in `attachments` (multiple allowed).
+- **Atom** — each is a `<link rel="enclosure">` (multiple allowed).
+- **RSS** — carries a single `<enclosure>` per the spec: the audio reading wins, else the first
+  `feed: true` attachment.
 
 ### How file references resolve
 

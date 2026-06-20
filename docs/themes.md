@@ -211,6 +211,9 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `draft`, `embargoed`, `embargo_until` | Preview-only flags for not-yet-public posts. |
 | `has_code`, `has_math`, `has_mermaid` | True when the post uses that block type — load the matching library only when set. |
 | `author_name`, `author_initials`, `author_bio`, `author_url`, `author_avatar` | Author h-card fields for the byline (empty when unset). `author_avatar` is a ready-to-use `src`: a file-path avatar is published to `/assets/<name>` and emitted root-anchored (or as the object-store URL when routed); `data:`/`http(s)://` avatars pass through. |
+| `has_audio`, `audio`, `audio_type` | True when the post has an audio reading (recorded or generated TTS); `audio` is its URL and `audio_type` its MIME. See [Audio, video & downloads](#audio-video--downloads). |
+| `audio_listen`, `audio_play`, `audio_pause` | Localised player UI strings (figcaption + play/pause aria-labels), in the page's language. Present only when `has_audio`. |
+| `has_attachments`, `attachments` | True when the post ships downloadable files; `attachments` is a list of `{url, label, name, type, size, bytes}` (`size` is human-readable, may be empty). See [Audio, video & downloads](#audio-video--downloads). |
 
 ### `index.html` (the post list, and per-tag pages)
 
@@ -221,7 +224,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `tagline` | The site's optional `tagline:`, for a hero lede under the title. Empty when unset — guard with `{% if tagline %}`. |
 | `seo_head` | The listing's SEO `<head>` block (canonical, Open Graph/Twitter, JSON-LD). Emit with `{{ seo_head\|safe }}`. |
 | `feeds` | List of `{label, href}` for subscribe links. |
-| `pages` | List of posts: `{title, url, date, draft, embargoed, embargo_until, image, tags}`. Prefix `url` with `base_path`. |
+| `pages` | List of posts: `{title, url, date, draft, embargoed, embargo_until, image, image_alt, image_style, audio, has_audio, has_attachments, tags, series}`. Prefix `url` with `base_path`. Use `has_audio`/`has_attachments` to flag entries with media (see below). |
 
 ## Enhancing rich blocks
 
@@ -241,6 +244,73 @@ Your theme is free to do something else with the same markup: load the libraries
 swap in a different highlighter, or — like the `minimal` theme — do nothing and let the raw
 text stand. The markup contract (`<pre class="mermaid">`, `<span class="math …">`,
 `<pre><code class="language-…">`, `<div class="callout …">`) does not change.
+
+## Audio, video & downloads
+
+colophon resolves media; the theme decides how it looks. There are four touch-points.
+
+**1. Inline video/audio embeds.** A body embed pointing at a media file (`![](demo.mp4)`,
+`![](clip.mp3)`) is rendered for you as `<video class="post-video" controls …>` or
+`<audio class="post-inline-audio" controls …>`. You only need to **style** them — make them
+responsive in your prose:
+
+```css
+.prose .post-video { display: block; max-width: 100%; height: auto; }
+.prose .post-inline-audio { display: block; width: 100%; }
+```
+
+**2. The audio reading + player.** When `has_audio` is set, a post has a podcast-style reading
+(recorded `audio_file:` or generated TTS). The build emits a shared, dependency-free
+`player.js` to the site root whenever any page has audio. Opt in with the markup contract — a
+container marked `data-audioplayer` with the source and localised labels, plus the script:
+
+```html
+{% if has_audio %}
+<figure class="post-audio" data-audioplayer data-src="{{ audio }}"
+        data-label-play="{{ audio_play }}" data-label-pause="{{ audio_pause }}">
+  <figcaption>{{ audio_listen }}</figcaption>
+  <audio controls preload="none" src="{{ audio }}"></audio>   <!-- no-JS fallback -->
+</figure>
+{% endif %}
+...
+{% if has_audio %}<script defer src="{{ base_path }}player.js"></script>{% endif %}
+```
+
+`player.js` progressively enhances the `<figure>` into a play/pause control with a scrubbable
+waveform (reading a `<src>.json` peaks sidecar when present, else live Web Audio, else idle);
+with JS off the native `<audio>` still plays. Style the enhanced parts via `.post-audio.ap-ready`,
+`.ap-toggle`, `.ap-wave`, `.ap-time` — see any bundled theme's CSS.
+
+> The *content* of a generated reading is shaped by authoring hints — type-aware cues for
+> code/diagrams/tables, and `<notts>`/`<tts>` to hide or force text. Those are an author concern,
+> documented in [Authoring content](content.md); a theme doesn't handle them.
+
+**3. The downloads block.** When `has_attachments` is set, loop `attachments` to render the
+post's downloadable files (each has `url`, `label`, `name`, `type`, `size`, `bytes`):
+
+```html
+{% if attachments %}
+<aside class="post-downloads" aria-label="Downloads">
+  <ul class="downloads-list">
+    {% for f in attachments %}
+    <li><a class="dl" href="{{ f.url }}" download>{{ f.label }}{% if f.size %} <span class="dl-meta">{{ f.size }}</span>{% endif %}</a></li>
+    {% endfor %}
+  </ul>
+</aside>
+{% endif %}
+```
+
+**4. Listing markers.** On `index.html`, each `pages` entry carries `has_audio` and
+`has_attachments`. The press and contrib themes show a small inert speaker / paperclip mark in
+the row's top-right corner so readers can spot posts with media at a glance — copy that pattern,
+or surface it however suits your design:
+
+```html
+{% if p.has_audio or p.has_attachments %}<span class="post-flags">
+  {% if p.has_audio %}<span class="pf" aria-label="Has an audio reading">…speaker svg…</span>{% endif %}
+  {% if p.has_attachments %}<span class="pf" aria-label="Has downloadable files">…paperclip svg…</span>{% endif %}
+</span>{% endif %}
+```
 
 ## Analytics
 

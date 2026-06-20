@@ -10,14 +10,21 @@ an S3/R2 bucket, a git branch, or anywhere a command can reach.
 
 - **Markdown in, static site out** — `md-dir` and Obsidian-vault sources; goldmark rendering with
   code highlighting, maths (KaTeX), diagrams (Mermaid), callouts, wikilinks and embeds.
+- **Rich media** — embed video and audio with plain image syntax (`![](demo.mp4)` → a player);
+  attach downloadable files (scripts, archives, datasets) to a post; both copy/route like images
+  and can surface in the feeds as enclosures.
+- **AI media generation** *(opt-in)* — generate images from a `gen:<prompt>` reference, and
+  spoken (TTS) audio readings of posts, via configured providers (Google, OpenAI-compatible,
+  MiniMax). Results are content-addressed and cached; a built-in themed audio player with a
+  scrubbable waveform plays the result. Secrets are read from the environment, never committed.
 - **Themes** — embedded `press` (default, with variants) and `minimal`, plus community themes in
   `contrib/`; per-environment overrides; progressive enhancement (usable without JS).
 - **Pluggable publishers** — Cloudflare Pages, Cloudflare R2 / S3 (SigV4), local mirror, git
   branch, or an arbitrary command. Incremental: only changed files upload, orphans are pruned.
 - **Static search** — a fully static, sharded index (no server, no third party) with a tiny
   browser reader and optional fuzzy matching. Built as a reusable module under [`search/`](search).
-- **Feeds & SEO** — RSS, Atom and JSON feeds; canonical / Open Graph / Twitter / JSON-LD metadata;
-  sitemap and robots.
+- **Feeds & SEO** — RSS, Atom and JSON feeds (with podcast-style enclosures for audio and
+  attachments); canonical / Open Graph / Twitter / JSON-LD metadata; sitemap and robots.
 - **Authors & personas** — a shown **author** (byline + h-card) versus a hidden **persona** (a
   reusable writing voice); `persona context` emits write-as context for an AI author.
 - **Environments** — one config drives many targets (production, preview, drafts, theme previews)
