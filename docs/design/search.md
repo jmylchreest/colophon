@@ -366,6 +366,18 @@ MiniLM stays the higher-quality opt-in fallback.
 - colophon side: `internal/build/search.go` (extract page text → `Doc`s → `Build` via a routed
   Writer), wire `SearchCmd` to `search.Open(...).Search`, theme assets + a `search` partial.
 
+## Releasing / using it elsewhere
+
+`./search` is its own Go module (`github.com/jmylchreest/colophon/search`) kept in this repo;
+colophon builds against it locally via the `go.work` workspace, so it needs no published tag
+for development. For external consumers it's published from the monorepo as a **nested module**:
+the release workflow tags `search/v<colophon-version>` whenever `./search` has changed since its
+last tag (mirroring the colophon release version — gaps are expected). Others then
+`go get github.com/jmylchreest/colophon/search@search/v<version>`. Those `search/v*` tags don't
+trigger the binary-release workflow (its trigger is `v*`). If the engine ever warrants a
+standalone identity (e.g. `github.com/jmylchreest/n`), it would move to its own repo, since a
+module's path must match its repository URL.
+
 ## Out of scope (future)
 
 Stemming/stop-words (matched Go+JS pair, analyzer-id bump); positions → phrase/proximity;

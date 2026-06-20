@@ -177,3 +177,26 @@ jobs:
           else
             gh release create "$VERSION_TAG" --title "Snapshot $VERSION" --prerelease --notes-file changelog.txt release/*
           fi
+
+      # Tag the in-repo ./search module so external consumers can `go get
+      # github.com/jmylchreest/colophon/search@<version>`. Only on a real release, and only when
+      # ./search actually changed since its last tag — the tag mirrors the colophon version (gaps
+      # are fine for semver). `search/v*` does NOT match this workflow's `v*` trigger, so no loop.
+      - name: Tag ./search module if changed
+        if: needs.prepare.outputs.is_release == 'true'
+        env:
+          VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+        run: |
+          last=$(git tag -l 'search/v*' --sort=-v:refname | head -1)
+          if [ -n "$last" ] && git diff --quiet "$last" HEAD -- search/; then
+            echo "./search unchanged since ${last}; not tagging."
+            exit 0
+          fi
+          tag="search/${VERSION_TAG}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "${tag} already exists; nothing to do."
+            exit 0
+          fi
+          echo "Tagging ${tag} (./search changed since ${last:-<no prior tag>})."
+          git tag "$tag"
+          git push origin "$tag"
