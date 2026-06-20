@@ -37,6 +37,9 @@ type Result struct {
 	// NextEmbargo is the soonest future publish_after across non-draft content (the
 	// next time a production build would reveal a new post), or nil if none pending.
 	NextEmbargo *time.Time
+	// Generated lists the extension-less stems of every generated asset (AI images, TTS
+	// audio) this build referenced — the set a cache prune treats as live.
+	Generated []string
 }
 
 // Options control a single build. They come from an Environment (or defaults).
@@ -66,6 +69,9 @@ type Options struct {
 	Routes []core.RouteRule
 	// Log receives SOURCE/BUILD progress lines; nil silences them.
 	Log *clog.Logger
+	// GenerateAI enables producing images for `gen:` references that aren't already cached.
+	// When false, missing generated images are warned and skipped (cached ones still ship).
+	GenerateAI bool
 	// Env is the environment name, used only as a telemetry label (may be "").
 	Env string
 	// Telemetry receives build/source/persona events. Nil (e.g. from serve) sends nothing,
@@ -107,16 +113,24 @@ type page struct {
 	Lang         string // per-post language override (BCP-47); empty → the site language
 	GlossaryOff  bool   // post opted out of glossary decoration (frontmatter glossary: false)
 
-	Hero       string // hero banner URL: page-relative when co-located, absolute when routed
-	HeroAbs    string // absolute hero URL, used as the og:image fallback when no image: is set
-	HeroAlt    string // accessible alt text for the hero; empty → decorative (alt="")
-	HeroFit    string // CSS object-fit for the hero (cover|contain|…); empty → theme default
-	HeroPos    string // CSS object-position for the hero (e.g. "top"); empty → theme default
-	Image      string // preview image href for the index card (rooted path or absolute), or ""
-	ImageAlt   string // accessible alt text for the card image; empty → decorative (alt="")
-	ImageFit   string // CSS object-fit for the card/preview image; empty → theme default
-	ImagePos   string // CSS object-position for the card/preview image; empty → theme default
-	ImageAbs   string // absolute preview image URL for og:image, or ""
+	Hero     string // hero banner URL: page-relative when co-located, absolute when routed
+	HeroAbs  string // absolute hero URL, used as the og:image fallback when no image: is set
+	HeroAlt  string // accessible alt text for the hero; empty → decorative (alt="")
+	HeroFit  string // CSS object-fit for the hero (cover|contain|…); empty → theme default
+	HeroPos  string // CSS object-position for the hero (e.g. "top"); empty → theme default
+	Image    string // preview image href for the index card (rooted path or absolute), or ""
+	ImageAlt string // accessible alt text for the card image; empty → decorative (alt="")
+	ImageFit string // CSS object-fit for the card/preview image; empty → theme default
+	ImagePos string // CSS object-position for the card/preview image; empty → theme default
+	ImageAbs string // absolute preview image URL for og:image, or ""
+
+	Audio      string // audio attachment URL (recorded or generated), root-relative or routed
+	AudioAbs   string // absolute audio URL, for the feed enclosure
+	AudioType  string // audio MIME, e.g. audio/mpeg
+	AudioBytes int64  // audio byte length for the enclosure, filled after production; 0 if unknown
+	AudioOut   string // output path key for the clip, used to back-fill AudioBytes
+	HasAudio   bool   // post has an audio attachment (theme player + filtering)
+
 	Tags       []string
 	Categories []string
 	Author     string        // author id from frontmatter (the byline)
@@ -178,16 +192,30 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// site-global and threaded into every template.
 	searchURL := searchBaseURL(router, basePath)
 	searchManifest := searchManifestName(site.ID, opts.Env)
-	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router)
-	if err != nil {
-		return Result{}, err
-	}
-	opts.Log.Step("BUILD", "", "pages", len(pages), "assets", len(assets), "drafts", opts.IncludeDrafts)
-
+	// The theme is resolved before pages are built so its metadata (the house-style image
+	// system prompt) is available while gen: references are generated.
 	eng, err := render.New(cfg.Root, site.Theme)
 	if err != nil {
 		return Result{}, err
 	}
+
+	// Image generation: resolve the provider once (a config error degrades to off with a
+	// warning) plus the house-style system prompt, then collect every gen: reference while
+	// rendering so they can be produced or served from cache after the pages are built.
+	// generateAI gates new generation: the build flag AND the config master switch. When the
+	// switch is off, no provider is ever called (even with --generate-ai) but already-cached
+	// assets are still resolved and served.
+	generateAI := opts.GenerateAI && cfg.Generation.Active()
+	if opts.GenerateAI && !cfg.Generation.Active() {
+		opts.Log.Step("BUILD", "", "warn", "generation disabled by config (generation.enabled: false); serving cached assets only")
+	}
+	gr := newGenResolver(resolveImageGen(cfg, opts.Log), cfg.Root, resolveSystemDefault(cfg, eng.Meta()))
+	ar := newAudioResolver(resolveSpeech(cfg, opts.Log), cfg.Root, basePath, site.BaseURL, router, generateAI, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(cfg.Glossary), opts.Log)
+	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router, gr, ar, generateAI, opts.Log)
+	if err != nil {
+		return Result{}, err
+	}
+	opts.Log.Step("BUILD", "", "pages", len(pages), "assets", len(assets), "drafts", opts.IncludeDrafts)
 
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return Result{}, err
@@ -203,6 +231,28 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		}
 		written[full] = struct{}{}
 		return nil
+	}
+
+	// Produce audio (recorded copies + generated readings) up front — before pages render and
+	// feeds are written — so a failed or uncached clip leaves no broken player or enclosure:
+	// its size stays 0 and the page's audio fields are cleared.
+	if err := ar.run(write, now); err != nil {
+		return Result{}, err
+	}
+	for i := range pages {
+		if pages[i].AudioOut == "" {
+			continue // external/passthrough recording, or no audio
+		}
+		if sz := ar.size(pages[i].AudioOut); sz > 0 {
+			pages[i].AudioBytes = sz
+		} else {
+			pages[i].Audio, pages[i].AudioAbs, pages[i].AudioType, pages[i].HasAudio = "", "", "", false
+		}
+	}
+	// Emit the shared player script once (site root) when any page has audio, so every theme
+	// can use it with just markup — no per-theme JS copy.
+	if err := emitPlayerAsset(write, pages); err != nil {
+		return Result{}, err
 	}
 
 	formats := feedFormats(site)
@@ -257,7 +307,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// post, most-recent-first) are built up front so every page's header can show the strip.
 	list := make([]map[string]any, len(posts))
 	for i, p := range posts {
-		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "tags": tagLinks(p.Tags, basePath), "series": seriesListName(&posts[i])}
+		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "audio": p.Audio, "has_audio": p.HasAudio, "tags": tagLinks(p.Tags, basePath), "series": seriesListName(&posts[i])}
 	}
 	// Publish file-path author avatars through the same asset pipeline as markdown embeds,
 	// emitting a depth-independent src (the topbar strip is built once for every page depth).
@@ -324,6 +374,9 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"image_alt":       p.ImageAlt,
 			"image_style":     imageStyle(p.ImageFit, p.ImagePos),
 			"image_abs":       p.ImageAbs,
+			"audio":           p.Audio,
+			"audio_type":      p.AudioType,
+			"has_audio":       p.HasAudio,
 			"tags":            tagLinks(p.Tags, basePath),
 			"category":        pageCategory(p),
 			"read_time":       readingTime(p.HTML),
@@ -335,6 +388,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"search":          searchEnabled(site),
 			"search_base":     searchURL,
 			"search_manifest": searchManifest,
+		}
+		if p.HasAudio {
+			// Localised player UI labels (figcaption + play/pause aria-labels), by page language.
+			ctx["audio_listen"], ctx["audio_play"], ctx["audio_pause"] = ar.uiLabels(pageLang)
 		}
 		for k, v := range authorVars(author) {
 			ctx[k] = v
@@ -433,6 +490,11 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		opts.Log.Detail("ASSET", a.src.ID(), "file", a.outPath, "bytes", len(b))
 	}
 
+	// Publish AI-generated images (already produced during buildPages) into the tree.
+	if err := publishGeneratedImages(write, gr, opts.Log); err != nil {
+		return Result{}, err
+	}
+
 	if err := writeSearchIndex(write, pages, site, basePath, opts.Env, opts.Log); err != nil {
 		return Result{}, err
 	}
@@ -441,7 +503,26 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		return Result{}, err
 	}
 	emitBuildTelemetry(opts.Telemetry, site, docs, pages)
-	return Result{Pages: len(pages), OutDir: outDir, NextEmbargo: nextEmbargo}, nil
+	return Result{Pages: len(pages), OutDir: outDir, NextEmbargo: nextEmbargo, Generated: referencedStems(gr, ar)}, nil
+}
+
+// referencedStems is the set of generated-cache stems this build pointed at — AI image
+// jobs plus generated (not recorded) audio jobs — for the orphan/prune check.
+func referencedStems(gr *genResolver, ar *audioResolver) []string {
+	var out []string
+	if gr.active() {
+		for stem := range gr.jobs {
+			out = append(out, stem)
+		}
+	}
+	if ar.active() {
+		for _, j := range ar.jobs {
+			if j.kind == "tts" {
+				out = append(out, strings.TrimSuffix(path.Base(j.outPath), path.Ext(j.outPath)))
+			}
+		}
+	}
+	return out
 }
 
 // sourceDoc pairs a document with the source it came from, so the build can resolve the
@@ -519,7 +600,7 @@ type assetRef struct {
 // (includeDrafts false) when it is a draft or its publish_after is still in the future;
 // preview builds include both, marking embargoed ones. Two passes so wikilinks resolve
 // against every other document's URL.
-func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, baseURL string, router *core.Router) ([]page, []assetRef, *time.Time, error) {
+func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, baseURL string, router *core.Router, gr *genResolver, ar *audioResolver, generateAI bool, log *clog.Logger) ([]page, []assetRef, *time.Time, error) {
 	var items []included
 	var next *time.Time
 	links := linkResolver{}
@@ -559,7 +640,13 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 	for _, it := range items {
 		for _, r := range docRefs(it.c) {
 			addAsset(it, r.Ref)
+			gr.note(r.Ref) // register gen: refs (frontmatter hero/image + body embeds)
 		}
+	}
+	// Produce generated images before rendering, so refs resolve to the real cached
+	// file (with the extension chosen from the bytes) rather than a guessed one.
+	if err := gr.ensure(generateAI, log, now); err != nil {
+		return nil, nil, nil, err
 	}
 
 	md := sharedMarkdown
@@ -568,7 +655,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 	for _, it := range items {
 		fm := it.c.Frontmatter
 		var buf bytes.Buffer
-		body := preprocessCallouts(resolveWikilinks(rewriteAssetURLs(it.c.Body, it.slug, router), links))
+		body := preprocessCallouts(resolveWikilinks(rewriteAssetURLs(rewriteGenRefs(it.c.Body, basePath, baseURL, router, gr), it.slug, router), links))
 		if err := md.Convert([]byte(body), &buf); err != nil {
 			return nil, nil, nil, fmt.Errorf("%s: %w", it.c.SourcePath, err)
 		}
@@ -601,7 +688,9 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		if it.embargoed {
 			p.EmbargoUntil = fm.PublishAfter.Format("2006-01-02 15:04 MST")
 		}
-		if localRef(fm.Hero) {
+		if rel, abs, ok := gr.resolveURL(fm.Hero, basePath, baseURL, router); ok {
+			p.Hero, p.HeroAbs = rel, abs // generated image, published site-root-relative
+		} else if localRef(fm.Hero) {
 			out := path.Clean(path.Join(it.slug, fm.Hero))
 			if url := router.AssetURL(out); url != "" {
 				p.Hero, p.HeroAbs = url, url // served from the object store (already absolute)
@@ -610,12 +699,25 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 				p.HeroAbs = absURL(baseURL, out)
 			}
 		}
-		if localRef(fm.Image) {
+		if rel, abs, ok := gr.resolveURL(fm.Image, basePath, baseURL, router); ok {
+			p.Image, p.ImageAbs = rel, abs
+		} else if localRef(fm.Image) {
 			out := path.Clean(path.Join(it.slug, fm.Image))
 			if url := router.AssetURL(out); url != "" {
 				p.Image, p.ImageAbs = url, url
 			} else {
 				p.Image, p.ImageAbs = basePath+out, absURL(baseURL, out)
+			}
+		}
+		if ar.active() {
+			if fm.AudioFile != "" {
+				if rel, abs, mime, out, ok := ar.registerFile(it, fm.AudioFile); ok {
+					p.Audio, p.AudioAbs, p.AudioType, p.AudioOut, p.HasAudio = rel, abs, mime, out, true
+				}
+			} else if fm.Audio {
+				if rel, abs, mime, out, ok := ar.registerTTS(it.slug, html, fm.Lang, fm.AudioVoice, fm.Author, resolvePersona(fm)); ok {
+					p.Audio, p.AudioAbs, p.AudioType, p.AudioOut, p.HasAudio = rel, abs, mime, out, true
+				}
 			}
 		}
 		p.Lang = fm.Lang

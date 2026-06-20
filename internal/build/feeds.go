@@ -89,13 +89,17 @@ func writeFeeds(write func(string, []byte) error, site core.Site, cfg *config.Co
 		// Feed items are chronological posts (standing pages like About are nav chrome, not
 		// feed entries) that carry a date to order by.
 		if !p.Static && !p.Published.IsZero() {
-			items = append(items, feed.Item{
+			it := feed.Item{
 				Title:       p.Title,
 				URL:         abs,
 				Description: p.Description,
 				Content:     p.HTML,
 				Published:   p.Published,
-			})
+			}
+			if p.HasAudio && p.AudioAbs != "" {
+				it.Enclosure = &feed.Enclosure{URL: p.AudioAbs, Type: p.AudioType, Length: p.AudioBytes}
+			}
+			items = append(items, it)
 		}
 	}
 

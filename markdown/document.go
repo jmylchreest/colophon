@@ -57,6 +57,15 @@ type Frontmatter struct {
 	ImageFit      string `yaml:"image_fit,omitempty"`
 	ImagePosition string `yaml:"image_position,omitempty"`
 
+	// Audio attaches a podcast-style audio reading of the post. Two sources: AudioFile points
+	// at a pre-recorded file (a source-relative path or [[embed]], copied like hero), which
+	// wins when set; otherwise Audio: true generates a TTS reading when speech generation is
+	// configured. AudioVoice overrides the generated voice id (else the author's/persona's
+	// voice, else the site default).
+	Audio      bool   `yaml:"audio,omitempty"`
+	AudioFile  string `yaml:"audio_file,omitempty"`
+	AudioVoice string `yaml:"audio_voice,omitempty"`
+
 	// Author is the byline shown to readers — the id of an authors/*.yaml entry. Empty
 	// falls back to the first configured author, else "Anonymous".
 	Author string `yaml:"author,omitempty"`

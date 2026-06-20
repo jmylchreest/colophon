@@ -178,7 +178,7 @@ func (t *themeSource) read(name string) ([]byte, error) {
 func (t *themeSource) staticAssets() ([]string, error) {
 	seen := map[string]struct{}{}
 	add := func(p string) {
-		if !strings.HasSuffix(p, ".html") && p != baseMarker {
+		if !strings.HasSuffix(p, ".html") && p != baseMarker && p != themeMetaFile {
 			seen[p] = struct{}{}
 		}
 	}

@@ -33,6 +33,16 @@ type Item struct {
 	Description string
 	Content     string
 	Published   time.Time
+	// Enclosure is an optional attached media file (e.g. a podcast audio reading), rendered
+	// as an RSS <enclosure>, an Atom <link rel="enclosure">, and a JSON Feed attachment.
+	Enclosure *Enclosure
+}
+
+// Enclosure is an attached media file. URL is absolute; Length is the byte size (0 omits it).
+type Enclosure struct {
+	URL    string
+	Type   string
+	Length int64
 }
 
 func updated(items []Item) time.Time {
@@ -62,11 +72,18 @@ type rssChannel struct {
 }
 
 type rssItem struct {
-	Title       string  `xml:"title"`
-	Link        string  `xml:"link"`
-	GUID        rssGUID `xml:"guid"`
-	PubDate     string  `xml:"pubDate,omitempty"`
-	Description string  `xml:"description"`
+	Title       string        `xml:"title"`
+	Link        string        `xml:"link"`
+	GUID        rssGUID       `xml:"guid"`
+	PubDate     string        `xml:"pubDate,omitempty"`
+	Description string        `xml:"description"`
+	Enclosure   *rssEnclosure `xml:"enclosure,omitempty"`
+}
+
+type rssEnclosure struct {
+	URL    string `xml:"url,attr"`
+	Type   string `xml:"type,attr"`
+	Length int64  `xml:"length,attr"`
 }
 
 type rssGUID struct {
@@ -90,6 +107,9 @@ func RSS(s Site, items []Item) ([]byte, error) {
 		if !it.Published.IsZero() {
 			ri.PubDate = it.Published.UTC().Format(time.RFC1123Z)
 		}
+		if it.Enclosure != nil {
+			ri.Enclosure = &rssEnclosure{URL: it.Enclosure.URL, Type: it.Enclosure.Type, Length: it.Enclosure.Length}
+		}
 		ch.Items = append(ch.Items, ri)
 	}
 	return marshal(rssRoot{Version: "2.0", Channel: ch})
@@ -108,8 +128,10 @@ type atomRoot struct {
 }
 
 type atomLink struct {
-	Href string `xml:"href,attr"`
-	Rel  string `xml:"rel,attr,omitempty"`
+	Href   string `xml:"href,attr"`
+	Rel    string `xml:"rel,attr,omitempty"`
+	Type   string `xml:"type,attr,omitempty"`
+	Length int64  `xml:"length,attr,omitempty"`
 }
 
 type atomAuthor struct {
@@ -117,13 +139,13 @@ type atomAuthor struct {
 }
 
 type atomEntry struct {
-	Title     string    `xml:"title"`
-	ID        string    `xml:"id"`
-	Link      atomLink  `xml:"link"`
-	Updated   string    `xml:"updated"`
-	Published string    `xml:"published,omitempty"`
-	Summary   *atomText `xml:"summary,omitempty"`
-	Content   *atomText `xml:"content,omitempty"`
+	Title     string     `xml:"title"`
+	ID        string     `xml:"id"`
+	Links     []atomLink `xml:"link"` // the alternate link, plus a rel="enclosure" when present
+	Updated   string     `xml:"updated"`
+	Published string     `xml:"published,omitempty"`
+	Summary   *atomText  `xml:"summary,omitempty"`
+	Content   *atomText  `xml:"content,omitempty"`
 }
 
 type atomText struct {
@@ -146,7 +168,7 @@ func Atom(s Site, items []Item) ([]byte, error) {
 		e := atomEntry{
 			Title:   it.Title,
 			ID:      it.URL,
-			Link:    atomLink{Href: it.URL, Rel: "alternate"},
+			Links:   []atomLink{{Href: it.URL, Rel: "alternate"}},
 			Updated: stamp(it.Published),
 			Content: &atomText{Type: "html", Body: it.Content},
 		}
@@ -155,6 +177,9 @@ func Atom(s Site, items []Item) ([]byte, error) {
 		}
 		if it.Description != "" {
 			e.Summary = &atomText{Type: "text", Body: it.Description}
+		}
+		if it.Enclosure != nil {
+			e.Links = append(e.Links, atomLink{Href: it.Enclosure.URL, Rel: "enclosure", Type: it.Enclosure.Type, Length: it.Enclosure.Length})
 		}
 		root.Entries = append(root.Entries, e)
 	}
@@ -176,12 +201,19 @@ type jsonAuthor struct {
 }
 
 type jsonItem struct {
-	ID            string `json:"id"`
-	URL           string `json:"url"`
-	Title         string `json:"title"`
-	Summary       string `json:"summary,omitempty"`
-	ContentHTML   string `json:"content_html"`
-	DatePublished string `json:"date_published,omitempty"`
+	ID            string           `json:"id"`
+	URL           string           `json:"url"`
+	Title         string           `json:"title"`
+	Summary       string           `json:"summary,omitempty"`
+	ContentHTML   string           `json:"content_html"`
+	DatePublished string           `json:"date_published,omitempty"`
+	Attachments   []jsonAttachment `json:"attachments,omitempty"`
+}
+
+type jsonAttachment struct {
+	URL         string `json:"url"`
+	MIMEType    string `json:"mime_type"`
+	SizeInBytes int64  `json:"size_in_bytes,omitempty"`
 }
 
 // JSON renders a JSON Feed 1.1 document.
@@ -194,6 +226,9 @@ func JSON(s Site, items []Item) ([]byte, error) {
 		ji := jsonItem{ID: it.URL, URL: it.URL, Title: it.Title, Summary: it.Description, ContentHTML: it.Content}
 		if !it.Published.IsZero() {
 			ji.DatePublished = it.Published.UTC().Format(time.RFC3339)
+		}
+		if it.Enclosure != nil {
+			ji.Attachments = []jsonAttachment{{URL: it.Enclosure.URL, MIMEType: it.Enclosure.Type, SizeInBytes: it.Enclosure.Length}}
 		}
 		root.Items = append(root.Items, ji)
 	}

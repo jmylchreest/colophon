@@ -16,7 +16,9 @@ import (
 
 // DoctorCmd validates the project: config structure (via config.Load), then drivers, themes,
 // publisher readiness, credentials, env refs and content. Errors exit non-zero; warnings don't.
-type DoctorCmd struct{}
+type DoctorCmd struct {
+	Prune bool `help:"Delete orphaned generated assets (AI images/audio no content references)"`
+}
 
 // report accumulates findings. Errors are problems that will break a build/publish; warnings are
 // things worth knowing (a fall-back kicked in, a credential isn't set yet) but not fatal.
@@ -48,6 +50,7 @@ func (c *DoctorCmd) Run() error {
 	checkEnvRefs(cfg, r)
 	checkContent(cfg, r)
 	checkAssets(cfg, r)
+	checkGeneratedOrphans(cfg, c.Prune, r)
 
 	fmt.Println(root)
 	fmt.Printf("  sites %d · publishers %d · environments %d (%s) · personas %d · authors %d\n",
@@ -191,6 +194,30 @@ func checkAssets(cfg *config.Config, r *report) {
 	}
 	for _, m := range missing {
 		r.warn("%s for %q references a file that can't be sourced: %q", m.Kind, m.Owner, m.Ref)
+	}
+}
+
+// checkGeneratedOrphans reports cached generated assets (AI images/audio) that no content
+// references — and deletes them when --prune is set. A scan failure is a warning, not fatal.
+func checkGeneratedOrphans(cfg *config.Config, prune bool, r *report) {
+	orphans, err := build.OrphanedGenerated(cfg)
+	if err != nil {
+		r.warn("generated-asset orphan check skipped: %v", err)
+		return
+	}
+	if len(orphans) == 0 {
+		return
+	}
+	if prune {
+		if err := build.PruneGenerated(orphans); err != nil {
+			r.warn("pruning generated orphans failed: %v", err)
+			return
+		}
+		fmt.Printf("  ✓ pruned %d orphaned generated asset(s)\n", len(orphans))
+		return
+	}
+	for _, p := range orphans {
+		r.warn("orphaned generated asset (no content references it): %s — run `doctor --prune` to delete", filepath.Base(p))
 	}
 }
 

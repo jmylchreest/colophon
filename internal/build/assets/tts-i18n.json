@@ -1,0 +1,116 @@
+{
+  "en": {
+    "code": "Here, the post shows a code example.",
+    "code_lang": "Here, the post shows a %s code example.",
+    "diagram": "Here, the post shows a diagram.",
+    "diagram_kind": "Here, the post shows a %s diagram.",
+    "table": "Here, the post shows a table.",
+    "formula": "Here, the post shows a formula.",
+    "hint": "Visit the post to view it.",
+    "wrap_up": "Some parts of this post are visual — code, diagrams and the like; visit the post to see them.",
+    "listen": "Listen to this post",
+    "play": "Play",
+    "pause": "Pause",
+    "symbols": {
+      "/": "slash", "\\": "backslash", "-": "dash", "_": "underscore", "~": "tilde",
+      ".": "dot", ":": "colon", "=": "equals", "|": "pipe", "&": "and", "$": "dollar",
+      "#": "hash", "@": "at", "%": "percent", "*": "star", "+": "plus",
+      ">": "greater than", "<": "less than"
+    }
+  },
+  "es": {
+    "code": "Aquí, la entrada muestra un ejemplo de código.",
+    "code_lang": "Aquí, la entrada muestra un ejemplo de código en %s.",
+    "diagram": "Aquí, la entrada muestra un diagrama.",
+    "diagram_kind": "Aquí, la entrada muestra un diagrama de tipo %s.",
+    "table": "Aquí, la entrada muestra una tabla.",
+    "formula": "Aquí, la entrada muestra una fórmula.",
+    "hint": "Visita la entrada para verlo.",
+    "wrap_up": "Algunas partes de esta entrada son visuales —código, diagramas y similares—; visita la entrada para verlas.",
+    "listen": "Escuchar esta entrada",
+    "play": "Reproducir",
+    "pause": "Pausar",
+    "symbols": {
+      "/": "barra", "\\": "barra invertida", "-": "guion", "_": "guion bajo", "~": "tilde",
+      ".": "punto", ":": "dos puntos", "=": "igual", "|": "barra vertical", "&": "y", "$": "dólar",
+      "#": "almohadilla", "@": "arroba", "%": "por ciento", "*": "asterisco", "+": "más",
+      ">": "mayor que", "<": "menor que"
+    }
+  },
+  "fr": {
+    "code": "Ici, l'article montre un exemple de code.",
+    "code_lang": "Ici, l'article montre un exemple de code %s.",
+    "diagram": "Ici, l'article montre un schéma.",
+    "diagram_kind": "Ici, l'article montre un schéma %s.",
+    "table": "Ici, l'article montre un tableau.",
+    "formula": "Ici, l'article montre une formule.",
+    "hint": "Consultez l'article pour le voir.",
+    "wrap_up": "Certaines parties de cet article sont visuelles — code, schémas, etc. ; consultez l'article pour les voir.",
+    "listen": "Écouter cet article",
+    "play": "Lecture",
+    "pause": "Pause",
+    "symbols": {
+      "/": "barre oblique", "\\": "barre oblique inversée", "-": "tiret", "_": "tiret bas", "~": "tilde",
+      ".": "point", ":": "deux-points", "=": "égal", "|": "barre verticale", "&": "et", "$": "dollar",
+      "#": "dièse", "@": "arobase", "%": "pour cent", "*": "astérisque", "+": "plus",
+      ">": "supérieur à", "<": "inférieur à"
+    }
+  },
+  "de": {
+    "code": "Hier zeigt der Beitrag ein Codebeispiel.",
+    "code_lang": "Hier zeigt der Beitrag ein %s-Codebeispiel.",
+    "diagram": "Hier zeigt der Beitrag ein Diagramm.",
+    "diagram_kind": "Hier zeigt der Beitrag ein %s-Diagramm.",
+    "table": "Hier zeigt der Beitrag eine Tabelle.",
+    "formula": "Hier zeigt der Beitrag eine Formel.",
+    "hint": "Besuche den Beitrag, um es zu sehen.",
+    "wrap_up": "Einige Teile dieses Beitrags sind visuell – Code, Diagramme und dergleichen; besuche den Beitrag, um sie zu sehen.",
+    "listen": "Diesen Beitrag anhören",
+    "play": "Wiedergabe",
+    "pause": "Pause",
+    "symbols": {
+      "/": "Schrägstrich", "\\": "umgekehrter Schrägstrich", "-": "Bindestrich", "_": "Unterstrich", "~": "Tilde",
+      ".": "Punkt", ":": "Doppelpunkt", "=": "gleich", "|": "senkrechter Strich", "&": "und", "$": "Dollar",
+      "#": "Raute", "@": "at", "%": "Prozent", "*": "Sternchen", "+": "plus",
+      ">": "größer als", "<": "kleiner als"
+    }
+  },
+  "it": {
+    "code": "Qui, l'articolo mostra un esempio di codice.",
+    "code_lang": "Qui, l'articolo mostra un esempio di codice %s.",
+    "diagram": "Qui, l'articolo mostra un diagramma.",
+    "diagram_kind": "Qui, l'articolo mostra un diagramma %s.",
+    "table": "Qui, l'articolo mostra una tabella.",
+    "formula": "Qui, l'articolo mostra una formula.",
+    "hint": "Visita l'articolo per vederlo.",
+    "wrap_up": "Alcune parti di questo articolo sono visive — codice, diagrammi e simili; visita l'articolo per vederle.",
+    "listen": "Ascolta questo articolo",
+    "play": "Riproduci",
+    "pause": "Pausa",
+    "symbols": {
+      "/": "barra", "\\": "barra rovesciata", "-": "trattino", "_": "trattino basso", "~": "tilde",
+      ".": "punto", ":": "due punti", "=": "uguale", "|": "barra verticale", "&": "e", "$": "dollaro",
+      "#": "cancelletto", "@": "chiocciola", "%": "per cento", "*": "asterisco", "+": "più",
+      ">": "maggiore di", "<": "minore di"
+    }
+  },
+  "zh": {
+    "code": "这里，文章展示了一段代码示例。",
+    "code_lang": "这里，文章展示了一段 %s 代码示例。",
+    "diagram": "这里，文章展示了一张图表。",
+    "diagram_kind": "这里，文章展示了一张 %s 图表。",
+    "table": "这里，文章展示了一个表格。",
+    "formula": "这里，文章展示了一个公式。",
+    "hint": "请访问文章查看。",
+    "wrap_up": "这篇文章的部分内容是可视化的——代码、图表等；请访问文章查看。",
+    "listen": "收听本文",
+    "play": "播放",
+    "pause": "暂停",
+    "symbols": {
+      "/": "斜杠", "\\": "反斜杠", "-": "连字符", "_": "下划线", "~": "波浪号",
+      ".": "点", ":": "冒号", "=": "等于", "|": "竖线", "&": "和", "$": "美元符号",
+      "#": "井号", "@": "at", "%": "百分号", "*": "星号", "+": "加",
+      ">": "大于", "<": "小于"
+    }
+  }
+}

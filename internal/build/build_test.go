@@ -46,6 +46,7 @@ func (f fakeEngine) Render(string, map[string]any) (string, error) { return "", 
 func (f fakeEngine) HasTemplate(name string) bool                  { return f.have[name] }
 func (f fakeEngine) Asset(string) ([]byte, error)                  { return nil, nil }
 func (f fakeEngine) Assets() ([]string, error)                     { return nil, nil }
+func (f fakeEngine) Meta() render.ThemeMeta                        { return render.ThemeMeta{} }
 
 func TestTemplateFor(t *testing.T) {
 	eng := fakeEngine{have: map[string]bool{"project.html": true}}

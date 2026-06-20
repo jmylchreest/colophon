@@ -13,4 +13,6 @@ type Engine interface {
 	// Assets lists the theme's static files (everything but *.html templates) as
 	// slash-separated paths relative to the theme root, for the build to copy verbatim.
 	Assets() ([]string, error)
+	// Meta returns the theme's optional metadata (theme.yaml), or the zero value if none.
+	Meta() ThemeMeta
 }

@@ -91,6 +91,10 @@ type Config struct {
 	// (the tool's events and every site's reader analytics).
 	Telemetry core.Telemetry `yaml:"telemetry,omitempty"`
 
+	// Generation configures optional AI media generation — currently images that satisfy
+	// `gen:` references in frontmatter and content. Empty means the feature is off.
+	Generation core.Generation `yaml:"generation,omitempty"`
+
 	// Personas (the hidden writing voices) and Authors (the shown bylines) are populated
 	// from personas/*.yaml and authors/*.yaml, not from colophon.yaml.
 	Personas []core.Persona `yaml:"-"`

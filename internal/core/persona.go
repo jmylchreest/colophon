@@ -24,6 +24,9 @@ type Persona struct {
 	// Name is a human label for the voice (not shown), e.g. "Senior engineer".
 	Name  string `yaml:"name,omitempty" json:"name,omitempty"`
 	Style Style  `yaml:"style,omitempty" json:"style,omitempty"`
+	// Voice is the text-to-speech voice id for audio of posts written as this persona, used
+	// when the author has none. A post's audio_voice or its author's voice takes precedence.
+	Voice string `yaml:"voice,omitempty" json:"voice,omitempty"`
 }
 
 // Validate checks the persona's internal consistency.

@@ -48,6 +48,10 @@ func (e *pongoEngine) Assets() ([]string, error) {
 	return e.src.staticAssets()
 }
 
+func (e *pongoEngine) Meta() ThemeMeta {
+	return e.src.readMeta()
+}
+
 // Abs and Get satisfy pongo2.TemplateLoader. Names are theme-relative, so Abs is identity.
 func (e *pongoEngine) Abs(base, name string) string { return name }
 

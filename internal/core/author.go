@@ -18,6 +18,9 @@ type Author struct {
 	AvatarPosition string   `yaml:"avatar_position,omitempty" json:"avatar_position,omitempty"`
 	Email          string   `yaml:"email,omitempty" json:"email,omitempty"`
 	URLs           []string `yaml:"urls,omitempty" json:"urls,omitempty"`
+	// Voice is the text-to-speech voice id used when a post by this author opts into audio
+	// (a provider system voice, or a cloned voice id). A post's audio_voice overrides it.
+	Voice string `yaml:"voice,omitempty" json:"voice,omitempty"`
 }
 
 // AnonymousAuthor is the fallback byline when a post names no author and none are configured.

@@ -56,8 +56,12 @@ func writeAvatarFixture(t *testing.T, avatar string) string {
 	}
 	write("colophon.yaml", []byte("sites:\n  - id: main\n    title: T\n    base_url: https://example.com/\n    theme: press\n"))
 	write("content/posts/hello.md", []byte("---\ntitle: Hello\ndate: 2026-01-02\nauthor: me\n---\nbody text here"))
+	// A second author (with a post) so the home/author author-strip renders — press hides it
+	// for a single author, and these tests assert the avatar appears in that strip.
+	write("content/posts/world.md", []byte("---\ntitle: World\ndate: 2026-01-01\nauthor: you\n---\nmore body text"))
 	write("content/assets/face.png", avatarPNG)
 	write("authors/me.yaml", []byte("id: me\nname: Sam Avery\navatar: "+avatar+"\n"))
+	write("authors/you.yaml", []byte("id: you\nname: Min Park\n"))
 	return root
 }
 
