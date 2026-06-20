@@ -66,6 +66,13 @@ type Frontmatter struct {
 	AudioFile  string `yaml:"audio_file,omitempty"`
 	AudioVoice string `yaml:"audio_voice,omitempty"`
 
+	// Attachments are downloadable files published with the post — scripts, archives,
+	// datasets, PDFs, etc. Each entry is either a bare source-relative path (or [[embed]])
+	// or a {path, label, feed} mapping. The build copies/routes them exactly like images.
+	// label sets the link text (default: the file name); feed: true also lists the file as
+	// an enclosure/attachment in the feeds.
+	Attachments []Attachment `yaml:"attachments,omitempty"`
+
 	// Author is the byline shown to readers — the id of an authors/*.yaml entry. Empty
 	// falls back to the first configured author, else "Anonymous".
 	Author string `yaml:"author,omitempty"`
@@ -113,6 +120,29 @@ type SEO struct {
 type SEOSocial struct {
 	Title       string `yaml:"title,omitempty"`
 	Description string `yaml:"description,omitempty"`
+}
+
+// Attachment is one downloadable file shipped with a post. It accepts two YAML shapes for
+// authoring convenience: a bare scalar path (- foo.zip) or a mapping (- {path: foo.zip,
+// label: "Download", feed: true}).
+type Attachment struct {
+	Path  string `yaml:"path"`            // source-relative path or [[embed]]
+	Label string `yaml:"label,omitempty"` // link text; defaults to the file name
+	Feed  bool   `yaml:"feed,omitempty"`  // also emit as a feed enclosure/attachment
+}
+
+// UnmarshalYAML accepts either a scalar path or a {path,label,feed} mapping.
+func (a *Attachment) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		return value.Decode(&a.Path)
+	}
+	type rawAttachment Attachment
+	var r rawAttachment
+	if err := value.Decode(&r); err != nil {
+		return err
+	}
+	*a = Attachment(r)
+	return nil
 }
 
 // PublicationSpec is one entry of a content file's publications list; zero fields

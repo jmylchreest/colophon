@@ -33,9 +33,14 @@ type Item struct {
 	Description string
 	Content     string
 	Published   time.Time
-	// Enclosure is an optional attached media file (e.g. a podcast audio reading), rendered
-	// as an RSS <enclosure>, an Atom <link rel="enclosure">, and a JSON Feed attachment.
+	// Enclosure is the item's primary attached media file (e.g. a podcast audio reading). RSS
+	// permits only one <enclosure> per item, so this is the only one RSS renders; it is also
+	// rendered as an Atom <link rel="enclosure"> and a JSON Feed attachment.
 	Enclosure *Enclosure
+	// Attachments are additional downloadable files beyond the primary Enclosure. Atom and
+	// JSON Feed allow multiple, so each is rendered there (as another enclosure link / feed
+	// attachment); RSS cannot carry them and omits them.
+	Attachments []Enclosure
 }
 
 // Enclosure is an attached media file. URL is absolute; Length is the byte size (0 omits it).
@@ -181,6 +186,9 @@ func Atom(s Site, items []Item) ([]byte, error) {
 		if it.Enclosure != nil {
 			e.Links = append(e.Links, atomLink{Href: it.Enclosure.URL, Rel: "enclosure", Type: it.Enclosure.Type, Length: it.Enclosure.Length})
 		}
+		for _, a := range it.Attachments {
+			e.Links = append(e.Links, atomLink{Href: a.URL, Rel: "enclosure", Type: a.Type, Length: a.Length})
+		}
 		root.Entries = append(root.Entries, e)
 	}
 	return marshal(root)
@@ -228,7 +236,10 @@ func JSON(s Site, items []Item) ([]byte, error) {
 			ji.DatePublished = it.Published.UTC().Format(time.RFC3339)
 		}
 		if it.Enclosure != nil {
-			ji.Attachments = []jsonAttachment{{URL: it.Enclosure.URL, MIMEType: it.Enclosure.Type, SizeInBytes: it.Enclosure.Length}}
+			ji.Attachments = append(ji.Attachments, jsonAttachment{URL: it.Enclosure.URL, MIMEType: it.Enclosure.Type, SizeInBytes: it.Enclosure.Length})
+		}
+		for _, a := range it.Attachments {
+			ji.Attachments = append(ji.Attachments, jsonAttachment{URL: a.URL, MIMEType: a.Type, SizeInBytes: a.Length})
 		}
 		root.Items = append(root.Items, ji)
 	}

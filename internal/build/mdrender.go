@@ -3,6 +3,7 @@ package build
 import (
 	"bytes"
 	"html"
+	"path"
 	"regexp"
 	"strings"
 	"unicode"
@@ -30,13 +31,154 @@ var sharedMarkdown = newMarkdown()
 // allowed because callout preprocessing emits <div> wrappers and blog content is trusted.
 func newMarkdown() goldmark.Markdown {
 	return goldmark.New(
-		goldmark.WithExtensions(extension.GFM, mathExtension{}),
+		goldmark.WithExtensions(extension.GFM, mathExtension{}, mediaExtension{}),
 		goldmark.WithParserOptions(parser.WithAutoHeadingID()),
 		goldmark.WithRendererOptions(
 			ghtml.WithUnsafe(),
 			renderer.WithNodeRenderers(util.Prioritized(codeRenderer{}, 10)),
 		),
 	)
+}
+
+// --- inline video/audio ---
+//
+// A markdown image embed whose destination is a video or audio file — ![caption](demo.mp4),
+// or Obsidian ![[demo.mp4]] which the source normalises to that form — is rendered as a
+// <video>/<audio> player instead of a broken <img>. Discovery, copying and R2 routing already
+// treat any image-syntax destination uniformly, so the file ships and its URL is rewritten
+// with no extra wiring; only the rendered element changes. Destinations are matched by
+// extension, so a direct external file URL (…/clip.mp4) plays too.
+var videoMIME = map[string]string{
+	".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
+	".m4v": "video/x-m4v", ".ogv": "video/ogg",
+}
+
+var audioMIMEInline = map[string]string{
+	".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".aac": "audio/aac", ".oga": "audio/ogg",
+	".ogg": "audio/ogg", ".wav": "audio/wav", ".flac": "audio/flac", ".opus": "audio/opus",
+}
+
+// mediaExt returns the lower-cased file extension of a URL, ignoring any ?query/#fragment.
+func mediaExt(rawURL string) string {
+	s := rawURL
+	if i := strings.IndexAny(s, "?#"); i >= 0 {
+		s = s[:i]
+	}
+	return strings.ToLower(path.Ext(s))
+}
+
+// mediaKind reports "video", "audio", or "" (a normal image) for an embed destination.
+func mediaKind(dest string) string {
+	ext := mediaExt(dest)
+	if _, ok := videoMIME[ext]; ok {
+		return "video"
+	}
+	if _, ok := audioMIMEInline[ext]; ok {
+		return "audio"
+	}
+	return ""
+}
+
+func mediaMIME(dest string) string {
+	ext := mediaExt(dest)
+	if m, ok := videoMIME[ext]; ok {
+		return m
+	}
+	return audioMIMEInline[ext]
+}
+
+var kindMedia = ast.NewNodeKind("Media")
+
+// mediaNode replaces an image node that points at a video/audio file.
+type mediaNode struct {
+	ast.BaseInline
+	media string // "video" | "audio"
+	dest  string
+	alt   string
+}
+
+func (n *mediaNode) Kind() ast.NodeKind         { return kindMedia }
+func (n *mediaNode) Dump(src []byte, level int) { ast.DumpHelper(n, src, level, nil, nil) }
+
+type mediaExtension struct{}
+
+func (mediaExtension) Extend(m goldmark.Markdown) {
+	m.Parser().AddOptions(parser.WithASTTransformers(util.Prioritized(mediaTransformer{}, 500)))
+	m.Renderer().AddOptions(renderer.WithNodeRenderers(util.Prioritized(mediaRenderer{}, 10)))
+}
+
+// mediaTransformer swaps image nodes whose destination is a media file for mediaNodes, leaving
+// every other image to goldmark's default <img> rendering. Matches are collected first, then
+// replaced, so editing the tree does not disturb the in-progress walk.
+type mediaTransformer struct{}
+
+func (mediaTransformer) Transform(doc *ast.Document, reader text.Reader, _ parser.Context) {
+	source := reader.Source()
+	var imgs []*ast.Image
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		if img, ok := n.(*ast.Image); ok && mediaKind(string(img.Destination)) != "" {
+			imgs = append(imgs, img)
+		}
+		return ast.WalkContinue, nil
+	})
+	for _, img := range imgs {
+		parent := img.Parent()
+		if parent == nil {
+			continue
+		}
+		parent.ReplaceChild(parent, img, &mediaNode{
+			media: mediaKind(string(img.Destination)),
+			dest:  string(img.Destination),
+			alt:   altText(img, source),
+		})
+	}
+}
+
+// altText concatenates the literal text children of an image node (its alt text / caption).
+func altText(n ast.Node, source []byte) string {
+	var b strings.Builder
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		if t, ok := c.(*ast.Text); ok {
+			b.Write(t.Segment.Value(source))
+		}
+	}
+	return b.String()
+}
+
+type mediaRenderer struct{}
+
+func (mediaRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+	reg.Register(kindMedia, renderMediaNode)
+}
+
+func renderMediaNode(w util.BufWriter, _ []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+	n := node.(*mediaNode)
+	src := html.EscapeString(n.dest)
+	mime := mediaMIME(n.dest)
+	if n.media == "video" {
+		_, _ = w.WriteString(`<video class="post-video" controls preload="metadata" playsinline`)
+		if n.alt != "" {
+			_, _ = w.WriteString(` aria-label="` + html.EscapeString(n.alt) + `"`)
+		}
+		_, _ = w.WriteString(`><source src="` + src + `"`)
+		if mime != "" {
+			_, _ = w.WriteString(` type="` + mime + `"`)
+		}
+		_, _ = w.WriteString("></video>")
+		return ast.WalkSkipChildren, nil
+	}
+	_, _ = w.WriteString(`<audio class="post-inline-audio" controls preload="metadata" src="` + src + `"`)
+	if n.alt != "" {
+		_, _ = w.WriteString(` aria-label="` + html.EscapeString(n.alt) + `"`)
+	}
+	_, _ = w.WriteString("></audio>")
+	return ast.WalkSkipChildren, nil
 }
 
 // --- code & mermaid blocks ---

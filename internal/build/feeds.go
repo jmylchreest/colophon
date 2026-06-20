@@ -96,8 +96,21 @@ func writeFeeds(write func(string, []byte) error, site core.Site, cfg *config.Co
 				Content:     p.HTML,
 				Published:   p.Published,
 			}
+			// Collect every feed-eligible media file: the audio reading plus any attachment
+			// flagged feed: true. RSS carries one <enclosure> (audio wins, else the first
+			// attachment); Atom and JSON Feed list the rest too.
+			var encs []feed.Enclosure
 			if p.HasAudio && p.AudioAbs != "" {
-				it.Enclosure = &feed.Enclosure{URL: p.AudioAbs, Type: p.AudioType, Length: p.AudioBytes}
+				encs = append(encs, feed.Enclosure{URL: p.AudioAbs, Type: p.AudioType, Length: p.AudioBytes})
+			}
+			for _, a := range p.Attachments {
+				if a.Feed && a.Abs != "" {
+					encs = append(encs, feed.Enclosure{URL: a.Abs, Type: a.Type, Length: a.Bytes})
+				}
+			}
+			if len(encs) > 0 {
+				it.Enclosure = &encs[0]
+				it.Attachments = encs[1:]
 			}
 			items = append(items, it)
 		}

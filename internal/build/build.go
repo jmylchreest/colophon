@@ -131,6 +131,9 @@ type page struct {
 	AudioOut   string // output path key for the clip, used to back-fill AudioBytes
 	HasAudio   bool   // post has an audio attachment (theme player + filtering)
 
+	Attachments    []pageAttachment // downloadable files shipped with the post (Downloads block + feeds)
+	HasAttachments bool             // post ships at least one attachment (theme marker + filtering)
+
 	Tags       []string
 	Categories []string
 	Author     string        // author id from frontmatter (the byline)
@@ -312,7 +315,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// post, most-recent-first) are built up front so every page's header can show the strip.
 	list := make([]map[string]any, len(posts))
 	for i, p := range posts {
-		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "audio": p.Audio, "has_audio": p.HasAudio, "tags": tagLinks(p.Tags, basePath), "series": seriesListName(&posts[i])}
+		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "audio": p.Audio, "has_audio": p.HasAudio, "has_attachments": p.HasAttachments, "tags": tagLinks(p.Tags, basePath), "series": seriesListName(&posts[i])}
 	}
 	// Publish file-path author avatars through the same asset pipeline as markdown embeds,
 	// emitting a depth-independent src (the topbar strip is built once for every page depth).
@@ -382,6 +385,8 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"audio":           p.Audio,
 			"audio_type":      p.AudioType,
 			"has_audio":       p.HasAudio,
+			"attachments":     attachmentVars(p.Attachments),
+			"has_attachments": p.HasAttachments,
 			"tags":            tagLinks(p.Tags, basePath),
 			"category":        pageCategory(p),
 			"read_time":       readingTime(p.HTML),
@@ -725,6 +730,8 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 				}
 			}
 		}
+		p.Attachments = resolveAttachments(context.Background(), it, basePath, baseURL, router)
+		p.HasAttachments = len(p.Attachments) > 0
 		p.Lang = fm.Lang
 		p.GlossaryOff = fm.Glossary != nil && !*fm.Glossary
 		p.HeroAlt, p.ImageAlt = fm.HeroAlt, fm.ImageAlt
@@ -815,10 +822,13 @@ type docRef struct{ Kind, Ref string }
 func docRefs(doc core.Content) []docRef {
 	fm := doc.Frontmatter
 	embeds := imageRefs(doc.Body)
-	refs := make([]docRef, 0, len(embeds)+2)
+	refs := make([]docRef, 0, len(embeds)+2+len(fm.Attachments))
 	refs = append(refs, docRef{Kind: "hero", Ref: fm.Hero}, docRef{Kind: "image", Ref: fm.Image})
 	for _, r := range embeds {
 		refs = append(refs, docRef{Kind: "embed", Ref: r})
+	}
+	for _, a := range fm.Attachments {
+		refs = append(refs, docRef{Kind: "attachment", Ref: a.Path})
 	}
 	return refs
 }
