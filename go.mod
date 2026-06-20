@@ -28,7 +28,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/jmylchreest/slog-logfilter v0.0.0
+	github.com/jmylchreest/slog-logfilter v0.2.1
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
@@ -43,5 +43,3 @@ require (
 	golang.org/x/sys v0.43.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
-
-replace github.com/jmylchreest/slog-logfilter => /mnt/data/2/src/github.com/jmylchreest/slog-logfilter

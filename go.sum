@@ -50,6 +50,8 @@ github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUq
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 h1:BQSFePA1RWJOlocH6Fxy8MmwDt+yVQYULKfN0RoTN8A=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99/go.mod h1:1lJo3i6rXxKeerYnT8Nvf0QmHCRC1n8sfWVwXF2Frvo=
+github.com/jmylchreest/slog-logfilter v0.2.1 h1:6gR0xq5EzW+W6He3RRrDPtkGdorplNwput7iSh+F7HU=
+github.com/jmylchreest/slog-logfilter v0.2.1/go.mod h1:OGJcNIvPUIGvcs/i7igxFxScBumZ1dq7wwdliAtxQoc=
 github.com/jmylchreest/statsfactory/packages/sdk-go v0.0.0-20260609230132-bf9e155d8714 h1:OLKdhKbRz89/M2DN99HtmEKixRwNSK23NumdS9QKrZY=
 github.com/jmylchreest/statsfactory/packages/sdk-go v0.0.0-20260609230132-bf9e155d8714/go.mod h1:Un37JlF2TLQNcwcM5aqSizTbYdvhlP6LkzSEI3pwj1Y=
 github.com/kevinburke/ssh_config v1.2.0 h1:x584FjTGwHzMwvHx18PXxbBVzfnxogHaAReU4gf13a4=
