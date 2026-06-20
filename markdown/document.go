@@ -62,7 +62,7 @@ type Frontmatter struct {
 	// wins when set; otherwise Audio: true generates a TTS reading when speech generation is
 	// configured. AudioVoice overrides the generated voice id (else the author's/persona's
 	// voice, else the site default).
-	Audio      bool   `yaml:"audio,omitempty"`
+	Audio      *bool  `yaml:"audio,omitempty"` // tri-state: unset → site default; true/false → explicit
 	AudioFile  string `yaml:"audio_file,omitempty"`
 	AudioVoice string `yaml:"audio_voice,omitempty"`
 

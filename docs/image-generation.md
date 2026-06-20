@@ -134,12 +134,14 @@ become a player in the theme and a podcast `<enclosure>` in the feeds (RSS/Atom/
 ```yaml
 # pre-recorded — no AI, just attach a file (copied like a hero image)
 audio_file: episode.mp3
-# or AI text-to-speech — reads the post aloud (needs generation.speech, below)
+# AI text-to-speech: omit to use the site default; set true/false to force per-post
 audio: true
 audio_voice: "English_Graceful_Lady"   # optional; else the author's/persona's voice, else the default
 ```
 
-`audio_file` wins if both are set. The reading voice resolves: post `audio_voice` → the
+`audio:` is optional and three-state: **omit it** to follow the site default (read aloud when
+a speech provider is configured), or set `true`/`false` to force it for this post. `audio_file`
+wins if both are set. The reading voice resolves: post `audio_voice` → the
 author's (or persona's) `voice:` → the `generation.speech` default.
 
 Configure the speech provider alongside the image one:
@@ -217,11 +219,26 @@ as the built-in table). A missing language or field falls back to English.
 (No LLM is involved — cues are fixed text. An abstractive *summary* reading would need a
 text-LLM provider, which colophon doesn't have yet.)
 
-## Turning generation off
+## Turning generation on/off
 
-`generation.enabled: false` is the master switch — no new images or audio are generated
-(no provider/API calls) even with `--generate-ai`, while everything already generated and
-committed keeps being served. The quick "shut it all off" button.
+Three nested switches, all defaulting **on**, all behaving the same way: when off, no new
+assets of that kind are generated (no provider/API calls) even with `--generate-ai`, while
+everything already generated and committed keeps being served.
+
+```yaml
+generation:
+  enabled: true          # master — turns ALL generation off in one line
+  image:
+    enabled: true        # just images
+  speech:
+    enabled: true        # just audio (also the per-post audio default — see below)
+```
+
+`generation.speech.enabled` does double duty: it's the audio guard **and** the default for a
+post's `audio:` field. With a speech provider configured and speech enabled, **every post
+reads aloud by default**; a post opts out with `audio: false`. Without a provider, audio is
+off regardless (so speech effectively self-disables). Image generation has no per-post
+equivalent (images are explicit `gen:` references), so `image.enabled` is purely the guard.
 
 ## Cleaning up the cache
 

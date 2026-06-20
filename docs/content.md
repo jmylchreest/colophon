@@ -35,7 +35,7 @@ All fields are optional unless noted.
 | `hero_alt`, `image_alt` | Alt text for those images. Empty = decorative (`alt=""`); set it when the image carries meaning. |
 | `hero_fit`, `image_fit` | How the image fills its box — CSS `object-fit`: `cover` (crop, default), `contain` (letterbox), `fill`, `scale-down`, `none`. |
 | `hero_position`, `image_position` | Which part shows when cropping — CSS `object-position`, e.g. `top` or `50% 20%`. |
-| `audio` | `true` generates a spoken (TTS) reading of the post — needs `generation.speech`. See [Image & audio generation](image-generation.md). |
+| `audio` | Spoken (TTS) reading of the post. Omit to follow the site default (on when a speech provider is configured); set `true`/`false` to force it. Needs `generation.speech`. See [Image & audio generation](image-generation.md). |
 | `audio_file` | Attach a pre-recorded audio file (a path or `[[embed]]`) instead of generating one — no AI. Wins over `audio`. |
 | `audio_voice` | Override the reading voice id (generated audio only); else the author's/persona's `voice`, else the site default. |
 | `lang` | Per-post language (BCP-47, e.g. `fr`), overriding the site `lang`. Emitted as `<html lang>`. |

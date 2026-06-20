@@ -22,6 +22,7 @@ func (g Generation) Active() bool { return g.Enabled == nil || *g.Enabled }
 // model/key-env); the rest overrides it. Voice is the default voice id; a post or its
 // author/persona can override it.
 type SpeechGen struct {
+	Enabled     *bool  `yaml:"enabled,omitempty"`     // per-modality guard + per-post audio default; nil/true → on
 	Provider    string `yaml:"provider,omitempty"`    // minimax (more later)
 	Model       string `yaml:"model,omitempty"`       // overrides the profile default
 	Voice       string `yaml:"voice,omitempty"`       // default voice id
@@ -89,6 +90,11 @@ func (t SpeechTranscript) ExpandsAcronyms() bool { return t.ExpandAcronyms == ni
 // Configured reports whether a speech provider has been selected.
 func (g SpeechGen) Configured() bool { return strings.TrimSpace(g.Provider) != "" }
 
+// On reports whether speech generation is switched on (default true). It also serves as the
+// per-post `audio:` default: with a provider configured and this on, posts read aloud by
+// default unless they set `audio: false`.
+func (g SpeechGen) On() bool { return g.Enabled == nil || *g.Enabled }
+
 // Waveforms reports whether a waveform-peaks sidecar should be generated (default true).
 func (g SpeechGen) Waveforms() bool { return g.Waveform == nil || *g.Waveform }
 
@@ -99,6 +105,7 @@ func (g SpeechGen) Waveforms() bool { return g.Waveform == nil || *g.Waveform }
 // (typically a {env:VAR} reference) else from the profile's default env var, so the
 // secret stays in the environment and is never required in the config file.
 type ImageGen struct {
+	Enabled      *bool             `yaml:"enabled,omitempty"`       // per-modality guard; nil/true → on
 	Provider     string            `yaml:"provider,omitempty"`      // google | minimax | openai | together | deepinfra | custom
 	Model        string            `yaml:"model,omitempty"`         // overrides the profile's default model
 	OutputDir    string            `yaml:"output_dir,omitempty"`    // cache dir for images + sidecars; default content/assets/generated
@@ -124,3 +131,6 @@ func (p ImagePostprocess) TrimsLetterbox() bool { return p.TrimLetterbox == nil 
 
 // Configured reports whether an image generator provider has been selected.
 func (g ImageGen) Configured() bool { return strings.TrimSpace(g.Provider) != "" }
+
+// On reports whether image generation is switched on (default true).
+func (g ImageGen) On() bool { return g.Enabled == nil || *g.Enabled }

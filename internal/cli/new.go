@@ -215,7 +215,7 @@ func newSkeleton(cfg *config.Config, o newOpts, kind, segment string, tgt writeT
 	b.WriteString("<!-- optional media (move into the frontmatter above to use):\n")
 	b.WriteString("     hero: \"gen:<prompt>\"      AI banner image — or a path/[[embed]] to an existing image\n")
 	b.WriteString("     image: \"gen:<prompt>\"     social/preview image — or a path\n")
-	b.WriteString("     audio: true               generate a spoken reading (needs generation.speech)\n")
+	b.WriteString("     audio: false              opt out of the spoken reading (on by default when speech is configured)\n")
 	b.WriteString("     audio_file: \"clip.mp3\"    attach a pre-recorded reading instead (no AI)\n")
 	b.WriteString("     audio_voice: \"<voice-id>\" override the reading voice (generated audio only)\n")
 	b.WriteString("     inline image in the body: ![alt](<gen:a prompt?aspect=16:9>)\n")

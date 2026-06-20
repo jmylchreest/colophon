@@ -202,16 +202,21 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// Image generation: resolve the provider once (a config error degrades to off with a
 	// warning) plus the house-style system prompt, then collect every gen: reference while
 	// rendering so they can be produced or served from cache after the pages are built.
-	// generateAI gates new generation: the build flag AND the config master switch. When the
-	// switch is off, no provider is ever called (even with --generate-ai) but already-cached
-	// assets are still resolved and served.
-	generateAI := opts.GenerateAI && cfg.Generation.Active()
-	if opts.GenerateAI && !cfg.Generation.Active() {
+	// New generation is gated by the build flag AND the config switches: the master
+	// generation.enabled plus the per-modality image/speech enabled. When a switch is off no
+	// provider is called (even with --generate-ai), but already-cached assets are still served.
+	genActive := cfg.Generation.Active()
+	imageGen := opts.GenerateAI && genActive && cfg.Generation.Image.On()
+	speechGen := opts.GenerateAI && genActive && cfg.Generation.Speech.On()
+	if opts.GenerateAI && !genActive {
 		opts.Log.Step("BUILD", "", "warn", "generation disabled by config (generation.enabled: false); serving cached assets only")
 	}
+	// audioDefaultOn is the per-post `audio:` default: a post with no explicit audio reads aloud
+	// when speech is configured and enabled, and is silent otherwise (e.g. no provider).
+	audioDefaultOn := genActive && cfg.Generation.Speech.On() && cfg.Generation.Speech.Configured()
 	gr := newGenResolver(resolveImageGen(cfg, opts.Log), cfg.Root, resolveSystemDefault(cfg, eng.Meta()))
-	ar := newAudioResolver(resolveSpeech(cfg, opts.Log), cfg.Root, basePath, site.BaseURL, router, generateAI, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(cfg.Glossary), opts.Log)
-	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router, gr, ar, generateAI, opts.Log)
+	ar := newAudioResolver(resolveSpeech(cfg, opts.Log), cfg.Root, basePath, site.BaseURL, router, speechGen, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(cfg.Glossary), audioDefaultOn, opts.Log)
+	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router, gr, ar, imageGen, opts.Log)
 	if err != nil {
 		return Result{}, err
 	}
@@ -600,7 +605,7 @@ type assetRef struct {
 // (includeDrafts false) when it is a draft or its publish_after is still in the future;
 // preview builds include both, marking embargoed ones. Two passes so wikilinks resolve
 // against every other document's URL.
-func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, baseURL string, router *core.Router, gr *genResolver, ar *audioResolver, generateAI bool, log *clog.Logger) ([]page, []assetRef, *time.Time, error) {
+func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, baseURL string, router *core.Router, gr *genResolver, ar *audioResolver, imageGen bool, log *clog.Logger) ([]page, []assetRef, *time.Time, error) {
 	var items []included
 	var next *time.Time
 	links := linkResolver{}
@@ -645,7 +650,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 	}
 	// Produce generated images before rendering, so refs resolve to the real cached
 	// file (with the extension chosen from the bytes) rather than a guessed one.
-	if err := gr.ensure(generateAI, log, now); err != nil {
+	if err := gr.ensure(imageGen, log, now); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -714,7 +719,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 				if rel, abs, mime, out, ok := ar.registerFile(it, fm.AudioFile); ok {
 					p.Audio, p.AudioAbs, p.AudioType, p.AudioOut, p.HasAudio = rel, abs, mime, out, true
 				}
-			} else if fm.Audio {
+			} else if ar.wantsAudio(fm.Audio) {
 				if rel, abs, mime, out, ok := ar.registerTTS(it.slug, html, fm.Lang, fm.AudioVoice, fm.Author, resolvePersona(fm)); ok {
 					p.Audio, p.AudioAbs, p.AudioType, p.AudioOut, p.HasAudio = rel, abs, mime, out, true
 				}

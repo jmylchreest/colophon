@@ -72,25 +72,26 @@ type audioJob struct {
 // stable URL, accumulates the clips to publish, and produces them. Recorded audio works
 // whenever a resolver exists; TTS additionally needs speech to be configured.
 type audioResolver struct {
-	speech      *generate.SpeechSettings
-	cacheDir    string
-	basePath    string
-	baseURL     string
-	router      *core.Router
-	generateAI  bool
-	voiceFor    func(postVoice, author, persona string) string
-	log         *clog.Logger
-	i18n        ttsTable         // injected-speech translations (block cues, hint, wrap-up, symbols)
-	defaultLang string           // site language, used when a post sets none
-	acronyms    *acronymReplacer // glossary acronym → spoken expansion
-	jobs        map[string]*audioJob
+	speech         *generate.SpeechSettings
+	cacheDir       string
+	basePath       string
+	baseURL        string
+	router         *core.Router
+	generateAI     bool
+	voiceFor       func(postVoice, author, persona string) string
+	log            *clog.Logger
+	i18n           ttsTable         // injected-speech translations (block cues, hint, wrap-up, symbols)
+	defaultLang    string           // site language, used when a post sets none
+	acronyms       *acronymReplacer // glossary acronym → spoken expansion
+	defaultAudioOn bool             // per-post audio: default when a post sets none
+	jobs           map[string]*audioJob
 }
 
-func newAudioResolver(speech *generate.SpeechSettings, root, basePath, baseURL string, router *core.Router, generateAI bool, voiceFor func(string, string, string) string, defaultLang string, acronyms *acronymReplacer, log *clog.Logger) *audioResolver {
+func newAudioResolver(speech *generate.SpeechSettings, root, basePath, baseURL string, router *core.Router, generateAI bool, voiceFor func(string, string, string) string, defaultLang string, acronyms *acronymReplacer, defaultAudioOn bool, log *clog.Logger) *audioResolver {
 	ar := &audioResolver{
 		speech: speech, basePath: basePath, baseURL: baseURL, router: router,
 		generateAI: generateAI, voiceFor: voiceFor, defaultLang: defaultLang,
-		acronyms: acronyms, i18n: loadTTSTable(root), log: log, jobs: map[string]*audioJob{},
+		acronyms: acronyms, defaultAudioOn: defaultAudioOn, i18n: loadTTSTable(root), log: log, jobs: map[string]*audioJob{},
 	}
 	if speech != nil {
 		dir := speech.OutputDir
@@ -103,6 +104,18 @@ func newAudioResolver(speech *generate.SpeechSettings, root, basePath, baseURL s
 }
 
 func (ar *audioResolver) active() bool { return ar != nil }
+
+// wantsAudio reports whether a post should get a generated reading: an explicit frontmatter
+// `audio:` wins; otherwise the site default (speech configured + enabled).
+func (ar *audioResolver) wantsAudio(audio *bool) bool {
+	if !ar.active() {
+		return false
+	}
+	if audio != nil {
+		return *audio
+	}
+	return ar.defaultAudioOn
+}
 
 // uiLabels returns the localised player UI strings (figcaption, play/pause aria-labels) for a
 // page language, falling back to the site default then English.
