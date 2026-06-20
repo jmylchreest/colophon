@@ -106,6 +106,14 @@ a { color: inherit; }
   padding: 0.1rem 0.6rem; text-decoration: none; transition: all 0.2s; }
 .chip:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .chip-series { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 28%, transparent); background: var(--accent-soft); }
+/* audio indicator: an inert accent speaker mark in the row's top-right corner. It signals "this
+   post has an audio reading" but is not a control — pointer-events:none lets the click fall through
+   to the row's stretched post link, so clicking it (or anywhere on the row) opens the post where
+   the real player lives. No JS or <audio> on the listing page. */
+.post-audio-flag { position: absolute; top: 1.55rem; right: 0; pointer-events: none;
+  display: inline-flex; align-items: center; justify-content: center; width: 1.65rem; height: 1.65rem;
+  border-radius: 50%; color: var(--accent); background: var(--accent-soft); }
+.post-audio-flag svg { width: 0.95rem; height: 0.95rem; }
 .post-list { list-style: none; padding: 2rem 0 5rem; }
 .post-row { position: relative; padding: 1.6rem 0; border-top: 1px solid var(--border);
   display: grid; grid-template-columns: 7rem 1fr; gap: 1.5rem; align-items: baseline; transition: opacity 0.2s; }

@@ -142,7 +142,12 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 .index-feeds a { background: var(--surface); border: 1px solid var(--border); color: var(--accent); padding: 0.3rem 0.85rem; border-radius: 20px; font-size: 0.78rem; font-weight: 500; text-decoration: none; transition: all 0.15s; }
 .index-feeds a:hover { border-color: var(--accent); background: var(--accent-glow); }
 .post-list { max-width: 760px; margin: 0 auto; padding: 2rem 2.5rem 4rem; list-style: none; }
-.post-list li { padding: 1.5rem 0; border-bottom: 1px solid var(--border); }
+.post-list li { position: relative; padding: 1.5rem 0; border-bottom: 1px solid var(--border); }
+/* inert "has audio" mark, top-right; not a control — the title link opens the post + its player */
+.post-audio-flag { position: absolute; top: 1.5rem; right: 0; pointer-events: none; display: inline-flex;
+  align-items: center; justify-content: center; width: 1.65rem; height: 1.65rem; border-radius: 50%;
+  color: var(--accent); background: var(--accent-glow); }
+.post-audio-flag svg { width: 0.95rem; height: 0.95rem; }
 .post-list a.title { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: var(--strong); text-decoration: none; }
 .post-list a.title:hover { color: var(--accent); }
 .post-list .meta { color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem; }

@@ -100,7 +100,12 @@ body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', 
 
 /* index */
 .post-list { list-style: none; margin-top: 2rem; }
-.post-list li { padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
+.post-list li { position: relative; padding: 1.25rem 0; border-bottom: 1px solid var(--border); }
+/* inert "has audio" mark, top-right; not a control — the title link opens the post + its player */
+.post-audio-flag { position: absolute; top: 1.25rem; right: 0; pointer-events: none; display: inline-flex;
+  align-items: center; justify-content: center; width: 1.65rem; height: 1.65rem; border-radius: 50%;
+  color: var(--accent); background: var(--accent-bg); }
+.post-audio-flag svg { width: 0.95rem; height: 0.95rem; }
 .post-list a.title { font-family: 'Libre Baskerville', serif; font-size: 1.35rem; color: var(--text); text-decoration: none; }
 .post-list a.title:hover { color: var(--accent); }
 .post-list .meta { font-size: 0.82rem; color: var(--text2); margin-top: 0.3rem; }
