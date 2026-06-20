@@ -266,6 +266,11 @@ This produces only the images that **aren't already cached**, writing each into
 parameters and date. Already-cached images are reused with no API call. Generations run
 in parallel (up to `concurrency`, default 5 — lower it if your provider rate-limits you).
 
+`--generate-ai` is also a flag on `colophon publish`, so a deploy can generate any
+still-uncached media first: `colophon publish --env production --generate-ai`. (The same
+applies to TTS audio readings — without the flag, an uncached reading is skipped with a
+`build --generate-ai to create it` hint.)
+
 Then **commit the generated files** (`content/assets/generated/` by default). The cache
 is part of your content: it makes builds reproducible and means a plain `colophon build`
 or `colophon publish` — including in CI — needs no API key and incurs no cost.

@@ -14,7 +14,7 @@ import (
 type BuildCmd struct {
 	Env        string `help:"Build a named environment (applies its overrides)"`
 	Verbose    bool   `short:"v" help:"Log each step (sources, files, feeds)"`
-	GenerateAI bool   `name:"generate-ai" help:"Generate images for uncached gen: references (calls the configured provider)"`
+	GenerateAI bool   `name:"generate-ai" help:"Generate uncached AI media (gen: images and TTS audio) via the configured providers"`
 	Pprof      string `help:"Capture CPU+heap profiles to a dir (or 1 for cwd)" hidden:""`
 }
 
