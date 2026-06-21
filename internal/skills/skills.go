@@ -7,6 +7,7 @@ package skills
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,6 +18,38 @@ import (
 
 	embedded "github.com/jmylchreest/colophon/contrib/skills"
 )
+
+// claudePluginName is the plugin id colophon publishes to the Claude plugin marketplace.
+const claudePluginName = "colophon-skills"
+
+// ClaudePlugin reports whether the colophon-skills plugin is installed via Claude Code's plugin
+// marketplace, and the version Claude recorded. It reads ~/.claude/plugins/installed_plugins.json
+// (keys are "<plugin>@<marketplace>"), so `skills detect`/`install` can recognise the marketplace
+// path instead of treating Claude as "not installed".
+func ClaudePlugin(home string) (installed bool, version string) {
+	b, err := os.ReadFile(filepath.Join(home, ".claude", "plugins", "installed_plugins.json"))
+	if err != nil {
+		return false, ""
+	}
+	var doc struct {
+		Plugins map[string][]struct {
+			Version string `json:"version"`
+		} `json:"plugins"`
+	}
+	if json.Unmarshal(b, &doc) != nil {
+		return false, ""
+	}
+	for key, insts := range doc.Plugins {
+		name := key
+		if i := strings.IndexByte(key, '@'); i >= 0 {
+			name = key[:i]
+		}
+		if name == claudePluginName && len(insts) > 0 {
+			return true, insts[len(insts)-1].Version
+		}
+	}
+	return false, ""
+}
 
 // Skill is one embedded skill: its directory name, the SKILL.md metadata, the canonical file
 // content (no marker), and a short content hash used for staleness detection.

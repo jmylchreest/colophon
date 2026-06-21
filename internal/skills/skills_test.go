@@ -85,6 +85,25 @@ func TestInstallStatusLifecycle(t *testing.T) {
 	}
 }
 
+func TestClaudePlugin(t *testing.T) {
+	home := t.TempDir()
+	if ok, _ := ClaudePlugin(home); ok {
+		t.Error("no config ⇒ not installed")
+	}
+	dir := filepath.Join(home, ".claude", "plugins")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	doc := `{"plugins":{"other@x":[{"version":"1.0.0"}],"colophon-skills@colophon":[{"version":"0.1.0"}]}}`
+	if err := os.WriteFile(filepath.Join(dir, "installed_plugins.json"), []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ok, ver := ClaudePlugin(home)
+	if !ok || ver != "0.1.0" {
+		t.Errorf("want installed v0.1.0, got ok=%v ver=%q", ok, ver)
+	}
+}
+
 func TestTargetsDedupe(t *testing.T) {
 	// codex + cursor both map to ~/.agents/skills → one target serving both.
 	var codex, cursor Harness

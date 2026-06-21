@@ -49,7 +49,7 @@ func (c *SkillsDetectCmd) Run() error {
 	fmt.Printf("colophon %s — %d skills available to install\n\n", resolveVersion(), len(emb))
 
 	if c.Dir != "" {
-		printStatus(skills.Target{Dir: c.Dir}, emb)
+		printStatus(home, skills.Target{Dir: c.Dir}, emb)
 		return nil
 	}
 	detected := skills.Detect(home)
@@ -59,7 +59,7 @@ func (c *SkillsDetectCmd) Run() error {
 		return nil
 	}
 	for _, t := range skills.Targets(home, detected) {
-		printStatus(t, emb)
+		printStatus(home, t, emb)
 	}
 	return nil
 }
@@ -87,19 +87,13 @@ func (c *SkillsInstallCmd) Run() error {
 		fmt.Println("No supported agent harness detected. Install one, or pass --dir <path> or --all.")
 		return nil
 	}
+	home, _ := skills.HomeDir()
 	version := resolveVersion()
 	for _, t := range targets {
 		// Claude Code can take the skills as files or via the self-updating plugin marketplace,
 		// so ask (or honour --claude) before writing into ~/.claude/skills.
-		if targetIsClaude(t) {
-			switch c.claudeMode() {
-			case "marketplace":
-				printClaudeMarketplace(t)
-				continue
-			case "skip":
-				fmt.Printf("%s%s\n    skipped (--claude=skip)\n\n", t.Dir, harnessSuffix(t))
-				continue
-			}
+		if targetIsClaude(t) && c.handleClaude(home, t) {
+			continue // marketplace/skip/already-installed — nothing to copy
 		}
 		actions, err := skills.Install(t.Dir, version, emb, c.Force, c.DryRun)
 		if err != nil {
@@ -110,18 +104,32 @@ func (c *SkillsInstallCmd) Run() error {
 	return nil
 }
 
-// claudeMode resolves the --claude choice: an explicit value wins; "ask" prompts when interactive,
-// and otherwise defaults to the marketplace (so a non-interactive run never silently writes files
-// into ~/.claude/skills — pass --claude=files to opt in).
-func (c *SkillsInstallCmd) claudeMode() string {
-	switch c.Claude {
-	case "files", "marketplace", "skip":
-		return c.Claude
-	default: // "ask" or unset
-		if !isInteractive() {
-			return "marketplace"
+// handleClaude resolves how to handle the Claude target. It returns true when nothing should be
+// copied (marketplace / skip / already-installed), or false to fall through to a file install. An
+// explicit --claude value wins; "ask" first reports an existing marketplace install, then prompts
+// when interactive (else defaults to marketplace, never silently writing files).
+func (c *SkillsInstallCmd) handleClaude(home string, t skills.Target) bool {
+	mode := c.Claude
+	if mode == "" || mode == "ask" {
+		if ok, ver := skills.ClaudePlugin(home); ok {
+			fmt.Printf("%s%s\n    already installed via the colophon plugin marketplace (colophon-skills %s, self-updating)\n\n", t.Dir, harnessSuffix(t), ver)
+			return true
 		}
-		return promptClaude()
+		if isInteractive() {
+			mode = promptClaude()
+		} else {
+			mode = "marketplace"
+		}
+	}
+	switch mode {
+	case "marketplace":
+		printClaudeMarketplace(t)
+		return true
+	case "skip":
+		fmt.Printf("%s%s\n    skipped (--claude=skip)\n\n", t.Dir, harnessSuffix(t))
+		return true
+	default: // files
+		return false
 	}
 }
 
@@ -228,9 +236,19 @@ func resolveTargets(dir string, ids []string, all bool) ([]skills.Target, error)
 	return skills.Targets(home, hs), nil
 }
 
-func printStatus(t skills.Target, emb []skills.Skill) {
+func printStatus(home string, t skills.Target, emb []skills.Skill) {
 	fmt.Printf("%s%s\n", t.Dir, harnessSuffix(t))
-	for _, st := range skills.StatusFor(t.Dir, emb) {
+	statuses := skills.StatusFor(t.Dir, emb)
+	if targetIsClaude(t) {
+		if ok, ver := skills.ClaudePlugin(home); ok {
+			fmt.Printf("    ✓ installed via the colophon plugin marketplace (colophon-skills %s, self-updating)\n", ver)
+			if allMissing(statuses) {
+				fmt.Println() // nothing on disk to report; the plugin provides the skills
+				return
+			}
+		}
+	}
+	for _, st := range statuses {
 		ver := ""
 		if st.Version != "" && st.Status != skills.StatusUpToDate {
 			ver = " (" + st.Version + ")"
@@ -239,6 +257,15 @@ func printStatus(t skills.Target, emb []skills.Skill) {
 	}
 	printNote(t)
 	fmt.Println()
+}
+
+func allMissing(ss []skills.SkillStatus) bool {
+	for _, s := range ss {
+		if s.Status != skills.StatusMissing {
+			return false
+		}
+	}
+	return true
 }
 
 func printActions(t skills.Target, actions []skills.Action, dryRun bool) {
