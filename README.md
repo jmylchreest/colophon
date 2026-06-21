@@ -139,17 +139,26 @@ template variables, progressive-enhancement contract, and base-theme inheritance
 ## AI authoring skills
 
 colophon ships agent skills (write, edit, cross-link, metadata, publish) that teach an AI coding
-agent to drive it. In Claude Code (this repo is a plugin marketplace):
+agent to drive it — the engine supplies the voice and scaffolding, the agent writes the prose.
+It never calls an LLM or touches your deploy secrets.
+
+The binary installs them into whatever harness you use:
+
+```sh
+colophon skills detect    # list detected harnesses + per-skill status (installed/outdated/…)
+colophon skills install   # install or update the skills into the detected harnesses
+```
+
+Skills go to the tool-neutral `~/.agents/skills/` (read by **Codex, opencode, Cursor, Copilot**),
+plus `~/.claude/skills/` (**Claude Code**) and `~/.gemini/skills/` (**Gemini CLI**). Each installed
+file carries a version marker, so re-running `install` updates stale copies and won't overwrite
+local edits without `--force`. Scope with `--harness=…`, `--dir=PATH`, or `--all`.
+
+In Claude Code you can instead use the self-updating plugin (this repo is a marketplace):
 
 ```text
 /plugin marketplace add jmylchreest/colophon
 /plugin install colophon-skills@colophon
-```
-
-For opencode or another tool, copy the `SKILL.md` folders into its skills directory:
-
-```sh
-cp -r contrib/skills/skills/* ~/.config/opencode/skill/   # or ~/.claude/skills/
 ```
 
 See [`contrib/skills/`](contrib/skills/README.md) for the full list.
