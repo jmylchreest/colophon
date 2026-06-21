@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/jmylchreest/colophon/internal/skills"
@@ -67,6 +69,7 @@ type SkillsInstallCmd struct {
 	Harness []string `help:"Install only for these harness ids (claude,codex,opencode,cursor,copilot,gemini)"`
 	Dir     string   `help:"Install into a specific directory instead of detected harnesses"`
 	All     bool     `help:"Install for every supported harness, detected or not"`
+	Claude  string   `help:"How to install for Claude Code: ask|marketplace|files|skip" default:"ask" enum:"ask,marketplace,files,skip"`
 	Force   bool     `help:"Overwrite locally-modified or unmanaged skills"`
 	DryRun  bool     `help:"Show what would change without writing"`
 }
@@ -86,6 +89,18 @@ func (c *SkillsInstallCmd) Run() error {
 	}
 	version := resolveVersion()
 	for _, t := range targets {
+		// Claude Code can take the skills as files or via the self-updating plugin marketplace,
+		// so ask (or honour --claude) before writing into ~/.claude/skills.
+		if targetIsClaude(t) {
+			switch c.claudeMode() {
+			case "marketplace":
+				printClaudeMarketplace(t)
+				continue
+			case "skip":
+				fmt.Printf("%s%s\n    skipped (--claude=skip)\n\n", t.Dir, harnessSuffix(t))
+				continue
+			}
+		}
 		actions, err := skills.Install(t.Dir, version, emb, c.Force, c.DryRun)
 		if err != nil {
 			return err
@@ -93,6 +108,61 @@ func (c *SkillsInstallCmd) Run() error {
 		printActions(t, actions, c.DryRun)
 	}
 	return nil
+}
+
+// claudeMode resolves the --claude choice: an explicit value wins; "ask" prompts when interactive,
+// and otherwise defaults to the marketplace (so a non-interactive run never silently writes files
+// into ~/.claude/skills — pass --claude=files to opt in).
+func (c *SkillsInstallCmd) claudeMode() string {
+	switch c.Claude {
+	case "files", "marketplace", "skip":
+		return c.Claude
+	default: // "ask" or unset
+		if !isInteractive() {
+			return "marketplace"
+		}
+		return promptClaude()
+	}
+}
+
+func targetIsClaude(t skills.Target) bool {
+	for _, h := range t.Harnesses {
+		if h.ID == "claude" {
+			return true
+		}
+	}
+	return false
+}
+
+func isInteractive() bool {
+	fi, err := os.Stdin.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
+func promptClaude() string {
+	fmt.Print("Claude Code detected. Install skills via the self-updating [m]arketplace plugin, " +
+		"as [f]iles in ~/.claude/skills, or [s]kip? [M/f/s] ")
+	sc := bufio.NewScanner(os.Stdin)
+	if !sc.Scan() {
+		return "marketplace"
+	}
+	switch strings.ToLower(strings.TrimSpace(sc.Text())) {
+	case "f", "files":
+		return "files"
+	case "s", "skip":
+		return "skip"
+	default:
+		return "marketplace"
+	}
+}
+
+func printClaudeMarketplace(t skills.Target) {
+	fmt.Printf("%s%s\n", t.Dir, harnessSuffix(t))
+	fmt.Println("    install via the colophon plugin marketplace (self-updating):")
+	fmt.Println("      /plugin marketplace add jmylchreest/colophon")
+	fmt.Println("      /plugin install colophon-skills@colophon")
+	fmt.Println("    (or re-run with --claude=files to copy them into ~/.claude/skills)")
+	fmt.Println()
 }
 
 // SkillsUninstallCmd removes colophon-managed skills.

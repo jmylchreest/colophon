@@ -154,7 +154,9 @@ plus `~/.claude/skills/` (**Claude Code**) and `~/.gemini/skills/` (**Gemini CLI
 file carries a version marker, so re-running `install` updates stale copies and won't overwrite
 local edits without `--force`. Scope with `--harness=…`, `--dir=PATH`, or `--all`.
 
-In Claude Code you can instead use the self-updating plugin (this repo is a marketplace):
+For **Claude Code**, `install` asks whether to use the self-updating marketplace plugin or copy
+files (set `--claude=marketplace|files|skip` to choose non-interactively). The plugin (this repo
+is a marketplace) is:
 
 ```text
 /plugin marketplace add jmylchreest/colophon
