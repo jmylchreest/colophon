@@ -178,6 +178,28 @@ jobs:
             gh release create "$VERSION_TAG" --title "Snapshot $VERSION" --prerelease --notes-file changelog.txt release/*
           fi
 
+      # Keep the Releases page tidy. Snapshot builds publish a v…-dev.N prerelease on every
+      # push to main, so prune all but the most recent few (deleting their tags too). Only on
+      # snapshot builds — real releases are never pruned. Mirrors the histui workflow.
+      - name: Prune old snapshot releases
+        if: needs.prepare.outputs.is_release != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RETENTION: "5"
+        run: |
+          echo "Keeping the ${RETENTION} most recent snapshot prereleases."
+          # gh release list returns newest-first; keep the first $RETENTION, delete the rest.
+          snapshots=$(gh release list --limit 100 --json tagName,isPrerelease \
+            --jq '.[] | select(.isPrerelease) | select(.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+-dev\\.")) | .tagName')
+          count=0
+          for tag in $snapshots; do
+            count=$((count + 1))
+            if [ "$count" -gt "$RETENTION" ]; then
+              echo "Deleting old snapshot: ${tag}"
+              gh release delete "${tag}" --yes --cleanup-tag || true
+            fi
+          done
+
       # Tag the in-repo ./search module so external consumers can `go get
       # github.com/jmylchreest/colophon/search@<version>`. Only on a real release, and only when
       # ./search actually changed since its last tag — the tag mirrors the colophon version (gaps

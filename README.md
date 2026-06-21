@@ -166,3 +166,7 @@ contrib/skills/  AI agent skills (Claude Code / opencode plugin)
 docs/            authoring, theming and publishing guides
 fixtures/        end-to-end example sites
 ```
+
+## License
+
+[Apache License 2.0](LICENSE) © John Mylchreest.
