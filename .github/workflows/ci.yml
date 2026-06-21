@@ -39,6 +39,11 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Build without workspace (installer's view; verifies pinned module versions)
+        run: go build ./...
+        env:
+          GOWORK: "off"
+
       - name: Vet
         run: go vet ./...
 
