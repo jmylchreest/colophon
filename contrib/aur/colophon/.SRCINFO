@@ -1,0 +1,16 @@
+pkgbase = colophon
+	pkgdesc = Themed Markdown static-site generator with pluggable publishers
+	pkgver = 0.0.4
+	pkgrel = 1
+	url = https://github.com/jmylchreest/colophon
+	arch = x86_64
+	arch = aarch64
+	license = Apache-2.0
+	makedepends = go
+	makedepends = git
+	provides = colophon
+	conflicts = colophon-bin
+	source = colophon-0.0.4.tar.gz::https://github.com/jmylchreest/colophon/archive/refs/tags/v0.0.4.tar.gz
+	sha256sums = 53e3f24f9c76468177629bec5b29d392aea8d0f2cea742e260337bca576aaf5f
+
+pkgname = colophon

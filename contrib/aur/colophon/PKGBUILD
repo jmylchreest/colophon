@@ -1,0 +1,27 @@
+# Maintainer: John Mylchreest <jmylchreest@gmail.com>
+pkgname=colophon
+pkgver=0.0.4
+pkgrel=1
+pkgdesc="Themed Markdown static-site generator with pluggable publishers"
+arch=('x86_64' 'aarch64')
+url="https://github.com/jmylchreest/colophon"
+license=('Apache-2.0')
+makedepends=('go' 'git')
+provides=('colophon')
+conflicts=('colophon-bin')
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/jmylchreest/colophon/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('53e3f24f9c76468177629bec5b29d392aea8d0f2cea742e260337bca576aaf5f')
+
+build() {
+    cd "${pkgname}-${pkgver}"
+    export CGO_ENABLED=0
+    export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+    # go.work (shipped in the tarball) builds the bundled ./search submodule from source.
+    go build -ldflags "-s -w -X github.com/jmylchreest/colophon/internal/cli.version=v${pkgver}" -o colophon ./cmd/colophon
+}
+
+package() {
+    cd "${pkgname}-${pkgver}"
+    install -Dm755 colophon "${pkgdir}/usr/bin/colophon"
+    install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

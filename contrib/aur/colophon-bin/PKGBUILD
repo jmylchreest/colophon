@@ -1,0 +1,24 @@
+# Maintainer: John Mylchreest <jmylchreest@gmail.com>
+pkgname=colophon-bin
+pkgver=0.0.4
+pkgrel=1
+pkgdesc="Themed Markdown static-site generator with pluggable publishers (prebuilt binary)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/jmylchreest/colophon"
+license=('Apache-2.0')
+provides=('colophon')
+conflicts=('colophon')
+
+_url="https://github.com/jmylchreest/colophon"
+source=("LICENSE-${pkgver}::https://raw.githubusercontent.com/jmylchreest/colophon/v${pkgver}/LICENSE")
+source_x86_64=("colophon-${pkgver}-x86_64.tar.gz::${_url}/releases/download/v${pkgver}/colophon_${pkgver}_linux_amd64.tar.gz")
+source_aarch64=("colophon-${pkgver}-aarch64.tar.gz::${_url}/releases/download/v${pkgver}/colophon_${pkgver}_linux_arm64.tar.gz")
+
+sha256sums=('25066970ea0a1dc0f4a791b97ed2e5025450031637d0e9621c03d1bb3048929c')
+sha256sums_x86_64=('ab0f26ee39b9ecd37366a0d6846ab8ed9bd71835078413575da1e59e5a7770b2')
+sha256sums_aarch64=('0eb9c4434d48ce92789730a112d098855009666bd8925a66291000ab17cb6642')
+
+package() {
+    install -Dm755 "${srcdir}/colophon" "${pkgdir}/usr/bin/colophon"
+    install -Dm644 "${srcdir}/LICENSE-${pkgver}" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
