@@ -27,7 +27,7 @@ type CLI struct {
 	Sources       SourcesCmd       `cmd:"" aliases:"source" help:"Show where content lives and how posts are marked publishable"`
 	Posts         PostsCmd         `cmd:"" aliases:"post" help:"List content entries (for editing and cross-referencing)"`
 	Search        SearchCmd        `cmd:"" help:"Search content (lexical or semantic)"`
-	Sync          SyncCmd          `cmd:"" help:"Pull API sources (notion/hackmd) into content/"`
+	Sync          SyncCmd          `cmd:"" hidden:"" help:"Pull API sources (notion/hackmd) into content/ (planned)"`
 	Doctor        DoctorCmd        `cmd:"" help:"Validate the project config and report problems"`
 	Env           EnvCmd           `cmd:"" help:"List the environment variables this project uses"`
 

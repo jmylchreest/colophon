@@ -29,14 +29,26 @@ an S3/R2 bucket, a git branch, or anywhere a command can reach.
 - **Pluggable publishers** — Cloudflare Pages, Cloudflare R2 / S3 (SigV4), local mirror, git
   branch, or any command. Incremental: only changed files upload, orphans are pruned.
 
-## Quick start
+## Install
 
-Requires Go 1.26+.
+**Download a prebuilt binary** — grab the archive for your OS/arch from the
+[Releases](https://github.com/jmylchreest/colophon/releases) page, extract it, and put `colophon`
+on your `PATH`:
 
 ```bash
-go install github.com/jmylchreest/colophon/cmd/colophon@latest
-# …or build from a clone: git clone … && cd colophon && go build -o colophon ./cmd/colophon
+# example: Linux x86-64 (swap in your platform's asset name)
+curl -sSL https://github.com/jmylchreest/colophon/releases/latest/download/colophon_VERSION_linux_amd64.tar.gz | tar -xz
+sudo mv colophon /usr/local/bin/
+```
 
+Prebuilt for Linux, macOS and Windows on amd64/arm64; each release lists `checksums.txt`.
+
+**Or with Go** (1.26+): `go install github.com/jmylchreest/colophon/cmd/colophon@latest`, or build
+from a clone — `git clone … && cd colophon && go build -o colophon ./cmd/colophon`.
+
+## Quick start
+
+```bash
 colophon init mysite && cd mysite
 colophon new post "Hello World"   # scaffold a post in content/
 colophon serve                    # preview at http://localhost:8080 with live reload
