@@ -6,12 +6,53 @@ package cli
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/alecthomas/kong"
 )
 
-// version is overridden at build time via -ldflags "-X ...cli.version=...".
+// version is overridden at build time via -ldflags "-X ...cli.version=..." (the CI/justfile
+// release builds). Plain `go build`/`go install` leave it as "dev"; resolveVersion then derives
+// a real value from the embedded build info instead.
 var version = "dev"
+
+// resolveVersion returns the binary's version. An ldflags-injected value wins. Otherwise it
+// falls back to Go's embedded build info: `go install …@v0.0.1`/`@latest` records the module
+// version (e.g. "v0.0.1"), and a build from a working tree records the VCS revision, which is
+// rendered as "dev-<shortsha>[-dirty]".
+func resolveVersion() string {
+	if version != "dev" && version != "" {
+		return version
+	}
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return version
+	}
+	if v := info.Main.Version; v != "" && v != "(devel)" {
+		return v // installed at a tagged version via the module proxy
+	}
+	var rev string
+	var dirty bool
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.modified":
+			dirty = s.Value == "true"
+		}
+	}
+	if rev != "" {
+		if len(rev) > 12 {
+			rev = rev[:12]
+		}
+		v := "dev-" + rev
+		if dirty {
+			v += "-dirty"
+		}
+		return v
+	}
+	return version
+}
 
 // CLI is the root command tree.
 type CLI struct {
@@ -41,7 +82,7 @@ func Execute() int {
 		kong.Name("colophon"),
 		kong.Description("A themed Markdown blog generator with pluggable publishers"),
 		kong.UsageOnError(),
-		kong.Vars{"version": version},
+		kong.Vars{"version": resolveVersion()},
 	)
 	if err := ctx.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "colophon:", err)
