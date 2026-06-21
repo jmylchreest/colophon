@@ -322,6 +322,24 @@ or surface it however suits your design:
 </span>{% endif %}
 ```
 
+## Microformats2 (IndieWeb)
+
+The bundled themes annotate posts with [microformats2](https://microformats.org/wiki/microformats2)
+— invisible class names that let other software (IndieWeb readers, Webmention senders, Bridgy)
+understand your content. It's pure markup: no JS, no config (the old `microformats` toggle was
+removed — it's always on). If you write your own theme, mirror the pattern so it stays parseable:
+
+- Post page: the post container is `h-entry`, with `p-name` (title), `dt-published` (the `<time>`),
+  `e-content` (the rendered body), a `u-url` permalink (`{{ permalink }}` is the absolute URL), and a
+  nested `p-author h-card` (`p-name` + `u-url` on the author, `u-photo` on the avatar).
+- Listing/index: the list is `h-feed`, each entry `h-entry`, the title link `u-url p-name`, the date
+  `dt-published`.
+- Identity: author profile links carry `rel="me"`.
+
+When a theme splits the title/byline away from the body (e.g. a hero block), carry the stray
+properties into the `h-entry` root as hidden elements (`<data class="p-name" value="…">`, a hidden
+`<time class="dt-published">`) — see the `signal`/`obsidian` contrib themes.
+
 ## Analytics
 
 colophon owns the analytics clients; a theme's only job is to **include** them. When a site

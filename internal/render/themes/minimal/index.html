@@ -13,9 +13,9 @@
 <header><a href="{{ base_path }}">{{ site_title }}</a>{% if nav_pages %} · <nav>{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% if not forloop.Last %} · {% endif %}{% endfor %}</nav>{% endif %}</header>
 <main>
 <h1>{{ heading|default:site_title }}</h1>
-<ul>
+<ul class="h-feed">
 {% for p in pages %}
-  <li><a href="{{ base_path }}{{ p.url }}">{{ p.title }}</a>{% if p.date %} — <time class="meta" datetime="{{ p.date }}">{{ p.date }}</time>{% endif %}{% if p.draft %} [draft]{% endif %}{% if p.embargoed %} [embargoed]{% endif %}{% for tg in p.tags %} <a href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</li>
+  <li class="h-entry"><a class="u-url p-name" href="{{ base_path }}{{ p.url }}">{{ p.title }}</a>{% if p.date %} — <time class="meta dt-published" datetime="{{ p.date }}">{{ p.date }}</time>{% endif %}{% if p.draft %} [draft]{% endif %}{% if p.embargoed %} [embargoed]{% endif %}{% for tg in p.tags %} <a href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</li>
 {% endfor %}
 </ul>
 {% if feeds %}<p class="meta">Subscribe:{% for f in feeds %} <a href="{{ f.href }}">{{ f.label }}</a>{% endfor %}</p>{% endif %}

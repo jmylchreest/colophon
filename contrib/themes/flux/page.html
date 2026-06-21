@@ -34,19 +34,20 @@
   {% if nav_pages %}<nav class="site-nav" aria-label="Pages">{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% endfor %}</nav>{% endif %}
 </div>
 
-<main class="article-container">
+<main class="article-container h-entry">
+  <a class="u-url u-uid" href="{{ permalink }}" hidden aria-hidden="true"></a>
   <header class="article-header">
     {% if category %}<span class="article-section">{{ category }}</span>{% endif %}
     {% if draft %}<span class="article-section">Draft</span>{% endif %}
     {% if embargoed %}<span class="article-section">Embargoed · {{ embargo_until }}</span>{% endif %}
-    <h1 class="article-title">{{ title }}</h1>
-    {% if description %}<p class="article-dek">{{ description }}</p>{% endif %}
-    <div class="byline">{{ author_name|default:site_title }}{% if date %} · {{ date }}{% endif %} · {{ read_time }} min read</div>
+    <h1 class="article-title p-name">{{ title }}</h1>
+    {% if description %}<p class="article-dek p-summary">{{ description }}</p>{% endif %}
+    <div class="byline"><span class="p-author h-card">{% if author_url %}<a class="p-name u-url" href="{{ author_url }}" rel="me">{{ author_name|default:site_title }}</a>{% else %}<span class="p-name">{{ author_name|default:site_title }}</span>{% endif %}</span>{% if date %} · <time class="dt-published" datetime="{{ date }}">{{ date }}</time>{% endif %} · {{ read_time }} min read</div>
   </header>
 
   {% if has_audio %}<figure class="post-audio" data-audioplayer data-src="{{ audio }}" data-label-play="{{ audio_play }}" data-label-pause="{{ audio_pause }}"><figcaption>{{ audio_listen }}</figcaption><audio controls preload="none" src="{{ audio }}"></audio></figure>{% endif %}
 
-  <div class="prose">
+  <div class="prose e-content">
     {{ content|safe }}
   </div>
 

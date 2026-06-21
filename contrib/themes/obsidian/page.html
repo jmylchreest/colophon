@@ -54,9 +54,14 @@
   </div>
 </div>
 
-<div class="article-wrap">
+<div class="article-wrap h-entry">
+  {# microformats2: title/date/byline live in the hero above; carry those h-entry properties here (hidden, in-scope) and annotate the body as e-content. #}
+  <a class="u-url u-uid" href="{{ permalink }}" hidden aria-hidden="true"></a>
+  <data class="p-name" value="{{ title }}"></data>
+  {% if date %}<time class="dt-published" datetime="{{ date }}" hidden></time>{% endif %}
+  {% if author_name %}<span class="p-author h-card" hidden>{% if author_url %}<a class="p-name u-url" href="{{ author_url }}" rel="me">{{ author_name }}</a>{% else %}<span class="p-name">{{ author_name }}</span>{% endif %}</span>{% endif %}
   {% if has_audio %}<figure class="post-audio" data-audioplayer data-src="{{ audio }}" data-label-play="{{ audio_play }}" data-label-pause="{{ audio_pause }}"><figcaption>{{ audio_listen }}</figcaption><audio controls preload="none" src="{{ audio }}"></audio></figure>{% endif %}
-  <div class="prose">
+  <div class="prose e-content">
     {{ content|safe }}
   </div>
 

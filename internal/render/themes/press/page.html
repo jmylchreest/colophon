@@ -85,7 +85,8 @@
   </aside>
   {% endif %}
 
-  <main id="main" class="post-main">
+  <main id="main" class="post-main h-entry">
+    <a class="u-url u-uid" href="{{ permalink }}" hidden aria-hidden="true"></a>
     <header class="post-hero">
       <a class="back" href="{{ base_path }}">← {{ site_title }}</a>
       <div style="margin-top:1.5rem">
@@ -93,13 +94,13 @@
         {% if draft %}<span class="eyebrow">Draft</span>{% endif %}
         {% if embargoed %}<span class="eyebrow">Embargoed · {{ embargo_until }}</span>{% endif %}
       </div>
-      <h1>{{ title }}</h1>
-      {% if description %}<p class="dek">{{ description }}</p>{% endif %}
+      <h1 class="p-name">{{ title }}</h1>
+      {% if description %}<p class="dek p-summary">{{ description }}</p>{% endif %}
       <div class="byline">
         <div class="av">{% if author_avatar %}<img src="{{ author_avatar }}" alt="{{ author_name }}"{% if author_avatar_style %} style="{{ author_avatar_style }}"{% endif %}>{% else %}{{ author_initials|default:"·" }}{% endif %}</div>
         <div>
           <div class="nm">{{ author_name|default:site_title }}</div>
-          <div class="mt">{% if date %}{{ date }} · {% endif %}{{ read_time }} min read</div>
+          <div class="mt">{% if date %}<time class="dt-published" datetime="{{ date }}">{{ date }}</time> · {% endif %}{{ read_time }} min read</div>
         </div>
       </div>
     </header>
@@ -108,16 +109,16 @@
 
     {% if hero %}<figure class="cover"><img src="{{ hero }}" alt="{{ hero_alt }}"{% if hero_style %} style="{{ hero_style }}"{% endif %}></figure>{% endif %}
 
-    <article class="prose">{{ content|safe }}</article>
+    <article class="prose e-content">{{ content|safe }}</article>
 
     <footer class="post-foot">
       {% if tags %}<div class="tags">{% for tg in tags %}<a class="chip" href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</div>{% endif %}
       {% if author_name %}
-      <div class="note">
-        <div class="av">{% if author_avatar %}<img src="{{ author_avatar }}" alt="{{ author_name }}"{% if author_avatar_style %} style="{{ author_avatar_style }}"{% endif %}>{% else %}{{ author_initials }}{% endif %}</div>
+      <div class="note p-author h-card">
+        <div class="av">{% if author_avatar %}<img class="u-photo" src="{{ author_avatar }}" alt="{{ author_name }}"{% if author_avatar_style %} style="{{ author_avatar_style }}"{% endif %}>{% else %}{{ author_initials }}{% endif %}</div>
         <div>
-          <div class="nm">{{ author_name }}</div>
-          {% if author_bio %}<div class="bio">{{ author_bio }}</div>{% endif %}
+          <div class="nm">{% if author_url %}<a class="p-name u-url" href="{{ author_url }}" rel="me">{{ author_name }}</a>{% else %}<span class="p-name">{{ author_name }}</span>{% endif %}</div>
+          {% if author_bio %}<div class="bio p-note">{{ author_bio }}</div>{% endif %}
           {% if author_links %}<div class="note-links">{% for l in author_links %}<a href="{{ l.url }}" rel="me">{{ l.label }}</a>{% endfor %}</div>{% endif %}
         </div>
       </div>

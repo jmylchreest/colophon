@@ -362,6 +362,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"site_title":       site.Title,
 			"base_url":         site.BaseURL,
 			"base_path":        basePath,
+			"permalink":        absURL(site.BaseURL, p.URL),
 			"feed_head":        feedHead,
 			"analytics_head":   analyticsHead(site.Analytics, basePath, &p),
 			"glossary_head":    pageGlossary,

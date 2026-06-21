@@ -12,13 +12,14 @@
 <body>
 <header><a href="{{ base_path }}">{{ site_title }}</a>{% if nav_pages %} · <nav>{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% if not forloop.Last %} · {% endif %}{% endfor %}</nav>{% endif %}</header>
 <main>
-<article>
+<article class="h-entry">
+<a class="u-url u-uid" href="{{ permalink }}" hidden aria-hidden="true"></a>
 {% if draft %}<p class="note">[draft — not published]</p>{% endif %}
 {% if embargoed %}<p class="note">[embargoed until {{ embargo_until }}]</p>{% endif %}
-<h1>{{ title }}</h1>
-{% if date %}<p class="meta"><time datetime="{{ date }}">{{ date }}</time></p>{% endif %}
+<h1 class="p-name">{{ title }}</h1>
+{% if date %}<p class="meta"><time class="dt-published" datetime="{{ date }}">{{ date }}</time></p>{% endif %}
 {# Minimal theme: no client-side JS. colophon's raw blocks (code/math/mermaid) show as plain text. #}
-{{ content|safe }}
+<div class="e-content">{{ content|safe }}</div>
 {% if tags %}<p class="meta">Tags:{% for tg in tags %} <a href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</p>{% endif %}
 {# Engine-rendered Downloads list (no JS). Drop-in; or build your own from the `attachments` list. #}
 {{ attachments_html|safe }}

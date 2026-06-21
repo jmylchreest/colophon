@@ -17,9 +17,9 @@
 </header>
 <main id="main">
 <h1>{{ heading|default:site_title }}</h1>
-<ul class="post-list">
+<ul class="post-list h-feed">
 {% for p in pages %}
-  <li>{% if p.image %}<a class="thumb" href="{{ base_path }}{{ p.url }}"><img src="{{ p.image }}" alt="{{ p.image_alt }}" loading="lazy"{% if p.image_style %} style="{{ p.image_style }}"{% endif %}></a>{% endif %}<a href="{{ base_path }}{{ p.url }}">{{ p.title }}</a>{% if p.date %} <time class="meta" datetime="{{ p.date }}">{{ p.date }}</time>{% endif %}{% if p.draft %} <span class="draft-tag">draft</span>{% endif %}{% if p.embargoed %} <span class="embargo-tag">embargoed until {{ p.embargo_until }}</span>{% endif %}{% for tg in p.tags %} <a class="tag" href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</li>
+  <li class="h-entry">{% if p.image %}<a class="thumb" href="{{ base_path }}{{ p.url }}"><img src="{{ p.image }}" alt="{{ p.image_alt }}" loading="lazy"{% if p.image_style %} style="{{ p.image_style }}"{% endif %}></a>{% endif %}<a class="u-url p-name" href="{{ base_path }}{{ p.url }}">{{ p.title }}</a>{% if p.date %} <time class="meta dt-published" datetime="{{ p.date }}">{{ p.date }}</time>{% endif %}{% if p.draft %} <span class="draft-tag">draft</span>{% endif %}{% if p.embargoed %} <span class="embargo-tag">embargoed until {{ p.embargo_until }}</span>{% endif %}{% for tg in p.tags %} <a class="tag" href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</li>
 {% endfor %}
 </ul>
 {% if feeds %}<p class="feeds">Subscribe:{% for f in feeds %} <a href="{{ f.href }}">{{ f.label }}</a>{% endfor %}</p>{% endif %}

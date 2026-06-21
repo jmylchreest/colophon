@@ -16,13 +16,14 @@
   {% if nav_pages %}<nav class="site-nav" aria-label="Pages">{% for n in nav_pages %}<a href="{{ n.url }}">{{ n.title }}</a>{% endfor %}</nav>{% endif %}
 </header>
 <main id="main">
-<article>
+<article class="h-entry">
+<a class="u-url u-uid" href="{{ permalink }}" hidden aria-hidden="true"></a>
 {% if draft %}<p class="draft">Draft — not published</p>{% endif %}
 {% if embargoed %}<p class="embargo">Embargoed until {{ embargo_until }} — not yet public</p>{% endif %}
 {% if hero %}<img class="hero" src="{{ hero }}" alt="{{ hero_alt }}"{% if hero_style %} style="{{ hero_style }}"{% endif %}>{% endif %}
-<h1>{{ title }}</h1>
-{% if date %}<p class="meta"><time datetime="{{ date }}">{{ date }}</time></p>{% endif %}
-{{ content|safe }}
+<h1 class="p-name">{{ title }}</h1>
+{% if date %}<p class="meta"><time class="dt-published" datetime="{{ date }}">{{ date }}</time></p>{% endif %}
+<div class="e-content">{{ content|safe }}</div>
 {% if tags %}<p class="tags">{% for tg in tags %}<a class="tag" href="{{ tg.url }}">#{{ tg.name }}</a> {% endfor %}</p>{% endif %}
 {# Engine-rendered Downloads list (no JS). Drop-in; or build your own from the `attachments` list. #}
 {{ attachments_html|safe }}

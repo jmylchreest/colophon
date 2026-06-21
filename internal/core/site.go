@@ -83,8 +83,10 @@ type Federation struct {
 }
 
 type IndieWeb struct {
-	Microformats bool            `yaml:"microformats,omitempty"`
-	Webmention   *WebmentionConf `yaml:"webmention,omitempty"`
+	// Microformats2 markup (h-entry/h-card/h-feed) is always emitted by the themes — it is
+	// invisible, beneficial, and the foundation other IndieWeb features parse — so there is no
+	// toggle for it. Webmention stays opt-in below.
+	Webmention *WebmentionConf `yaml:"webmention,omitempty"`
 }
 
 type WebmentionConf struct {

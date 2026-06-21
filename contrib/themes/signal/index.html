@@ -34,12 +34,12 @@
   {% endif %}
 </header>
 
-<ul class="post-list">
+<ul class="post-list h-feed">
 {% for p in pages %}
-  <li>
+  <li class="h-entry">
     {% if p.has_audio or p.has_attachments %}<span class="post-flags">{% if p.has_audio %}<span class="pf" aria-label="Has an audio reading"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></span>{% endif %}{% if p.has_attachments %}<span class="pf" aria-label="Has downloadable files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>{% endif %}</span>{% endif %}
-    <a class="title" href="{{ base_path }}{{ p.url }}">{{ p.title }}</a>
-    <div class="meta">{% if p.date %}{{ p.date }}{% endif %}{% if p.draft %} · draft{% endif %}{% if p.embargoed %} · embargoed{% endif %}{% for tg in p.tags %} <a class="ctag" href="{{ tg.url }}">{{ tg.name }}</a>{% endfor %}</div>
+    <a class="title u-url p-name" href="{{ base_path }}{{ p.url }}">{{ p.title }}</a>
+    <div class="meta">{% if p.date %}<time class="dt-published" datetime="{{ p.date }}">{{ p.date }}</time>{% endif %}{% if p.draft %} · draft{% endif %}{% if p.embargoed %} · embargoed{% endif %}{% for tg in p.tags %} <a class="ctag" href="{{ tg.url }}">{{ tg.name }}</a>{% endfor %}</div>
   </li>
 {% endfor %}
 </ul>
