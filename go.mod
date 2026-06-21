@@ -16,6 +16,8 @@ require (
 	lukechampine.com/blake3 v1.4.1
 )
 
+require github.com/jmylchreest/colophon/search v0.0.1
+
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
