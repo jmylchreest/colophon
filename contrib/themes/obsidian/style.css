@@ -114,6 +114,13 @@ body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-s
 .prose pre { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; overflow-x: auto; font-size: 0.87rem; line-height: 1.6; margin: 1.5rem 0; color: var(--text); }
 .prose code { font-family: ui-monospace, 'Fira Code', monospace; background: var(--surface-2); color: var(--accent-soft); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.88em; }
 .prose pre code { background: none; color: inherit; padding: 0; }
+/* themed thin scrollbars for horizontally-scrolling blocks */
+.prose pre, .math-display { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--accent) 45%, transparent) transparent; }
+.prose pre::-webkit-scrollbar, .math-display::-webkit-scrollbar { height: 9px; width: 9px; }
+.prose pre::-webkit-scrollbar-button, .math-display::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.prose pre::-webkit-scrollbar-track, .math-display::-webkit-scrollbar-track { background: transparent; }
+.prose pre::-webkit-scrollbar-thumb, .math-display::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 999px; }
+.prose pre:hover::-webkit-scrollbar-thumb, .math-display:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 64%, transparent); }
 
 .side-col { position: sticky; top: 100px; }
 .side-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem; }

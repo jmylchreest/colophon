@@ -113,6 +113,13 @@ header.site { border-bottom: 1px solid var(--border); }
 .article code { font-family: inherit; background: var(--surface); color: var(--green); padding: 0.15em 0.45em; border-radius: 3px; font-size: 0.9em; }
 .article pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.25rem; overflow-x: auto; font-size: 0.85rem; line-height: 1.65; margin: 1.5rem 0; }
 .article pre code { background: none; color: inherit; padding: 0; }
+/* themed thin scrollbars for horizontally-scrolling blocks */
+.article pre, .math-display { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--cyan) 50%, transparent) transparent; }
+.article pre::-webkit-scrollbar, .math-display::-webkit-scrollbar { height: 9px; width: 9px; }
+.article pre::-webkit-scrollbar-button, .math-display::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.article pre::-webkit-scrollbar-track, .math-display::-webkit-scrollbar-track { background: transparent; }
+.article pre::-webkit-scrollbar-thumb, .math-display::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--cyan) 40%, transparent); border-radius: 2px; }
+.article pre:hover::-webkit-scrollbar-thumb, .math-display:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--cyan) 65%, transparent); }
 
 .r-sidebar { position: sticky; top: 2rem; align-self: start; }
 .r-box { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.25rem; margin-bottom: 1.25rem; }
@@ -135,8 +142,8 @@ header.site { border-bottom: 1px solid var(--border); }
   width: 1.4rem; height: 1.4rem; color: var(--cyan); }
 .post-flags .pf svg { width: 0.95rem; height: 0.95rem; }
 /* inline media embeds + downloads */
-.prose .post-video { display: block; max-width: 100%; height: auto; margin: 1.5rem 0; border: 1px solid var(--border); }
-.prose .post-inline-audio { display: block; width: 100%; margin: 1.5rem 0; }
+.article .post-video { display: block; max-width: 100%; height: auto; margin: 1.5rem 0; border: 1px solid var(--border); }
+.article .post-inline-audio { display: block; width: 100%; margin: 1.5rem 0; }
 .post-downloads { margin: 1.5rem 0; border: 1px solid var(--border); padding: 0.75rem 1rem; }
 .post-downloads .downloads-title { color: var(--green); font-size: 0.78rem; margin-bottom: 0.5rem; }
 .downloads-list { list-style: none; display: flex; flex-direction: column; gap: 0.3rem; }

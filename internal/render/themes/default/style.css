@@ -40,6 +40,13 @@ h1 { line-height: 1.2; }
 pre { padding: 1rem; overflow-x: auto; background: rgba(127,127,127,.12); border-radius: 6px; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
 pre code { font-size: .85em; }
+/* themed thin scrollbars for horizontally-scrolling blocks (neutral grey works light + dark) */
+pre, .math-display { scrollbar-width: thin; scrollbar-color: rgba(127,127,127,.5) transparent; }
+pre::-webkit-scrollbar, .math-display::-webkit-scrollbar { height: 9px; width: 9px; }
+pre::-webkit-scrollbar-button, .math-display::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+pre::-webkit-scrollbar-track, .math-display::-webkit-scrollbar-track { background: transparent; }
+pre::-webkit-scrollbar-thumb, .math-display::-webkit-scrollbar-thumb { background: rgba(127,127,127,.4); border-radius: 999px; }
+pre:hover::-webkit-scrollbar-thumb, .math-display:hover::-webkit-scrollbar-thumb { background: rgba(127,127,127,.65); }
 blockquote { margin: 0 0 1rem; padding-left: 1rem; border-left: 3px solid rgba(127,127,127,.4); opacity: .85; }
 article img { max-width: 100%; height: auto; border-radius: 6px; }
 article .post-video { display: block; max-width: 100%; height: auto; border-radius: 6px; margin: 1.5rem 0; }

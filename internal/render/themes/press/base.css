@@ -223,6 +223,13 @@ a { color: inherit; }
 .prose pre { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   padding: 1.4rem 1.5rem; overflow-x: auto; margin: 1.75rem 0; font-size: 0.9rem; line-height: 1.65; }
 .prose pre code { background: none; border: 0; padding: 0; color: var(--text); }
+/* themed thin scrollbars for horizontally-scrolling blocks (code, math) — replaces the chunky OS bar */
+.prose pre, .math-display { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--accent) 45%, transparent) transparent; }
+.prose pre::-webkit-scrollbar, .math-display::-webkit-scrollbar { height: 9px; width: 9px; }
+.prose pre::-webkit-scrollbar-button, .math-display::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.prose pre::-webkit-scrollbar-track, .math-display::-webkit-scrollbar-track { background: transparent; }
+.prose pre::-webkit-scrollbar-thumb, .math-display::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 38%, transparent); border-radius: 999px; }
+.prose pre:hover::-webkit-scrollbar-thumb, .math-display:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 62%, transparent); }
 
 /* colophon content blocks */
 .callout { margin: 1.75rem 0; padding: 0.4rem 1.3rem; border: 1px solid var(--border);
