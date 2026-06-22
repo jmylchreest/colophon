@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jmylchreest/colophon/internal/clog"
 )
@@ -17,10 +18,13 @@ func TestNormalizeAliases(t *testing.T) {
 }
 
 func TestEmitRedirects(t *testing.T) {
+	old := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	recent := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	pages := []page{
-		{Slug: "posts/renamed", URL: "posts/renamed/", Aliases: []string{"old-name", "2020/legacy-post"}},
-		{Slug: "posts/other", URL: "posts/other/", Aliases: []string{"old-name"}},      // duplicate alias → first wins
-		{Slug: "posts/clash", URL: "posts/clash/", Aliases: []string{"posts/renamed"}}, // collides with a real page
+		// "other" is listed first and is newer, but the OLDER "renamed" must win the shared alias.
+		{Slug: "posts/other", URL: "posts/other/", Published: recent, Aliases: []string{"old-name"}},
+		{Slug: "posts/renamed", URL: "posts/renamed/", Published: old, Aliases: []string{"old-name", "2020/legacy-post"}},
+		{Slug: "posts/clash", URL: "posts/clash/", Published: recent, Aliases: []string{"posts/renamed"}}, // collides with a real page
 	}
 	files := map[string][]byte{}
 	write := func(rel string, b []byte) error { files[rel] = b; return nil }

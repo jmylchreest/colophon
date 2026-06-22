@@ -59,7 +59,9 @@ func jsString(s string) string {
 //   - a `_redirects` file (Cloudflare Pages / Netlify / GitLab Pages format) when any alias exists;
 //   - `.nojekyll` always, so GitHub Pages serves the stubs and the _search/ _mentions/ dirs.
 //
-// An alias that collides with a real page is skipped with a warning (the real page wins).
+// Collisions resolve deterministically with a warning: an alias matching a real page is dropped
+// (the page wins), and when two posts claim the same alias the OLDEST page wins (it likely
+// established the URL first — inbound links/webmentions point at it), tie-broken by slug.
 func emitRedirects(write func(string, []byte) error, pages []page, basePath, baseURL string, log *clog.Logger) error {
 	// Real output paths, so an alias never clobbers a page.
 	taken := map[string]bool{}
@@ -67,27 +69,42 @@ func emitRedirects(write func(string, []byte) error, pages []page, basePath, bas
 		taken[p.URL] = true // base_path-relative, e.g. "posts/hello/"
 	}
 
-	var rules []string // "<from> <to> 301" lines for _redirects
-	seen := map[string]bool{}
-	for _, p := range pages {
-		target := basePath + p.URL // root-relative, e.g. "/posts/hello/"
-		canonical := absURL(baseURL, p.URL)
-		for _, a := range p.Aliases {
-			urlPath := a + "/" // mirror page URL shape ("old/")
-			if taken[urlPath] {
-				log.Step("ALIAS", p.Slug, "skipped", a, "reason", "collides with a page")
+	// Resolve a single winner per alias path (oldest wins).
+	winner := map[string]int{} // alias URL path ("old/") -> page index
+	for i := range pages {
+		for _, a := range pages[i].Aliases {
+			up := a + "/"
+			if taken[up] {
+				log.Step("ALIAS", pages[i].Slug, "skipped", a, "reason", "collides with a page")
 				continue
 			}
-			if seen[urlPath] {
-				log.Step("ALIAS", p.Slug, "skipped", a, "reason", "duplicate alias")
+			if w, ok := winner[up]; ok {
+				keep, lose := w, i
+				if olderPage(pages[i], pages[w]) {
+					keep, lose = i, w
+					winner[up] = i
+				}
+				log.Step("ALIAS", pages[lose].Slug, "skipped", a, "reason", "duplicate alias (kept "+pages[keep].Slug+")")
 				continue
 			}
-			seen[urlPath] = true
-			if err := write(a+"/index.html", redirectStub(canonical, target)); err != nil {
-				return err
-			}
-			rules = append(rules, basePath+urlPath+" "+target+" 301")
+			winner[up] = i
 		}
+	}
+
+	ups := make([]string, 0, len(winner))
+	for up := range winner {
+		ups = append(ups, up)
+	}
+	sort.Strings(ups)
+
+	var rules []string
+	for _, up := range ups {
+		p := pages[winner[up]]
+		target := basePath + p.URL // root-relative, e.g. "/posts/hello/"
+		if err := write(up+"index.html", redirectStub(absURL(baseURL, p.URL), target)); err != nil {
+			return err
+		}
+		rules = append(rules, basePath+up+" "+target+" 301")
 	}
 
 	// .nojekyll is unconditional and harmless everywhere; only GitHub Pages needs it (without it,
@@ -96,11 +113,19 @@ func emitRedirects(write func(string, []byte) error, pages []page, basePath, bas
 		return err
 	}
 	if len(rules) > 0 {
-		sort.Strings(rules)
 		if err := write("_redirects", []byte(strings.Join(rules, "\n")+"\n")); err != nil {
 			return err
 		}
 		log.Detail("BUILD", "", "redirects", len(rules))
 	}
 	return nil
+}
+
+// olderPage reports whether x predates y: earlier Published wins, slug breaks ties so the result
+// is deterministic regardless of page order.
+func olderPage(x, y page) bool {
+	if !x.Published.Equal(y.Published) {
+		return x.Published.Before(y.Published)
+	}
+	return x.Slug < y.Slug
 }
