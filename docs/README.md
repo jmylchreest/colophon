@@ -18,4 +18,7 @@ End-user guides for authoring, theming and publishing a colophon site.
 - **[Agent skills](skills.md)** *(design)* — the planned authoring skills (seo, draft, tag,
   social…) and the prompt packs that drive them.
 
+- **[How-to guides](howto/)** — short zero-to-published recipes: federate via Bridgy Fed, show
+  webmentions, syndicate to Mastodon/Bluesky. Each notes whether it's shipped or planned.
+
 Design notes and the roadmap live in [PLAN.md](PLAN.md) and [design/](design/).
