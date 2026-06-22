@@ -38,6 +38,58 @@ It performs **irreversible external actions** (posting to real accounts), so it'
 everything. It maps post → driver → `{url, syndicated_at}`; `encoding/json` sorts keys so diffs stay
 clean.
 
+> **`.gitignore` gotcha:** to commit the ledger out of an otherwise-ignored `.colophon/`, ignore the
+> directory's *contents*, not the directory — git can't re-include a file under a wholly-ignored dir:
+> ```gitignore
+> /.colophon/*                       # build trees, caches
+> !/.colophon/syndication.json       # …but keep the ledger
+> ```
+> `/.colophon/` (trailing slash) followed by a `!` negation **silently fails** — the ledger stays
+> ignored. `colophon init` scaffolds the correct form.
+
+### Persisting the ledger in CI (commit it back)
+
+The catch on GitHub Actions (or any CI): `colophon syndicate` *writes* the ledger in the runner, but
+that runner is thrown away. Unless the workflow **commits the updated ledger back to the repo**, the
+next run checks out the old ledger and **re-posts everything**. So a CI syndication step is two
+parts — syndicate, then commit back:
+
+```yaml
+permissions:
+  contents: write            # needed to push the ledger back
+concurrency:
+  group: deploy              # serialise: two overlapping runs must not both post before committing
+jobs:
+  deploy:
+    steps:
+      # … build + publish (the post must be live before you syndicate) …
+      - name: Syndicate
+        env:
+          MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+        run: colophon syndicate --env production --allow-publish
+      - name: Commit syndication ledger
+        run: |
+          git diff --quiet .colophon/syndication.json && exit 0
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .colophon/syndication.json
+          git commit -m "chore(syndication): update ledger [skip ci]"
+          git push
+```
+
+Three things make this safe:
+
+- **`contents: write`** — the default workflow is read-only; the commit-back needs write.
+- **`[skip ci]`** in the commit message — so pushing the ledger doesn't trigger the workflow again
+  (it would self-terminate anyway once the ledger is current, but this avoids the extra run).
+- **`concurrency:`** — serialises runs, so two in-flight deploys can't each syndicate before either
+  commits, which would double-post.
+
+`colophon init` scaffolds these as commented steps in the Deploy workflow. *(Alternative, not yet
+built: keeping the ledger in the asset store like the `_mentions/` pipeline, avoiding commit-back —
+at the cost of versioning. Commit-back is the supported path today.)*
+
 ### Per-post controls (frontmatter)
 
 | Frontmatter | Effect |

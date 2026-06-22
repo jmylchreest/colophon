@@ -138,7 +138,13 @@ About this blog.
 const gitignore = `# colophon build output and derived state
 /public/
 /dist/
-/.colophon/
+# Ignore the .colophon/ contents (build trees, caches) but NOT the directory itself, so the
+# un-ignore below can take effect — git can't re-include a file under a wholly-ignored dir.
+/.colophon/*
+# ...except the syndication ledger: it is the committed, authoritative record of what POSSE
+# has already posted, so it must travel with the repo or a fresh clone / CI run re-posts
+# everything. (Only relevant once you configure federation.syndication.)
+!/.colophon/syndication.json
 
 # Local env overrides / secrets. Shared, non-secret defaults live in .env.defaults
 # (committed); this file overrides them and is where deploy secrets go.
@@ -165,6 +171,14 @@ on:
 
 permissions:
   contents: read
+  # POSSE syndication writes the ledger and must commit it BACK to the repo (see the
+  # Syndicate steps below) — that needs: contents: write
+
+# Serialise runs so two overlapping deploys can't both syndicate before either commits the
+# ledger (which would double-post). Only matters once syndication is enabled.
+# concurrency:
+#   group: deploy
+#   cancel-in-progress: false
 
 jobs:
   deploy:
@@ -192,6 +206,24 @@ jobs:
       # cloudflare-pages + cloudflare-r2) and the secrets above are set:
       # - name: Publish
       #   run: colophon publish --env production --allow-publish
+
+      # POSSE (optional): after the post is live, syndicate copies to your silos and commit the
+      # updated ledger BACK to the repo — otherwise the next run starts from the stale ledger and
+      # re-posts everything. Requires permissions: contents: write (above) and a token allowed to
+      # push. The [skip ci] in the commit stops the push from triggering this workflow again.
+      # - name: Syndicate
+      #   env:
+      #     MASTODON_TOKEN: ${{ secrets.MASTODON_TOKEN }}
+      #     BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+      #   run: colophon syndicate --env production --allow-publish
+      # - name: Commit syndication ledger
+      #   run: |
+      #     git diff --quiet .colophon/syndication.json && exit 0
+      #     git config user.name  "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+      #     git add .colophon/syndication.json
+      #     git commit -m "chore(syndication): update ledger [skip ci]"
+      #     git push
 `
 
 const envDefaults = `# Shared, non-secret defaults loaded by colophon before {env:VAR} interpolation.
