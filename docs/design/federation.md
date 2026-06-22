@@ -48,10 +48,12 @@ type Syndicator interface { Syndicate(ctx, post) (siloURL string, err error) }
 //     command  – run a user command; stdout = silo URL (empty stdout = fire-and-forget webhook)
 ```
 
-Bridgy is just one provider here: `via: native` uses the per-network API provider; `via: bridgy`
-routes through Bridgy (for a network you've connected there but don't want to code against). One
-interface, four transports — and a site may configure **many** syndicators (the `syndication:`
-list, like the publishers list); per-post `syndicate: [ids]` narrows which fire.
+Each entry is `{ id, provider, …provider fields }` — the same shape as a publisher
+(`id` + `driver`) or a generation `provider`. The `provider` is the concrete mechanism
+(`mastodon`, `bluesky`, `bridgy`, `command`); `id` is an arbitrary handle that `syndicate:`
+(per-env and per-post) references. A site may configure **many** syndicators (the `syndication:`
+list, like the publishers list). Bridgy is simply `provider: bridgy` with a `network:` field naming
+the silo to publish to — not a special "via".
 
 **The `command` syndicator is also a publish webhook.** Mirroring the `command` *publisher*, it
 runs a user-defined command per post with interpolated placeholders (`{url}` canonical, `{title}`,
@@ -68,12 +70,12 @@ a **fire-and-forget publish webhook**. No separate hook system — the same inte
   Reader. **Not modeled** — it's invisible infrastructure.
 - *POSSE (outbound):* Bridgy does **not** auto-publish new posts, so automating cross-posting means
   colophon **actively** POSTs to `brid.gy/publish` and records the returned silo URL. That's an
-  explicit syndication action → it's a `Syndicator` provider, same as native. (Implementation note:
+  explicit syndication action → it's a `Syndicator` provider like the rest. (Implementation note:
   Bridgy verifies the source links to `brid.gy/publish/{silo}`, so the provider includes that link
   in the source it sends.)
 
-So `via: bridgy` buys cross-posting to networks without a native provider (or without holding their
-API tokens yourself), at the cost of per-network formatting control.
+So `provider: bridgy` buys cross-posting to networks without a native provider (or without holding
+their API tokens yourself), at the cost of per-network formatting control.
 
 Syndication runs as a **post-publish step** (`colophon syndicate`, after the canonical URL is live),
 decoupled and best-effort like webmention send — it never blocks the deploy.
@@ -164,11 +166,11 @@ sites:
         webmention:
           endpoint: https://webmention.io/blog.example.com/webmention   # advertised rel=webmention
           source:   https://webmention.io/api/mentions.jf2              # read API (JF2 reader)
-      syndication:                             # a list — many syndicators per site
-        - { id: mastodon, via: native, instance: https://hachyderm.io }   # token from env MASTODON_TOKEN
-        - { id: bluesky,  via: native, handle: me.bsky.social }           # app password from env
-        - { id: discord,  via: command, command: "curl -sf -X POST $DISCORD_WEBHOOK -d @{json}" }  # webhook: no stdout → fire-and-forget
-        - { id: twitter,  via: bridgy }        # delegate to brid.gy (account connected there)
+      syndication:                             # a list — many syndicators per site (id + provider + fields)
+        - { id: mastodon, provider: mastodon, instance: https://hachyderm.io }   # token from env MASTODON_TOKEN
+        - { id: bluesky,  provider: bluesky,  handle: me.bsky.social }           # app password from env
+        - { id: discord,  provider: command,  command: "curl -sf -X POST $DISCORD_WEBHOOK -d @{json}" }  # webhook: no stdout → fire-and-forget
+        - { id: twitter,  provider: bridgy,   network: twitter }                 # via brid.gy/publish/twitter
 
 environments:
   - name: production
