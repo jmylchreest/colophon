@@ -26,6 +26,7 @@ All fields are optional unless noted.
 | `date` | Publish date (`YYYY-MM-DD`). If omitted (Obsidian), the file's modified time is used. |
 | `type` | Page type (`post`, `page`, or a custom value). Overrides the date-based default — see [Page types](#page-types). |
 | `slug` | Overrides the final URL segment (otherwise derived from the file path). |
+| `aliases` | Old/alternate URL paths that redirect here (e.g. after a rename) — see [Redirects](#redirects-aliases). |
 | `description` | Summary for feeds, `<meta name="description">` and `og:description`. |
 | `tags`, `categories` | Lists for organisation/feeds. |
 | `author` | The byline — an `authors/<id>.yaml` id. Defaults to the first author, else "Anonymous". See [Authors & personas](personas.md). |
@@ -242,6 +243,36 @@ Two kinds of reference resolve differently:
 `colophon doctor` dry-resolves every *defined* reference through the same machinery and warns when
 one can't be sourced (a likely broken link). An *undefined* reference is fine — it just means none
 was wanted. `data:`/`http(s)://` references always pass through untouched.
+
+## Redirects (aliases)
+
+When you rename a post (or want short links), list the old paths in `aliases:` so the old URLs
+keep working:
+
+```yaml
+---
+title: A Renamed Post
+slug: renamed
+aliases:
+  - old-name            # /old-name/        → /posts/renamed/
+  - 2020/legacy-post    # nested paths fine
+---
+```
+
+Each alias is normalised like a slug (lower-cased, non-alphanumerics → hyphens, `/` kept). For
+each, the build emits:
+
+- a **meta-refresh stub** at `<alias>/index.html` → the post (works on *any* static host),
+- a line in a root **`_redirects`** file, and
+- a root **`.nojekyll`** (so GitHub Pages serves the stubs and the `_search/` index).
+
+How that becomes a redirect depends on the host: **Cloudflare Pages, Netlify and GitLab Pages**
+read `_redirects` and serve a real **301**; **S3 static-website** hosting gets a 301 too (colophon
+sets the object redirect header on publish); plain object stores (R2, bare S3/MinIO) and GitHub
+Pages fall back to the client-side meta-refresh stub. Either way the old URL resolves.
+
+**Collisions** are resolved deterministically with a warning: an alias that matches a real page is
+ignored (the page wins), and if two posts claim the same alias the newest wins.
 
 ## Glossary
 

@@ -102,6 +102,7 @@ type page struct {
 	Description  string    // frontmatter description or derived excerpt
 	URL          string    // base_path-relative, e.g. posts/hello/
 	Slug         string    // resolved slug (URL without the trailing slash), the series/wikilink key
+	Aliases      []string  // extra URL paths (normalised, base_path-relative) that redirect here
 	Out          string    // path under public/, e.g. posts/hello/index.html
 	SourcePath   string    // origin file (for diagnostics, e.g. slug-collision warnings)
 	HTML         string
@@ -482,6 +483,11 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	}
 	opts.Log.Detail("BUILD", "", "feeds", strings.Join(formats, " "), "sitemap", true, "robots", true)
 
+	// Alias redirects (meta-refresh stubs + _redirects) and .nojekyll.
+	if err := emitRedirects(write, pages, basePath, site.BaseURL, opts.Log); err != nil {
+		return Result{}, err
+	}
+
 	// Copy referenced assets through their owning source. A missing asset warns (a likely
 	// broken link) rather than failing the whole build.
 	ctx := context.Background()
@@ -734,6 +740,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		}
 		p.Attachments = resolveAttachments(context.Background(), it, basePath, baseURL, router)
 		p.HasAttachments = len(p.Attachments) > 0
+		p.Aliases = normalizeAliases(fm.Aliases)
 		p.Lang = fm.Lang
 		p.GlossaryOff = fm.Glossary != nil && !*fm.Glossary
 		p.HeroAlt, p.ImageAlt = fm.HeroAlt, fm.ImageAlt

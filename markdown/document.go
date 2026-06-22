@@ -13,13 +13,18 @@ import (
 // Frontmatter is the typed YAML block at the top of a content file. Unknown keys are
 // ignored so authors can carry source-specific metadata (e.g. Obsidian fields).
 type Frontmatter struct {
-	Title       string    `yaml:"title"`
-	Date        time.Time `yaml:"date,omitempty"`
-	Slug        string    `yaml:"slug,omitempty"`
-	Lang        string    `yaml:"lang,omitempty"` // per-post BCP-47 override of the site language
-	Description string    `yaml:"description,omitempty"`
-	Tags        []string  `yaml:"tags,omitempty"`
-	Categories  []string  `yaml:"categories,omitempty"`
+	Title string    `yaml:"title"`
+	Date  time.Time `yaml:"date,omitempty"`
+	Slug  string    `yaml:"slug,omitempty"`
+	// Aliases are extra URL paths that redirect to this entry — old slugs after a rename, or
+	// short links. Each becomes a redirect stub (meta-refresh, works on any static host) plus a
+	// `_redirects` entry; hosts that read `_redirects` (Cloudflare Pages, Netlify, GitLab Pages)
+	// turn it into a real 301.
+	Aliases     []string `yaml:"aliases,omitempty"`
+	Lang        string   `yaml:"lang,omitempty"` // per-post BCP-47 override of the site language
+	Description string   `yaml:"description,omitempty"`
+	Tags        []string `yaml:"tags,omitempty"`
+	Categories  []string `yaml:"categories,omitempty"`
 
 	// Type selects the page type for templating and placement, e.g. "post" (chronological:
 	// listed, in feeds and tags) or "page" (standing: surfaced in the nav menu). When unset it
