@@ -117,36 +117,71 @@ Concretely:
 Implication for `publish`: it must apply orphan pruning **scoped to the `_mentions/` prefix** so a
 mentions refresh never deletes content objects (and vice versa).
 
-## Display: a template choice, not an engine switch
+## Display: a per-site `mode`, three freshness/control trade-offs
 
-Rendering HTML is a **template (pongo) responsibility** — so the engine doesn't decide "bake vs
-JS"; it just **exposes the data to the template**, exactly as `attachments`/`attachments_html`
-already do. The theme then picks how to render. Two options, same `_mentions/` asset:
+How responses reach the page is a **per-site setting** (`federation.indieweb.webmention.display.mode`),
+because it trades **freshness** against **privacy/control/no-JS support** and different sites want
+different points on that curve. All three modes consume the *same* normalised mention shape and the
+*same* moderation pipeline (see [Moderation](#moderation-a-distilled-committed-blocklist)); they
+differ only in **where the data is fetched from** and **who renders it**:
 
-- **Bake (pongo)** — the theme loops the structured `mentions` var (or drops the engine-rendered
-  `mentions_html` fragment) to emit the responses server-side. **No JS**, fully static; as-of-last
-  `fetch`. Needs the data available at build time.
-- **JS** — the theme emits a placeholder (`<section data-mentions="<base>/_mentions/<key>.json">`)
-  and the engine-emitted shared `mentions.js` (like `search-ui.js`/`player.js`) fetches and
-  renders in the browser. No JS → the section stays empty, post unaffected. **Always current**,
-  and needs nothing from the build-time cache.
+| Mode | Who fetches | Renders | Freshness | Moderation | No-JS | Privacy |
+|------|-------------|---------|-----------|------------|-------|---------|
+| **`live`** | browser → **receiver directly** | JS | **near-realtime** (next page load) | client-side glob blocklist only | ✗ | visitor hits the receiver |
+| **`asset`** | browser → **our `_mentions/` on R2** | JS | near-realtime to the **refresh cron** | full server-side (glob **+ semantic**) | ✗ | self-hosted |
+| **`baked`** | engine at build | server (pongo) | as of last **incremental publish** | full server-side | ✓ | self-hosted |
 
-Template surface (parallels attachments):
+### `live` — JS straight to the receiver (no fetch/publish/build)
+
+The browser calls the receiver's read API directly (webmention.io exposes a public, CORS-enabled,
+token-free read endpoint). **A new mention shows on the next page load** — no `fetch`, no `publish`,
+no rebuild, no asset to host. This is the lowest-infra, most-realtime option.
+
+Because each reader speaks its own API, the **JS is parameterised by the reader provider**: the
+provider declares a small **client descriptor** (endpoint URL template, query params, and the
+mapping from its response → our normalised shape). One shared `mentions.js` consumes the descriptor
+and handles any JF2-shaped provider (webmention.io and compatibles); a provider with an exotic API
+may ship its own client module. So *"the fetch JS is provided by the specific driver"* — yes, via
+the descriptor, without forking the renderer per provider.
+
+Moderation still applies in `live` mode: the **distilled blocklist is shipped to the client** (it's
+spam-hiding, not a secret) and filtered in-browser. Glob/domain/author rules work client-side;
+semantic rules don't (no embeddings in the browser), so a site that needs semantic moderation should
+use `asset`/`baked`. Trade-offs to accept: every visitor's browser hits a third party (their uptime
+and rate-limits become yours; a privacy leak), and no-JS/RSS readers see nothing.
+
+### `asset` — JS against our published `_mentions/` (curated, decoupled)
+
+The browser fetches *our* server-curated `_mentions/<key>.json` from R2 (the placeholder +
+`mentions.js` path). Freshness comes from a scheduled **`webmention publish`** — `fetch` + push of
+**only** the `_mentions/` prefix, **no site build** (see [Separate publish pipeline](#separate-publish-pipeline)).
+So it's near-realtime to whatever cron cadence you pick (e.g. every 15 min) while keeping full
+server-side moderation (glob + semantic), self-hosting, and provider-neutrality.
+
+### `baked` — server-rendered, refreshed by *incremental* publish (no JS)
+
+The theme renders mentions server-side via pongo; no client JS, RSS/text-reader safe. Freshness
+without a full rebuild comes from **incremental publish**: `webmention publish` diffs the freshly
+fetched mentions against the last run and **re-renders + republishes only the posts whose mentions
+changed** — not the whole site. (This is your "publish runs build, but only for pages with changed
+mentions.") Best for low-frequency or strictly no-JS sites.
+
+### Template surface (same for every mode)
+
+Rendering remains a **template responsibility** — the engine only **exposes the data**, exactly as
+`attachments`/`attachments_html` do; `mode` selects which of these the theme leans on:
 
 | Var | For |
 |-----|-----|
-| `mentions` | structured list `[{type, author{name,url,photo}, url, content, published}]` — bake your own |
-| `mentions_html` | engine-rendered drop-in block (empty string when none) |
+| `mentions` | structured list `[{type, author{name,url,photo}, url, content, published}]` — bake your own (`baked`) |
+| `mentions_html` | engine-rendered drop-in block, empty when none (`baked`) |
 | `has_mentions` | flag |
-| `mentions_src` | the `_mentions/<key>.json` URL, for the JS placeholder |
+| `mentions_src` | the fetch URL for the JS placeholder — our `_mentions/<key>.json` (`asset`) **or** the provider's client descriptor endpoint (`live`) |
 
-### Preference: JS by default, bake for the no-JS themes
-
-The bundled themes **prefer JS** (press, default, signal, flux, obsidian); the text-first
-`minimal` **bakes**. Rationale: matches the existing PE split (search + player are JS-enhanced,
-`minimal` is JS-free); JS keeps HTML immutable and mentions **fresh without a rebuild** (they
-change far more often than content), and pairs with the separate publish pipeline below; baking
-stays available for zero-JS at the cost of freshness. It's a per-theme decision, overridable.
+The bundled themes default to a **JS** mode (press, default, signal, flux, obsidian — `live` or
+`asset`); the text-first **`minimal`** uses **`baked`**. Rationale unchanged: matches the existing PE
+split (search + player are JS-enhanced, `minimal` is JS-free), and JS modes keep HTML immutable while
+responses change far more often than content. The mode is overridable per site.
 
 ## Audio / TTS: mentions are never spoken
 
@@ -191,8 +226,44 @@ Three cases, by what changes:
   `fetch` always returns the current set (deletions vanish); `send`'s sent-cache re-pings dropped
   targets. JS display is always-current; baked display reconciles on the next fetch+build.
 
-**Spam/moderation:** inbound mentions can be junk. Start minimal — rely on webmention.io's
-filtering plus an optional `blocklist` of domains in config; defer per-mention approval/allowlist.
+**Spam/moderation:** inbound mentions can be junk — handled by a declarative, committed blocklist
+plus an optional moderation skill; see [Moderation](#moderation-a-distilled-committed-blocklist).
+
+## Moderation: a distilled, committed blocklist
+
+Inbound mentions are third-party content, so the author needs a way to drop spam/abuse — and it has
+to **survive `fetch`'s full regenerate** (editing the generated `_mentions/` JSON is pointless; the
+next fetch overwrites it). So moderation is **declarative and committed**, applied as a filter step
+over the normalised list, and reused by every display mode.
+
+**The blocklist is rules over normalised mention attributes, glob-matched.** Matchable fields:
+`domain`, `url`, `author.name`, `author.url`, `content`, `type`. A bare string is shorthand for
+`domain`/`author.url`; the structured form targets a field:
+
+```yaml
+# .colophon/webmention-block.yml  (committed)
+- "*.spam.example"            # shorthand: domain/author.url glob
+- author.url: "https://troll.example/*"
+- content: "*free crypto*"
+- domain: "*.cn.example"
+```
+
+- **One filter pipeline, two execution sites.** Applied **server-side in `fetch`** (full power) for
+  `asset`/`baked`; for `live` the **distilled blocklist is shipped to the client** and the same glob
+  rules run in `mentions.js` (it's spam-hiding, not a secret). Glob rules run in both places;
+  semantic rules (below) are server-only.
+- **Semantic moderation (future).** When the semantic subsystem lands, a rule kind scores a
+  mention's `content` against a concept ("spam"/"abuse") via embeddings + a threshold, slotting into
+  the same server-side pipeline. Not available client-side, so semantic-moderated sites use
+  `asset`/`baked`. (Ties into [decision `search`] — the shared embedding subsystem.)
+- **A `moderate-mentions` skill** (an agent skill alongside the other authoring skills) scans the
+  current mention set, flags likely spam/abuse, and either auto-filters or **presents a decision
+  list** for the author to confirm. Crucially it **distills** confirmed cases into *generalised*
+  glob (and later semantic) rules appended to the blocklist — so the list stays **small and
+  effective** rather than an ever-growing pile of individual URLs.
+- **Receiver-side delete** (e.g. webmention.io's dashboard) remains the quick one-off: delete there,
+  the next `fetch` won't return it. The committed blocklist is the version-controlled, reproducible
+  path; per-mention approval queues are deferred.
 
 ## Separate publish pipeline
 
@@ -239,8 +310,13 @@ sites:
         webmention:
           receiver: https://webmention.io/blog.example.com/webmention  # the rel=webmention endpoint
           # token read from env, e.g. WEBMENTION_IO_TOKEN, never written here
-          # blocklist: [spam.example]   # optional domain filter (later)
+          provider: jf2                # reader provider (read API + client descriptor); default jf2
+          display:
+            mode: asset                # live | asset | baked   (see Display)
+          # blocklist lives in .colophon/webmention-block.yml (committed), not inline
 ```
+
+`mode: live` needs nothing else; `asset`/`baked` use the `webmention fetch`/`publish` pipeline.
 
 `<link rel="webmention" href="{{ receiver }}">` is emitted in every page `<head>` when a receiver
 is configured (the discovery tag senders look for).
@@ -254,9 +330,17 @@ is configured (the discovery tag senders look for).
    into content — mirrors `_search/`. The cache is **not reproducible** (external state); builds
    are **graceful when it's empty**, and freshness comes from `fetch`/`publish`, not the repo.
 3. **One JSON per post**, normalised (`type`/`author`/`url`/`content`), not raw receiver payload.
-4. **Rendering is a template choice**: the engine exposes `mentions`/`mentions_html`/`has_mentions`
-   (like `attachments`); themes bake via pongo *or* use the JS placeholder + `mentions.js`. Bundled
-   themes prefer JS; `minimal` bakes.
+4. **Display is a per-site `mode`** (`live`/`asset`/`baked`) over one normalised shape + one
+   moderation pipeline: `live` = browser→receiver direct (most realtime, client-side glob blocklist,
+   no no-JS); `asset` = browser→our R2 asset, refreshed by a cron `publish` (full moderation,
+   self-hosted); `baked` = server-rendered, kept fresh by **incremental publish** (no JS). The engine
+   only exposes `mentions`/`mentions_html`/`has_mentions`/`mentions_src` (like `attachments`); the
+   theme renders. `live` mode's fetch JS is parameterised by the **reader provider's client
+   descriptor**.
+4b. **Moderation is a declarative, committed blocklist** of glob rules over mention attributes
+   (`.colophon/webmention-block.yml`), re-applied every `fetch` (and shipped to the client in `live`
+   mode). Future **semantic** rules run server-side; a **`moderate-mentions` skill** distills
+   confirmed spam into small, general rules. Survives full-regenerate because it's declarative.
 5. **TTS invariant**: mentions live outside the content body the speech extractor reads, so they're
    never spoken — true for both paths.
 6. **Separate publish pipeline**: `webmention publish` pushes only `_mentions/` to the store, so
@@ -278,16 +362,27 @@ is configured (the discovery tag senders look for).
   (JS path 404s → renders nothing). Pruning is scoped to the `_mentions/` prefix.
 - A JS-enhanced theme shows likes/reposts/replies; with JS off the post is unaffected; `minimal`
   bakes them statically. Mentions never appear in a post's TTS audio.
+- `display.mode: live` renders mentions with **no** `fetch`/`publish`/rebuild (browser → receiver),
+  honouring the shipped glob blocklist client-side; `asset` renders from the published `_mentions/`;
+  `baked` renders server-side and an incremental `publish` re-renders only changed-mention posts.
+- A blocklisted mention (glob over domain/url/author/content) never appears in any mode; the
+  blocklist survives a full `fetch` regenerate (it's committed, not edited into the export).
 - Secrets come only from the environment; a site with no `webmention` config emits nothing.
 
 ## Files to create (when built)
 
-- `internal/webmention/` — endpoint discovery + sender (sent-cache) + receiver client + normaliser.
-- `internal/cli/webmention.go` — the `webmention {send,fetch,publish}` command group.
+- `internal/webmention/` — endpoint discovery + sender (sent-cache) + reader **provider** (server
+  fetch **+ client descriptor**) + normaliser + the **blocklist filter pipeline**.
+- `internal/cli/webmention.go` — the `webmention {send,fetch,publish}` command group; `publish`
+  supports the incremental (changed-mention-posts-only) re-render for `baked`.
 - build: expose `mentions`/`mentions_html`/`has_mentions`/`mentions_src` to templates, emit
-  `_mentions/` assets + the `<link rel="webmention">` head tag.
+  `_mentions/` assets + the `<link rel="webmention">` head tag; in `live` mode emit the provider
+  client descriptor + the distilled blocklist for client-side filtering.
 - `internal/render/themes/*/…` — a `data-mentions` placeholder + engine-emitted `mentions.js`
-  (JS themes) and a pongo-baked block (text themes), kept outside the content/`e-content` element.
+  (parameterised by the provider descriptor; applies glob blocklist in `live`) and a pongo-baked
+  block (text themes), kept outside the content/`e-content` element.
+- `contrib/skills/` (+ wiring) — a `moderate-mentions` skill that flags spam/abuse and distills
+  confirmed cases into blocklist rules.
 
 ## Out of scope (future)
 
