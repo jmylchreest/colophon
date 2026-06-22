@@ -282,6 +282,13 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	mentionsURL := mentionsBaseURL(router, basePath)
 	mentionsDir := webmention.CacheDir(cfg.Root)
 	anyMentions := false
+	// In live mode the browser fetches the receiver's read API directly; resolve it once.
+	var wmReadEndpoint string
+	if wmMode == "live" {
+		if iw := site.Federation.IndieWeb; iw != nil && iw.Webmention != nil {
+			wmReadEndpoint = webmention.ReadEndpoint(iw.Webmention.Source, iw.Webmention.Receiver)
+		}
+	}
 
 	favicon, err := writeFavicon(write, eng, cfg.Root, site)
 	if err != nil {
@@ -442,10 +449,12 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		ctx["mentions"] = []map[string]any{}
 		ctx["mentions_html"] = ""
 		ctx["mentions_src"] = ""
+		ctx["mentions_attrs"] = ""
 		if wmEnabled {
 			anyMentions = true
 			key := webmention.KeyForURL(p.URL)
-			if wmMode == "asset" {
+			switch wmMode {
+			case "asset":
 				m, err := webmention.LoadCached(mentionsDir, key)
 				if err != nil {
 					return Result{}, err
@@ -462,7 +471,13 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 						return Result{}, err
 					}
 				}
-				ctx["mentions_src"] = mentionsURL + mentionsAssetKey(key) + ".json"
+				src := mentionsURL + mentionsAssetKey(key) + ".json"
+				ctx["mentions_src"] = src
+				ctx["mentions_attrs"] = mentionsAttrs(src, "", "")
+			case "live":
+				// No build-time data: the browser fetches the receiver directly per page load.
+				ctx["mentions_src"] = wmReadEndpoint
+				ctx["mentions_attrs"] = mentionsAttrs(wmReadEndpoint, absURL(site.BaseURL, p.URL), "")
 			}
 		}
 		html, err := eng.Render(templateFor(eng, p.Type), ctx)

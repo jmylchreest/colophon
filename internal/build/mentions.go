@@ -61,6 +61,21 @@ func mentionsAssetName(key string) string {
 	return mentionsBase + "/" + mentionsAssetKey(key) + ".json"
 }
 
+// mentionsAttrs builds the data-* attributes for the theme placeholder, so the engine owns the
+// fetch wiring and themes stay mode-agnostic. asset mode emits only data-mentions (our JSON URL);
+// live mode adds data-mentions-live + the post URL as the target, plus the shipped glob blocklist
+// (so client-side moderation works without a server). All values are attribute-escaped.
+func mentionsAttrs(src, liveTarget, blockJSON string) string {
+	attrs := fmt.Sprintf(`data-mentions="%s"`, html.EscapeString(src))
+	if liveTarget != "" {
+		attrs += fmt.Sprintf(` data-mentions-live data-mentions-target="%s"`, html.EscapeString(liveTarget))
+	}
+	if blockJSON != "" {
+		attrs += fmt.Sprintf(` data-mentions-block="%s"`, html.EscapeString(blockJSON))
+	}
+	return attrs
+}
+
 // mentionVars maps mentions to the structured `mentions` template list (build-your-own).
 func mentionVars(ms []webmention.Mention) []map[string]any {
 	out := make([]map[string]any, 0, len(ms))

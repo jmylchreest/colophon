@@ -375,15 +375,16 @@ the engine-emitted `mentions.js` refresh it (or, in `live` mode, populate it):
 
 ```django
 {% if mentions_enabled %}
-<section class="responses" data-mentions="{{ mentions_src }}" aria-label="Responses">{{ mentions_html|safe }}</section>
+<section class="responses" {{ mentions_attrs|safe }} aria-label="Responses">{{ mentions_html|safe }}</section>
 {% endif %}
 …
 {% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}
 ```
 
-With JS off (and `asset` mode) the baked `mentions_html` still shows; with JS on, `mentions.js` reads
-`data-mentions` and renders/refreshes. `mentions.js` is parameterised per reader driver, so the
-same markup works across receivers.
+`mentions_attrs` is the engine-owned `data-mentions*` wiring (the source URL, plus `data-mentions-live`
++ target + blocklist in `live` mode) — drop it in and the same markup works across modes and reader
+drivers. With JS off (and `asset` mode) the baked `mentions_html` still shows; with JS on, `mentions.js`
+fetches and renders/refreshes.
 
 **Build your own from the structured list** (`asset` mode), e.g. to restyle or split by type:
 
