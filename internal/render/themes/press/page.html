@@ -127,6 +127,11 @@
 
     {# Engine-rendered Downloads list (no JS). Drop-in; or build your own from the `attachments` list. #}
     {{ attachments_html|safe }}
+
+    {# Webmentions: sibling of the content <article> (never read by TTS). asset mode bakes mentions_html; mentions.js refreshes/populates from data-mentions. mentions_enabled is false unless the site configures webmention.display. #}
+    {% if mentions_enabled %}
+    <section class="responses" data-mentions="{{ mentions_src }}" aria-label="Responses">{{ mentions_html|safe }}</section>
+    {% endif %}
   </main>
 </div>
 
@@ -135,6 +140,7 @@
 <script defer src="{{ base_path }}app.js"></script>
 {% if has_audio %}<script defer src="{{ base_path }}player.js"></script>{% endif %}
 {% if search %}<script type="module" src="{{ base_path }}search-ui.js"></script>{% endif %}
+{% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}
 {% if has_code %}
 <link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css">
 <script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>

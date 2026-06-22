@@ -214,6 +214,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `has_audio`, `audio`, `audio_type` | True when the post has an audio reading (recorded or generated TTS); `audio` is its URL and `audio_type` its MIME. See [Audio, video & downloads](#audio-video--downloads). |
 | `audio_listen`, `audio_play`, `audio_pause` | Localised player UI strings (figcaption + play/pause aria-labels), in the page's language. Present only when `has_audio`. |
 | `has_attachments`, `attachments`, `attachments_html` | Downloads. `attachments_html` is a ready-to-drop-in, no-JS block (`{{ attachments_html\|safe }}`); `attachments` is the structured list — `{url, label, description, name, type, type_label, size, bytes}` — if you'd rather build your own. `has_attachments` is the flag. See [Audio, video & downloads](#audio-video--downloads). |
+| `mentions_enabled`, `has_mentions`, `mentions`, `mentions_html`, `mentions_src` | Webmentions (replies/likes/reposts). What's populated depends on the site's `display.mode` — see [Webmentions](#webmentions-responses-planned). *(Planned — ships with the webmention display feature.)* |
 
 ### `index.html` (the post list, and per-tag pages)
 
@@ -339,6 +340,68 @@ removed — it's always on). If you write your own theme, mirror the pattern so 
 When a theme splits the title/byline away from the body (e.g. a hero block), carry the stray
 properties into the `h-entry` root as hidden elements (`<data class="p-name" value="…">`, a hidden
 `<time class="dt-published">`) — see the `signal`/`obsidian` contrib themes.
+
+## Webmentions (responses) *(planned)*
+
+> Ships with the webmention display feature ([design](design/webmention.md)). The variables below are
+> the firm contract themes target; today only the `<link rel="webmention">` discovery tag is emitted.
+> The `press` theme already carries the reference block.
+
+Webmentions are replies/likes/reposts from other sites, shown under a post. **The engine never
+decides how they render — it only exposes the data**, and the site picks a `display.mode`
+(`federation.indieweb.webmention.display.mode`). What the engine populates depends on that mode:
+
+| Variable | `live` | `asset` | `disabled` |
+|----------|--------|---------|-----------|
+| `mentions_enabled` | `true` (unless the post sets `webmentions: false`) | `true` (unless opted out) | **`false`** |
+| `has_mentions` | `false` — **not known at build** (JS fills the count) | accurate, from the synced list | `false` |
+| `mentions` | empty — no build-time data | structured list (bake your own) | empty |
+| `mentions_html` | empty | engine-rendered drop-in block | empty |
+| `mentions_src` | the receiver's client-fetch endpoint | your published `_mentions/<post>.json` | unset |
+
+- **`live`** — the browser fetches the receiver directly; most realtime, no rebuild, but no
+  build-time data (so no count, no baking) and nothing for no-JS readers.
+- **`asset`** — the browser fetches *your* curated `_mentions/` asset (refreshed out-of-band by
+  `webmention publish`); because that list also exists at build, the engine fills `mentions` /
+  `mentions_html` / `has_mentions`, so a theme **may bake** instead of relying on JS.
+- **`disabled`** — nothing is exposed or shipped, regardless of the per-post setting.
+
+Always guard the block on `mentions_enabled` and keep it a **sibling of the content element**, never
+inside it (so it's never read aloud by the TTS reading — same rule as the author card/downloads).
+
+**Progressive-enhancement block (what `press` uses).** Bake the asset-mode HTML server-side, then let
+the engine-emitted `mentions.js` refresh it (or, in `live` mode, populate it):
+
+```django
+{% if mentions_enabled %}
+<section class="responses" data-mentions="{{ mentions_src }}" aria-label="Responses">{{ mentions_html|safe }}</section>
+{% endif %}
+…
+{% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}
+```
+
+With JS off (and `asset` mode) the baked `mentions_html` still shows; with JS on, `mentions.js` reads
+`data-mentions` and renders/refreshes. `mentions.js` is parameterised per reader provider, so the
+same markup works across receivers.
+
+**Build your own from the structured list** (`asset` mode), e.g. to restyle or split by type:
+
+```django
+{% if has_mentions %}<section class="responses">
+  {% for m in mentions %}
+  <article class="response {{ m.type }} h-cite">
+    {% if m.author.photo %}<img class="u-photo" src="{{ m.author.photo }}" alt="">{% endif %}
+    <a class="p-author h-card u-url" href="{{ m.author.url }}">{{ m.author.name }}</a>
+    {% if m.content %}<div class="p-content">{{ m.content }}</div>{% endif %}
+    <a class="u-url" href="{{ m.url }}"><time class="dt-published">{{ m.published }}</time></a>
+  </article>
+  {% endfor %}
+</section>{% endif %}
+```
+
+Each `mentions` item is `{type (like|repost|reply|mention), author{name,url,photo}, url, content,
+published}`. A **no-JS / text theme** (e.g. `minimal`) just uses `asset` mode + `{{ mentions_html|safe }}`
+and skips the script entirely.
 
 ## Analytics
 
