@@ -45,12 +45,21 @@ type Syndicator interface { Syndicate(ctx, post) (siloURL string, err error) }
 //     mastodon – instance URL + access token (env); statuses + media API
 //     bluesky  – handle + app password (env); AT-proto createRecord + blob upload
 //     bridgy   – POST to brid.gy/publish, parse the created silo URL from the response
-//     command  – escape hatch: shell out to an external POSSE tool
+//     command  – run a user command; stdout = silo URL (empty stdout = fire-and-forget webhook)
 ```
 
 Bridgy is just one provider here: `via: native` uses the per-network API provider; `via: bridgy`
 routes through Bridgy (for a network you've connected there but don't want to code against). One
-interface, four transports.
+interface, four transports — and a site may configure **many** syndicators (the `syndication:`
+list, like the publishers list); per-post `syndicate: [ids]` narrows which fire.
+
+**The `command` syndicator is also a publish webhook.** Mirroring the `command` *publisher*, it
+runs a user-defined command per post with interpolated placeholders (`{url}` canonical, `{title}`,
+`{slug}`, `{summary}`, `{tags}`, `{json}` = path to a metadata file) and env for secrets — so a
+user can wire up anything (a Discord/Slack webhook, a Bluesky CLI, an n8n flow, a custom API). The
+trick that makes it both a syndicator and a generic hook: **stdout is the silo URL.** If the command
+prints a URL it's recorded in the ledger and rendered as `u-syndication`; if it prints nothing it's
+a **fire-and-forget publish webhook**. No separate hook system — the same interface covers both.
 
 **Bridgy is transparent for receiving, a syndicator for sending** — the two are unrelated:
 
@@ -123,6 +132,24 @@ post-publish step. Hubs are hosted (Superfeedr, websubhub.com). No provider abst
 9. **Per-network formatting.** Char limits (Mastodon ~500 instance-variable, Bluesky 300), link-back,
    hashtags, media + alt, threading long posts; per-post custom syndication text.
 10. **Selective syndication.** `syndicate:` frontmatter chooses targets (opt-in/out) per post.
+11. **Display freshness.** JS-rendered mentions are *not* tied to page regeneration: the browser
+    fetches the `_mentions/` asset live, so a scheduled `webmention publish` (refresh that asset, no
+    site rebuild) updates them near-live. Only the no-JS *bake* path is as-fresh-as-the-last-build.
+
+## Environments: read everywhere, write only where enabled
+
+Federation splits cleanly across environments, and the split is a **safety property**:
+
+- **Webmention reading is site-domain-scoped, so it's shared.** webmention.io keys mentions by your
+  *production* target URLs, so the `webmention` config lives at the **site** level and every
+  environment inherits it. A **preview build reads the same production mentions** (previewing how
+  real responses look) — no separate receiver, no extra config.
+- **Syndication is environment-gated and off by default**, like `allow_publish`. Which syndicators
+  fire is an *environment* decision (`environments[].syndicate: [ids]`); an env that omits it —
+  notably **preview/draft** — never cross-posts. `colophon syndicate` also takes the same kind of
+  deploy latch. This makes double-posting (or POSSEing a draft) structurally impossible from preview.
+
+So: **read in every environment, write only where explicitly enabled.**
 
 ## Config sketch
 
@@ -137,21 +164,27 @@ sites:
         webmention:
           endpoint: https://webmention.io/blog.example.com/webmention   # advertised rel=webmention
           source:   https://webmention.io/api/mentions.jf2              # read API (JF2 reader)
-      syndication:
-        - network: mastodon
-          via: native
-          instance: https://hachyderm.io       # token from env MASTODON_TOKEN
-        - network: bluesky
-          via: native
-          handle: me.bsky.social               # app password from env BLUESKY_APP_PASSWORD
-        - network: twitter
-          via: bridgy                          # delegate to brid.gy (account connected there)
+      syndication:                             # a list — many syndicators per site
+        - { id: mastodon, via: native, instance: https://hachyderm.io }   # token from env MASTODON_TOKEN
+        - { id: bluesky,  via: native, handle: me.bsky.social }           # app password from env
+        - { id: discord,  via: command, command: "curl -sf -X POST $DISCORD_WEBHOOK -d @{json}" }  # webhook: no stdout → fire-and-forget
+        - { id: twitter,  via: bridgy }        # delegate to brid.gy (account connected there)
+
+environments:
+  - name: production
+    publish: [cf, r2]
+    syndicate: [mastodon, bluesky, discord, twitter]   # which syndicators fire here
+  - name: preview
+    publish: [cf-preview]
+    # no `syndicate:` → preview never cross-posts, but still reads the production webmentions above
 ```
 
-Per post: `syndicate: [mastodon, bluesky]` (else all configured), `syndicate: false` to opt out, and
-an optional custom blurb (`syndicate_text:`). Resolved silo URLs are written to the ledger and
-rendered as `u-syndication` links on the post; manually-added `syndication:` frontmatter is honoured
-too.
+Per post: `syndicate: [mastodon, bluesky]` (else all the env's configured ids), `syndicate: false`
+to opt out, and an optional custom blurb (`syndicate_text:`). Resolved silo URLs are written to the
+ledger and rendered as `u-syndication` links on the post; manually-added `syndication:` frontmatter
+is honoured too. (`webmention` sits at the site level, so every environment — preview included —
+reads the same production mentions; `syndicate:` is per-environment, so only the envs that list it
+ever post.)
 
 ## Phasing
 
