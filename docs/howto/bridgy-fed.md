@@ -17,10 +17,10 @@ you running an ActivityPub server or even having a Mastodon/Bluesky account.
    federation:
      indieweb:
        webmention:
-         endpoint: https://fed.brid.gy/webmention   # advertised as <link rel=webmention>
+         receiver: https://fed.brid.gy/webmention   # emitted as <link rel="webmention"> on every page
    ```
-   *(Until colophon emits this tag, add `<link rel="webmention" href="https://fed.brid.gy/webmention">`
-   to your theme `<head>`.)*
+   colophon emits the `<link rel="webmention">` discovery tag site-wide when `receiver` is set — no
+   manual theme edit needed.
 3. **Enrol** at <https://fed.brid.gy> and follow its current instructions for your domain (it
    verifies your site, then your handle becomes `@yourdomain@yourdomain`). Bridgy Fed's onboarding
    changes over time, so use its docs as the source of truth: <https://fed.brid.gy/docs>.

@@ -265,7 +265,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	}
 
 	formats := feedFormats(site)
-	feedHead := feedDiscoveryLinks(site, formats)
+	// feedHead carries the site-wide <head> discovery links: feed autodiscovery plus
+	// the webmention endpoint (when configured) — both are link-rel hints senders/readers
+	// look for, emitted on every page via the themes' {{ feed_head }}.
+	feedHead := feedDiscoveryLinks(site, formats) + webmentionHead(site)
 	siteLang := defaultLang(site.Lang)
 
 	favicon, err := writeFavicon(write, eng, cfg.Root, site)

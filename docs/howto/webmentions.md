@@ -1,8 +1,9 @@
 # How to show webmentions (replies, likes, reposts)
 
-> Status: **planned.** The `webmention` config and `colophon webmention` commands below are the
-> designed interface ([../design/webmention.md](../design/webmention.md)), not yet implemented.
-> `rel=me` and microformats2 (which sign-in and parsing rely on) are shipped.
+> Status: **partly shipped.** The `<link rel="webmention">` discovery tag is emitted today (set
+> `federation.indieweb.webmention.receiver`); `rel=me` and microformats2 (which sign-in and parsing
+> rely on) are shipped. The `colophon webmention fetch/publish/send` commands and response *display*
+> below are the designed interface ([../design/webmention.md](../design/webmention.md)), not yet built.
 
 Webmentions let other sites' replies/likes/reposts appear under your posts — "comments without a
 database." A static site can't receive POSTs, so a hosted receiver ([webmention.io](https://webmention.io))
@@ -20,11 +21,14 @@ collects them and colophon pulls them in at build/refresh time.
    federation:
      indieweb:
        webmention:
-         endpoint: https://webmention.io/yourdomain/webmention   # advertised <link rel=webmention>
-         source:   https://webmention.io/api/mentions.jf2        # read API (provider: jf2)
+         receiver: https://webmention.io/yourdomain/webmention  # emitted as <link rel="webmention"> (shipped)
+         provider: jf2                                          # read API shape (planned)
+         display:
+           mode: asset                                          # live | asset | baked (planned)
    # export WEBMENTION_IO_TOKEN=...   (CI secret)
    ```
-3. **Build** — colophon emits `<link rel="webmention">` and a per-post responses block in the theme.
+3. **Build** — colophon emits `<link rel="webmention">` site-wide today; the per-post responses block
+   (and `fetch`/`publish` below) are the planned display layer.
 4. **Pull mentions in:**
    ```sh
    colophon webmention fetch        # writes _mentions/<post>.json (the display data)
