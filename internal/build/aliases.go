@@ -6,7 +6,56 @@ import (
 	"strings"
 
 	"github.com/jmylchreest/colophon/internal/clog"
+	"github.com/jmylchreest/colophon/internal/config"
 )
+
+// AliasConflict is an alias that can't be honoured cleanly: it either matches a real page (Page
+// set) or is claimed by more than one post (Posts has the contenders). The build still resolves
+// these deterministically (page wins; otherwise oldest wins) — this surfaces them for doctor.
+type AliasConflict struct {
+	Alias string   // normalised alias path, e.g. "old-name"
+	Page  string   // slug of the page it collides with, or ""
+	Posts []string // slugs claiming this alias when ≥2 (sorted), else nil
+}
+
+// AliasConflicts dry-resolves every declared alias against the gathered content and returns the
+// conflicts, for `colophon doctor` preflight. It reads no bytes beyond the documents.
+func AliasConflicts(cfg *config.Config) ([]AliasConflict, error) {
+	docs, err := gatherDocuments(cfg, clog.Discard())
+	if err != nil {
+		return nil, err
+	}
+	pageSlug := map[string]bool{}
+	for _, sd := range docs {
+		pageSlug[slugFor(sd.doc.SourcePath, sd.doc.Frontmatter.Slug)] = true
+	}
+	owners := map[string][]string{} // alias path -> claiming slugs
+	for _, sd := range docs {
+		slug := slugFor(sd.doc.SourcePath, sd.doc.Frontmatter.Slug)
+		for _, a := range normalizeAliases(sd.doc.Frontmatter.Aliases) {
+			owners[a] = append(owners[a], slug)
+		}
+	}
+	var out []AliasConflict
+	for alias, claimers := range owners {
+		c := AliasConflict{Alias: alias}
+		hit := false
+		if pageSlug[alias] {
+			c.Page = alias
+			hit = true
+		}
+		if len(claimers) > 1 {
+			sort.Strings(claimers)
+			c.Posts = claimers
+			hit = true
+		}
+		if hit {
+			out = append(out, c)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Alias < out[j].Alias })
+	return out, nil
+}
 
 // normalizeAliases slugifies each declared alias path (same rules as a slug) and drops empties,
 // so `aliases: [Old Name, 2020/old-post]` becomes ["old-name", "2020/old-post"].

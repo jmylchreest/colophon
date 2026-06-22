@@ -319,6 +319,22 @@ environments:
 
 Overrides also carry per-environment publisher tweaks like a Cloudflare Pages `branch`.
 
+## Redirects (aliases)
+
+A post's `aliases:` ([Authoring → Redirects](content.md#redirects-aliases)) produce, at build
+time, a meta-refresh stub per old URL, a root `_redirects` file, and a root `.nojekyll`. How that
+becomes a redirect depends on the host:
+
+| Host | Result |
+|------|--------|
+| Cloudflare Pages, Netlify, GitLab Pages | real **301** from `_redirects` |
+| S3 static-website hosting | real **301** — the `s3` publisher sets the object redirect header on publish |
+| Cloudflare R2, bare S3/MinIO, local | client-side **meta-refresh** stub (no in-bucket redirects) |
+| GitHub Pages | client-side **meta-refresh** stub; the `.nojekyll` is what keeps `_search/` and the stubs from being stripped |
+
+So redirects work everywhere; hosts that support server-side rules get a true 301, the rest fall
+back to the (always-emitted) stub. `colophon doctor` warns about alias conflicts before you ship.
+
 ## On-site search
 
 colophon builds a **static search index** at build time — a sharded, content-addressed BM25 index

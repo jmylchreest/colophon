@@ -50,6 +50,7 @@ func (c *DoctorCmd) Run() error {
 	checkEnvRefs(cfg, r)
 	checkContent(cfg, r)
 	checkAssets(cfg, r)
+	checkAliases(cfg, r)
 	checkGeneratedOrphans(cfg, c.Prune, r)
 
 	fmt.Println(root)
@@ -194,6 +195,25 @@ func checkAssets(cfg *config.Config, r *report) {
 	}
 	for _, m := range missing {
 		r.warn("%s for %q references a file that can't be sourced: %q", m.Kind, m.Owner, m.Ref)
+	}
+}
+
+// checkAliases warns about alias redirects that can't be honoured cleanly — one that shadows a
+// real page, or the same alias claimed by several posts. The build resolves these deterministically
+// (the page wins; otherwise the oldest post), so they are warnings, not errors.
+func checkAliases(cfg *config.Config, r *report) {
+	conflicts, err := build.AliasConflicts(cfg)
+	if err != nil {
+		r.warn("alias checks skipped: %v", err)
+		return
+	}
+	for _, c := range conflicts {
+		if c.Page != "" {
+			r.warn("alias %q collides with page %q — the page wins, the alias is dropped", c.Alias, c.Page)
+		}
+		if len(c.Posts) > 1 {
+			r.warn("alias %q is claimed by %d posts (%s) — the oldest wins", c.Alias, len(c.Posts), strings.Join(c.Posts, ", "))
+		}
 	}
 }
 

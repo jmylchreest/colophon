@@ -209,15 +209,16 @@ func newSkeleton(cfg *config.Config, o newOpts, kind, segment string, tgt writeT
 			fmt.Fprintf(&b, "<!-- voice (%s): %s -->\n", p, firstLine(pv.Style.Guide))
 		}
 	}
-	// Document the optional media fields so an author (or an LLM) knows what's available without
+	// Document the optional fields so an author (or an LLM) knows what's available without
 	// hunting the docs. These are comments, not active frontmatter — promote one into the block
 	// above to use it. Generation honours generation.enabled and only runs with --generate-ai.
-	b.WriteString("<!-- optional media (move into the frontmatter above to use):\n")
+	b.WriteString("<!-- optional fields (move into the frontmatter above to use):\n")
 	b.WriteString("     hero: \"gen:<prompt>\"      AI banner image — or a path/[[embed]] to an existing image\n")
 	b.WriteString("     image: \"gen:<prompt>\"     social/preview image — or a path\n")
 	b.WriteString("     audio: false              opt out of the spoken reading (on by default when speech is configured)\n")
 	b.WriteString("     audio_file: \"clip.mp3\"    attach a pre-recorded reading instead (no AI)\n")
 	b.WriteString("     audio_voice: \"<voice-id>\" override the reading voice (generated audio only)\n")
+	b.WriteString("     aliases: [old-slug]       redirect old URLs here after a rename\n")
 	b.WriteString("     inline image in the body: ![alt](<gen:a prompt?aspect=16:9>)\n")
 	b.WriteString("-->\n")
 	fmt.Fprintf(&b, "<!-- write the %s here -->\n", kind)
