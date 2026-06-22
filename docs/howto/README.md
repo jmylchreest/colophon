@@ -7,10 +7,10 @@ Short, zero-to-published recipes. The design behind them is in
 |-------|--------|
 | [Federate via Bridgy Fed](bridgy-fed.md) — be followable from Mastodon/Bluesky | **works today** (uses the mf2 + feeds colophon already emits) |
 | [Show webmentions](webmentions.md) — replies/likes on your posts | **shipped** (`colophon webmention fetch/publish` + display modes) |
-| [Syndicate with a command](syndicate-command.md) — POSSE to any target | **shipped** (the `command` driver + ledger + gating) |
-| [Syndicate to Mastodon](syndicate-mastodon.md) | **planned** (native `mastodon` driver) |
-| [Syndicate to Bluesky](syndicate-bluesky.md) | **planned** (native `bluesky` driver) |
+| [Syndicate with a command](syndicate-command.md) — POSSE to any target | **shipped** (the `command` driver) |
+| [Syndicate to Mastodon](syndicate-mastodon.md) | **shipped** (native `mastodon` driver) |
+| [Syndicate to Bluesky](syndicate-bluesky.md) | **shipped** (native `bluesky` driver) |
 
-> The syndication **harness** (the ledger, env/per-post gating, `--dry-run`) and the `command`
-> driver ship today; the native `mastodon`/`bluesky` drivers are the next slices. "Planned" guides
-> are written against the agreed design so they're ready when those drivers land.
+> Syndication ships: the harness (ledger, env/per-post gating, `--dry-run`) plus the `command`,
+> `mastodon`, and `bluesky` drivers. The remaining federation piece is the `bridgy` driver
+> (delegated auth) — see [../design/federation.md](../design/federation.md).

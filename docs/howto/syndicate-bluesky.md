@@ -1,7 +1,6 @@
 # How to syndicate to Bluesky (POSSE)
 
-> Status: **planned.** The `syndication` config and `colophon syndicate` command below are the
-> designed interface ([../design/federation.md](../design/federation.md)), not yet implemented.
+> Status: **shipped.** The `bluesky` driver, `colophon syndicate`, and the ledger work today.
 
 POSSE = Publish on your Own Site, Syndicate Elsewhere: the post is canonical on your blog, and a
 copy is cross-posted to Bluesky linking back to it.
@@ -14,9 +13,14 @@ copy is cross-posted to Bluesky linking back to it.
 3. **Export it** as a CI secret: `export BLUESKY_APP_PASSWORD=...`
 4. **Configure a syndicator** (`driver: bluesky`):
    ```yaml
-   federation:
-     syndication:
-       - { id: bluesky, driver: bluesky, handle: me.bsky.social }   # app password from BLUESKY_APP_PASSWORD
+   sites:
+     - id: main
+       federation:
+         syndication:
+           - id: bluesky
+             driver: bluesky
+             handle: me.bsky.social
+             app_password: "{env:BLUESKY_APP_PASSWORD}"   # never a literal
    environments:
      - name: production
        syndicate: [bluesky]      # only this env cross-posts; preview/draft never do

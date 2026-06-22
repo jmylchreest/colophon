@@ -39,8 +39,12 @@ func Open(conf core.SyndicatorConf) (Syndicator, error) {
 	switch conf.Driver {
 	case "command":
 		return newCommandSyndicator(conf)
+	case "bluesky":
+		return newBlueskySyndicator(conf)
+	case "mastodon":
+		return newMastodonSyndicator(conf)
 	default:
-		return nil, fmt.Errorf("syndicator %q: unknown driver %q (have: command)", conf.ID, conf.Driver)
+		return nil, fmt.Errorf("syndicator %q: unknown driver %q (have: command, bluesky, mastodon)", conf.ID, conf.Driver)
 	}
 }
 

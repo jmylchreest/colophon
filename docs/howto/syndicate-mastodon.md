@@ -1,7 +1,6 @@
 # How to syndicate to Mastodon (POSSE)
 
-> Status: **planned.** The `syndication` config and `colophon syndicate` command below are the
-> designed interface ([../design/federation.md](../design/federation.md)), not yet implemented.
+> Status: **shipped.** The `mastodon` driver, `colophon syndicate`, and the ledger work today.
 
 POSSE = Publish on your Own Site, Syndicate Elsewhere: the post is canonical on your blog, and a
 copy is cross-posted to Mastodon linking back to it.
@@ -15,9 +14,14 @@ copy is cross-posted to Mastodon linking back to it.
 3. **Export the token** as a CI secret: `export MASTODON_TOKEN=...`
 4. **Configure a syndicator** (`driver: mastodon`):
    ```yaml
-   federation:
-     syndication:
-       - { id: mastodon, driver: mastodon, instance: https://hachyderm.io }   # token from MASTODON_TOKEN
+   sites:
+     - id: main
+       federation:
+         syndication:
+           - id: mastodon
+             driver: mastodon
+             instance: https://hachyderm.io
+             token: "{env:MASTODON_TOKEN}"   # never a literal
    environments:
      - name: production
        syndicate: [mastodon]     # only this env cross-posts; preview/draft never do
