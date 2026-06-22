@@ -21,7 +21,8 @@ The two operations run at different points in the lifecycle, so neither belongs 
 | Operation | When | Why |
 |-----------|------|-----|
 | **`colophon webmention send`** | **after** `publish` | the source URL must be live so the receiver can fetch it back and verify the link |
-| **`colophon webmention fetch`** | **before** `build` (or standalone/scheduled) | pulls received mentions into the cache so the build can emit/bake them |
+| **`colophon webmention fetch`** | **before** `build`, or standalone/scheduled | pulls received mentions into the local cache so a bake build can read them |
+| **`colophon webmention publish`** | **on its own cadence** (e.g. cron) | `fetch` + push **only** the `_mentions/` prefix to the object store, decoupled from the site build — see [Separate publish pipeline](#separate-publish-pipeline) |
 
 So `webmention` is a command group alongside `build`/`publish`. A typical CI flow:
 
@@ -66,40 +67,74 @@ Each file is a small, normalised list (not the raw webmention.io payload):
 - The build emits these to the output tree under `_mentions/`, **routed to R2** like `_search/`,
   and they get **CORS for free** from `publish --create` (same `GET/HEAD` rule the JS search
   index already relies on for cross-origin fetch).
-- `fetch` writes a **committed cache** (`.colophon/cache/webmentions/` or content-adjacent) so a
-  plain `build` needs no network and is reproducible (same discipline as the generated-image
-  cache and audio sidecars).
+- `fetch` writes a local cache (`.colophon/cache/webmentions/`). This cache is **not** treated
+  like the generated-image cache — see below.
 
 One JSON-per-post (no sharded manifest like search) because a post page already knows its own key.
 
-## Display: two render paths, one asset
+### Not reproducible — and that's fine
 
-Both paths read the *same* `_mentions/<post>.json` — clean separation from content either way.
-This is the progressive-enhancement contract colophon already uses for the audio player and
-search box.
+Unlike the gen-image cache (a deterministic function of the prompt, committed for reproducible
+builds), received mentions are **external, time-varying state** — other people's posts. The
+cache is therefore **not reproducible**, and a fresh CI runner starts **empty**. The design makes
+that a non-issue:
 
-- **JS path** — the engine emits a shared `mentions.js` (like `search-ui.js` / `player.js`) when a
-  page opts in via a placeholder (`<section data-mentions="<base>/_mentions/<key>.json">`). The
-  browser fetches the JSON and renders likes/reposts/replies. No JS → the section stays empty,
-  the post is unaffected. **Always current** (re-fetched in the browser, picks up new/removed
-  mentions between deploys).
-- **Bake path** — at **build** time the engine reads the same JSON from the cache and injects the
-  rendered HTML directly. **No JS**, fully static; mentions are **as-of-last-fetch**.
+1. **Graceful when empty.** A missing/empty `_mentions/<post>.json` renders nothing and never
+   fails the build. Mentions are always additive chrome.
+2. **Freshness comes from `fetch`, not the repo.** Run `colophon webmention fetch` in CI before
+   the build, or — better — on a **schedule**, independent of content changes.
+3. **The JS path removes the dependency entirely.** A JS-rendering theme ships only a placeholder
+   at build time; the browser fetches the separately-published `_mentions/` from R2 (see
+   [Separate publish pipeline](#separate-publish-pipeline)). So an empty build-time cache doesn't
+   matter — the data is published and refreshed out-of-band.
 
-### Decision: JS by default, bake for the no-JS themes
+Committing the JSON to the repo is *optional* (it makes baked builds show mentions with no network
+at the cost of churny commits); the default expectation is "fetched in CI / published separately,"
+not "committed."
 
-Recommended default: **JS-fetch for the standard themes (press, default, signal, flux, obsidian),
-bake for the text-first themes (minimal)** — selectable per theme, and a site may force baking.
+## Display: a template choice, not an engine switch
 
-Rationale:
-- It matches the existing PE split exactly (search + player are JS-enhanced; `minimal` is
-  deliberately JS-free), so theme authors meet no new concept.
-- JS-fetch keeps the **HTML cacheable/immutable** and the mentions **fresh** without a rebuild —
-  important because mentions change far more often than content (a post can keep collecting likes
-  for months). Baking would force a rebuild+redeploy to show each new mention.
-- Baking stays available for `minimal` and any site that wants zero JS, at the cost of freshness.
+Rendering HTML is a **template (pongo) responsibility** — so the engine doesn't decide "bake vs
+JS"; it just **exposes the data to the template**, exactly as `attachments`/`attachments_html`
+already do. The theme then picks how to render. Two options, same `_mentions/` asset:
 
-Either way the data lives only in `_mentions/` assets; the theme just chooses when to read them.
+- **Bake (pongo)** — the theme loops the structured `mentions` var (or drops the engine-rendered
+  `mentions_html` fragment) to emit the responses server-side. **No JS**, fully static; as-of-last
+  `fetch`. Needs the data available at build time.
+- **JS** — the theme emits a placeholder (`<section data-mentions="<base>/_mentions/<key>.json">`)
+  and the engine-emitted shared `mentions.js` (like `search-ui.js`/`player.js`) fetches and
+  renders in the browser. No JS → the section stays empty, post unaffected. **Always current**,
+  and needs nothing from the build-time cache.
+
+Template surface (parallels attachments):
+
+| Var | For |
+|-----|-----|
+| `mentions` | structured list `[{type, author{name,url,photo}, url, content, published}]` — bake your own |
+| `mentions_html` | engine-rendered drop-in block (empty string when none) |
+| `has_mentions` | flag |
+| `mentions_src` | the `_mentions/<key>.json` URL, for the JS placeholder |
+
+### Preference: JS by default, bake for the no-JS themes
+
+The bundled themes **prefer JS** (press, default, signal, flux, obsidian); the text-first
+`minimal` **bakes**. Rationale: matches the existing PE split (search + player are JS-enhanced,
+`minimal` is JS-free); JS keeps HTML immutable and mentions **fresh without a rebuild** (they
+change far more often than content), and pairs with the separate publish pipeline below; baking
+stays available for zero-JS at the cost of freshness. It's a per-theme decision, overridable.
+
+## Audio / TTS: mentions are never spoken
+
+A real hazard for the bake path — handled by an invariant. The TTS reading is generated from the
+**post's markdown body** (`registerTTS(slug, html, …)`, where `html` is the converted content)
+*before* the theme runs. Mentions are **theme chrome** rendered as a sibling of `{{ content }}`
+— like the author card, downloads and tags, none of which are spoken. So:
+
+> **Invariant:** mentions render *outside* the content / `e-content` body the TTS extractor reads.
+> Themes must keep the mentions block a sibling of the content element, never inside it.
+
+This means baked mentions are excluded from audio for free (the TTS source predates theming); the
+guard just stops a theme from accidentally nesting them into the content element.
 
 ## Sending
 
@@ -134,13 +169,37 @@ Three cases, by what changes:
 **Spam/moderation:** inbound mentions can be junk. Start minimal — rely on webmention.io's
 filtering plus an optional `blocklist` of domains in config; defer per-mention approval/allowlist.
 
+## Separate publish pipeline
+
+The `_mentions/` assets are published **independently of the content build/deploy**, so you can
+update one without the other. colophon already partitions output by path at publish time (the
+router sends `_search/**` to the R2 publisher while content goes to Pages); the same machinery
+publishes *only* the `_mentions/**` prefix.
+
+```
+colophon webmention publish --env production    # fetch + write _mentions/ + push ONLY that prefix to R2
+```
+
+So the two cadences are decoupled:
+
+- **Content pipeline** (`build` → `publish`): ships HTML + JS placeholders. Never depends on the
+  mentions cache; a fresh runner is fine.
+- **Webmention pipeline** (`webmention publish`, e.g. hourly cron): refreshes `_mentions/` on R2.
+  The JS path picks it up in the browser with no site rebuild.
+
+This is the strongest reason JS is the default render path — it's the only one that benefits from
+the decoupling (a baked theme still needs a content rebuild to reflect new mentions, so baking
+suits low-frequency / no-JS sites). Implementation reuses the per-publisher routing
+(`router.Owns`/`Keep`) plus a publish that only materialises the `_mentions/` tree.
+
 ## Fit with existing design
 
 | Concern | Reused pattern |
 |---|---|
 | Separate JSON asset, R2-routed, cross-origin | `_search/` index + `publish --create` CORS |
 | Browser fetch + render, no-JS fallback | `search-ui.js` / `player.js` progressive enhancement |
-| Committed, reproducible cache; offline build | generated-image cache + audio sidecars |
+| Template data exposure (`mentions`/`mentions_html`) | `attachments`/`attachments_html` |
+| Per-path publish partitioning | the router's `_search/**` → R2 split (`router.Owns`/`Keep`) |
 | Read token from environment, not config | all secrets via `{env:…}` |
 | Config wiring | `federation.indieweb.webmention.receiver` (already present, unread) |
 | Parsing mention authors | the mf2 `h-card`/`h-entry` just shipped |
@@ -163,32 +222,44 @@ is configured (the discovery tag senders look for).
 
 ## Key decisions
 
-1. **Separate `webmention` command** (`send` after publish, `fetch` before build) — not folded
-   into `build`/`publish`, because of the live-URL ordering constraint.
-2. **Received data is a separate `_mentions/` asset** (R2-routed, CORS via `--create`, committed
-   cache), never mixed into content — mirrors `_search/`.
+1. **Separate `webmention` command** (`send` after publish, `fetch` before build, `publish` on its
+   own cadence) — not folded into `build`/`publish`, because of the live-URL ordering constraint
+   and the decoupled-refresh goal.
+2. **Received data is a separate `_mentions/` asset** (R2-routed, CORS via `--create`), never mixed
+   into content — mirrors `_search/`. The cache is **not reproducible** (external state); builds
+   are **graceful when it's empty**, and freshness comes from `fetch`/`publish`, not the repo.
 3. **One JSON per post**, normalised (`type`/`author`/`url`/`content`), not raw receiver payload.
-4. **JS-fetch default + bake for no-JS themes**, both reading the same asset.
-5. **Sent-cache** drives correct re-send on link changes; **`aliases:`** is the soft dependency
+4. **Rendering is a template choice**: the engine exposes `mentions`/`mentions_html`/`has_mentions`
+   (like `attachments`); themes bake via pongo *or* use the JS placeholder + `mentions.js`. Bundled
+   themes prefer JS; `minimal` bakes.
+5. **TTS invariant**: mentions live outside the content body the speech extractor reads, so they're
+   never spoken — true for both paths.
+6. **Separate publish pipeline**: `webmention publish` pushes only `_mentions/` to the store, so
+   mentions and content update independently (reuses per-publisher path routing).
+7. **Sent-cache** drives correct re-send on link changes; **`aliases:`** is the soft dependency
    for surviving URL changes.
-6. webmention.io as the receiver (no self-hosted endpoint) — per PLAN §10/§14.
+8. webmention.io as the receiver (no self-hosted endpoint) — per PLAN §10/§14.
 
 ## Acceptance criteria
 
 - `colophon webmention send` discovers endpoints and POSTs for outbound links; re-run is a no-op
   unless links changed; dropped links trigger a delete-style re-send.
-- `colophon webmention fetch` writes normalised `_mentions/<post>.json` into the committed cache;
-  offline `build` emits them to output and routes them like `_search/`.
+- `colophon webmention fetch` writes normalised JSON into the local cache; `webmention publish`
+  pushes only `_mentions/**` to the store, independent of a content deploy.
+- A build with an **empty** cache succeeds and shows no mentions (graceful); a build with the cache
+  present exposes `mentions`/`mentions_html` to templates and emits `_mentions/` assets.
 - A JS-enhanced theme shows likes/reposts/replies; with JS off the post is unaffected; `minimal`
-  bakes them statically.
+  bakes them statically. Mentions never appear in a post's TTS audio.
 - Secrets come only from the environment; a site with no `webmention` config emits nothing.
 
 ## Files to create (when built)
 
-- `internal/webmention/` — endpoint discovery + sender + receiver client + normaliser.
-- `internal/cli/webmention.go` — the `webmention {send,fetch}` command group.
-- build emit for `_mentions/` + `<link rel="webmention">` head tag + optional bake.
-- `internal/render/themes/*/…` — a `data-mentions` placeholder + `mentions.js` (engine-emitted).
+- `internal/webmention/` — endpoint discovery + sender (sent-cache) + receiver client + normaliser.
+- `internal/cli/webmention.go` — the `webmention {send,fetch,publish}` command group.
+- build: expose `mentions`/`mentions_html`/`has_mentions`/`mentions_src` to templates, emit
+  `_mentions/` assets + the `<link rel="webmention">` head tag.
+- `internal/render/themes/*/…` — a `data-mentions` placeholder + engine-emitted `mentions.js`
+  (JS themes) and a pongo-baked block (text themes), kept outside the content/`e-content` element.
 
 ## Out of scope (future)
 
