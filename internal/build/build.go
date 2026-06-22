@@ -9,6 +9,7 @@ package build
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
@@ -289,6 +290,23 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			wmReadEndpoint = webmention.ReadEndpoint(iw.Webmention.Source, iw.Webmention.Receiver)
 		}
 	}
+	// The committed blocklist gates display too: a defensive filter on the asset-mode cache (so
+	// editing it takes effect on the next build, not only the next fetch), and the glob patterns
+	// shipped to the browser for client-side filtering in live mode.
+	wmBlock := &webmention.Blocklist{}
+	wmBlockJSON := ""
+	if wmMode != "disabled" {
+		if bl, err := webmention.LoadBlocklist(cfg.Root); err == nil {
+			wmBlock = bl
+			if wmMode == "live" {
+				if pats := bl.ClientPatterns(); len(pats) > 0 {
+					if b, err := json.Marshal(pats); err == nil {
+						wmBlockJSON = string(b)
+					}
+				}
+			}
+		}
+	}
 
 	favicon, err := writeFavicon(write, eng, cfg.Root, site)
 	if err != nil {
@@ -459,6 +477,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 				if err != nil {
 					return Result{}, err
 				}
+				m.Mentions = wmBlock.Filter(m.Mentions)
 				if len(m.Mentions) > 0 {
 					ctx["has_mentions"] = true
 					ctx["mentions"] = mentionVars(m.Mentions)
@@ -477,7 +496,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			case "live":
 				// No build-time data: the browser fetches the receiver directly per page load.
 				ctx["mentions_src"] = wmReadEndpoint
-				ctx["mentions_attrs"] = mentionsAttrs(wmReadEndpoint, absURL(site.BaseURL, p.URL), "")
+				ctx["mentions_attrs"] = mentionsAttrs(wmReadEndpoint, absURL(site.BaseURL, p.URL), wmBlockJSON)
 			}
 		}
 		html, err := eng.Render(templateFor(eng, p.Type), ctx)

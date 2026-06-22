@@ -342,11 +342,11 @@ When a theme splits the title/byline away from the body (e.g. a hero block), car
 properties into the `h-entry` root as hidden elements (`<data class="p-name" value="…">`, a hidden
 `<time class="dt-published">`) — see the `signal`/`obsidian` contrib themes.
 
-## Webmentions (responses) *(planned)*
+## Webmentions (responses)
 
-> Ships with the webmention display feature ([design](design/webmention.md)). The variables below are
-> the firm contract themes target; today only the `<link rel="webmention">` discovery tag is emitted.
-> The `press` theme already carries the reference block.
+> Shipped. All bundled + contrib themes carry the responses block; configure
+> `federation.indieweb.webmention.display.mode` (and run `colophon webmention fetch`) to populate it.
+> See [Show webmentions](howto/webmentions.md).
 
 Webmentions are replies/likes/reposts from other sites, shown under a post. **The engine never
 decides how they render — it only exposes the data**, and the site picks a `display.mode`

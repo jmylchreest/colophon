@@ -74,9 +74,9 @@ type rssRoot struct {
 }
 
 type rssChannel struct {
-	Title         string       `xml:"title"`
-	Link          string       `xml:"link"`
-	Description   string       `xml:"description"`
+	Title         string    `xml:"title"`
+	Link          string    `xml:"link"`
+	Description   string    `xml:"description"`
 	LastBuildDate string    `xml:"lastBuildDate,omitempty"`
 	AtomLinks     string    `xml:",innerxml"` // pre-rendered Atom <link rel=self/hub> for WebSub
 	Items         []rssItem `xml:"item"`
@@ -150,10 +150,10 @@ func RSS(s Site, items []Item) ([]byte, error) {
 // --- Atom 1.0 ---
 
 type atomRoot struct {
-	XMLName    xml.Name    `xml:"http://www.w3.org/2005/Atom feed"`
-	Title      string      `xml:"title"`
-	ID         string      `xml:"id"`
-	Updated    string      `xml:"updated"`
+	XMLName xml.Name    `xml:"http://www.w3.org/2005/Atom feed"`
+	Title   string      `xml:"title"`
+	ID      string      `xml:"id"`
+	Updated string      `xml:"updated"`
 	Links   []atomLink  `xml:"link"` // rel="alternate" (site) + rel="self"/rel="hub" (WebSub)
 	Author  *atomAuthor `xml:"author,omitempty"`
 	Entries []atomEntry `xml:"entry"`

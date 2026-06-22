@@ -1,11 +1,12 @@
 # Design: webmention
 
-> Status: **partly built** · relates to PLAN §10 (Federation & IndieWeb), §6 (build pipeline).
-> Builds on the microformats2 markup now shipped in the themes. **Shipped:** the
-> `<link rel="webmention">` discovery tag (`internal/build/webmention.go`); **`colophon webmention
-> send`** — outbound-link scan + endpoint discovery + POST + sent-cache (`internal/webmention/`,
-> `internal/cli/webmention.go`). **Not yet built:** `fetch`/`publish`, the `_mentions/` assets,
-> display modes, and moderation — the rest of this design.
+> Status: **built** · relates to PLAN §10 (Federation & IndieWeb), §6 (build pipeline). The whole
+> design ships: the `<link rel="webmention">` tag; `webmention send` (sent-cache); `webmention
+> fetch` (jf2 reader → `_mentions/` cache); per-site `display.mode` (live/asset/disabled) with the
+> themed responses block + `mentions.js`; `webmention publish` (decoupled `_mentions/`-only deploy);
+> and the committed glob blocklist + `colophon-moderate-mentions` skill. Code in
+> `internal/webmention/`, `internal/build/{mentions,webmention}.go`, `internal/cli/webmention.go`.
+> Deferred: semantic moderation and searchable mentions (see those sections).
 
 Goal: let a colophon site participate in [Webmention](https://www.w3.org/TR/webmention/) — the
 W3C standard for "site A notified site B that it linked to / replied to / liked B's post" —

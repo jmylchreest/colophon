@@ -8,7 +8,7 @@
     {
       "name": "colophon-skills",
       "source": "./contrib/skills",
-      "description": "Authoring skills for colophon: write, edit, cross-link, metadata, and publish."
+      "description": "Authoring skills for colophon: write, edit, cross-link, metadata, publish, and moderate webmentions."
     }
   ]
 }

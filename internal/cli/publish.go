@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +28,10 @@ type PublishCmd struct {
 	GenerateAI   bool     `name:"generate-ai" help:"Generate uncached AI media (gen: images and TTS audio) via the configured providers before deploying"`
 	Verbose      bool     `short:"v" help:"Log each step (sources, files, publisher actions)"`
 	Pprof        string   `help:"Capture CPU+heap profiles to a dir (or 1 for cwd)" hidden:""`
+
+	// mentionsOnly restricts the deploy to the _mentions/ prefix and skips manifests/WebSub —
+	// set by `webmention publish` so received mentions refresh without re-uploading the site.
+	mentionsOnly bool
 }
 
 func (c *PublishCmd) Run() error {
@@ -172,12 +177,25 @@ func (c *PublishCmd) publishEnv(ctx context.Context, root string, cfg *config.Co
 		log.Step("PUBLISH", "", "env", name, "warning", "base_url is local; feeds/sitemap will be non-public")
 	}
 
-	if err := deployAll(ctx, env, name, targets, routes, outDir, siteURL, log, summary, tel); err != nil {
+	var extraKeep func(string) bool
+	if c.mentionsOnly {
+		extraKeep = isMentionsPath
+	}
+	if err := deployAll(ctx, env, name, targets, routes, outDir, siteURL, log, summary, tel, extraKeep); err != nil {
 		return err
 	}
-	writeManifests(ctx, cfg, targets, name, siteURL, log)
-	pingWebSubHubs(ctx, cfg, siteURL, log)
+	// A mentions-only refresh deploys just _mentions/; the manifests and WebSub ping belong to a
+	// full content deploy, so skip them here.
+	if !c.mentionsOnly {
+		writeManifests(ctx, cfg, targets, name, siteURL, log)
+		pingWebSubHubs(ctx, cfg, siteURL, log)
+	}
 	return nil
+}
+
+// isMentionsPath reports whether an output path is part of the _mentions/ asset prefix.
+func isMentionsPath(p string) bool {
+	return p == "mentions.js" || strings.HasPrefix(p, "_mentions/")
 }
 
 // pingWebSubHubs notifies the configured WebSub hubs that the site's feeds changed, after
@@ -324,7 +342,9 @@ func resolveBaseURLs(ctx context.Context, cfg *config.Config, env *config.Enviro
 // deployAll deploys the built tree to each target, applying routing so each publisher sees
 // only the files it owns, then prunes old deployments where supported. It appends a summary
 // row per target.
-func deployAll(ctx context.Context, env *config.Environment, name string, targets []deployTarget, routes []core.RouteRule, outDir, siteURL string, log *clog.Logger, summary *[]summaryRow, tel *telemetry.Client) error {
+// extraKeep, when non-nil, further restricts which output paths are deployed (ANDed with the
+// router's partition) — used by `webmention publish` to push only the _mentions/ prefix.
+func deployAll(ctx context.Context, env *config.Environment, name string, targets []deployTarget, routes []core.RouteRule, outDir, siteURL string, log *clog.Logger, summary *[]summaryRow, tel *telemetry.Client, extraKeep func(string) bool) error {
 	base := os.DirFS(outDir)
 	router := core.NewRouter(routes, env.Publish)
 	routeTargets := map[string]bool{}
@@ -343,11 +363,18 @@ func deployAll(ctx context.Context, env *config.Environment, name string, target
 			tel.Publish(t.driver, t.id, "skipped", 0, 0)
 			continue
 		}
-		tree := base
-		if router.Active() {
+		var tree fs.FS = base
+		if router.Active() || extraKeep != nil {
 			id := t.id
-			tree = selectFS{base: base, keep: func(p string) bool { return router.Keep(id, p) }}
-			log.Detail("PUBLISH", t.id, "env", name, "routed", router.Owns(t.id))
+			tree = selectFS{base: base, keep: func(p string) bool {
+				if router.Active() && !router.Keep(id, p) {
+					return false
+				}
+				return extraKeep == nil || extraKeep(p)
+			}}
+			if router.Active() {
+				log.Detail("PUBLISH", t.id, "env", name, "routed", router.Owns(t.id))
+			}
 		}
 		// A whole-tree destination (git branch, external deploy command) takes the entire tree
 		// at once — no incremental plan — so it is dispatched to Push instead of publish.Run.

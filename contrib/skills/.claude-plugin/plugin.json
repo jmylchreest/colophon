@@ -1,6 +1,6 @@
 {
   "name": "colophon-skills",
-  "description": "Authoring skills for the colophon static blog generator: write, edit, cross-link, metadata, and publish — the agent drives colophon, colophon provides the context.",
+  "description": "Authoring skills for the colophon static blog generator: write, edit, cross-link, metadata, publish, and moderate webmentions — the agent drives colophon, colophon provides the context.",
   "version": "0.1.0",
   "author": {
     "name": "John Mylchreest",

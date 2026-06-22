@@ -1,10 +1,9 @@
 # How to show webmentions (replies, likes, reposts)
 
-> Status: **partly shipped.** Emitted today: the `<link rel="webmention">` discovery tag (set
-> `federation.indieweb.webmention.receiver`), `rel=me`, microformats2, and **`colophon webmention
-> send`** (notify the sites you link to). The `webmention fetch`/`publish` commands and the response
-> *display* below are the designed interface ([../design/webmention.md](../design/webmention.md)),
-> not yet built.
+> Status: **shipped.** The full flow works: the `<link rel="webmention">` tag, `rel=me`,
+> microformats2, `webmention send`, and the receive/display layer — `webmention fetch`/`publish`, the
+> `display.mode` (live/asset/disabled), the themed responses block, and a committed glob blocklist
+> with the `colophon-moderate-mentions` skill. See [../design/webmention.md](../design/webmention.md).
 
 Webmentions let other sites' replies/likes/reposts appear under your posts — "comments without a
 database." A static site can't receive POSTs, so a hosted receiver ([webmention.io](https://webmention.io))
@@ -59,5 +58,7 @@ collects them and colophon pulls them in at build/refresh time.
 
 - Self-hosting: webmention.io is open source, or use a JF2-compatible receiver — point `source:` at
   its API (`driver: jf2`).
-- Privacy/spam: a bl[ock]list and avatar caching are part of the design; treat displayed third-party
-  content accordingly.
+- Privacy/spam: drop spam with a committed glob blocklist at `.colophon/webmention-block.yml`
+  (by domain/url/author/content/type), applied at `fetch` and shipped to the browser in `live` mode.
+  The `colophon-moderate-mentions` skill helps distill spam into small rules. Treat displayed
+  third-party content accordingly.

@@ -17,8 +17,28 @@ import (
 // WebmentionCmd groups the webmention operations. Sending is implemented; fetching/
 // publishing received mentions (display) are the designed Tier-2 layer (docs/design/webmention.md).
 type WebmentionCmd struct {
-	Send  WebmentionSendCmd  `cmd:"" help:"Notify the sites your live posts link to (run after publish)"`
-	Fetch WebmentionFetchCmd `cmd:"" help:"Pull received mentions from the configured receiver into the local cache"`
+	Send    WebmentionSendCmd    `cmd:"" help:"Notify the sites your live posts link to (run after publish)"`
+	Fetch   WebmentionFetchCmd   `cmd:"" help:"Pull received mentions from the configured receiver into the local cache"`
+	Publish WebmentionPublishCmd `cmd:"" help:"Fetch mentions and deploy only _mentions/ (refresh responses without a full re-upload)"`
+}
+
+// WebmentionPublishCmd refreshes received mentions on a deployed site without re-uploading the
+// whole thing: it fetches into the cache, then deploys only the _mentions/ prefix. Run it on a
+// schedule (cron) so asset-mode responses stay fresh between content builds.
+type WebmentionPublishCmd struct {
+	Env          string `help:"Environment to refresh mentions on" default:"production"`
+	AllowPublish bool   `help:"Deploy environments that set allow_publish: false"`
+	Domain       string `help:"Domain to fetch mentions for (default: the site base_url host)"`
+	Verbose      bool   `short:"v" help:"Log each step"`
+}
+
+func (c *WebmentionPublishCmd) Run() error {
+	fetch := &WebmentionFetchCmd{Domain: c.Domain, Verbose: c.Verbose}
+	if err := fetch.Run(); err != nil {
+		return err
+	}
+	pub := &PublishCmd{Env: []string{c.Env}, AllowPublish: c.AllowPublish, Verbose: c.Verbose, mentionsOnly: true}
+	return pub.Run()
 }
 
 // WebmentionFetchCmd reads received mentions back from the configured receiver's read API
@@ -71,23 +91,37 @@ func (c *WebmentionFetchCmd) Run() error {
 		return err
 	}
 
+	// Moderation chokepoint: drop blocklisted mentions before they reach the cache, so the filter
+	// survives the full regenerate (editing the generated JSON would just be overwritten).
+	block, err := webmention.LoadBlocklist(root)
+	if err != nil {
+		return fmt.Errorf("load blocklist: %w", err)
+	}
+
 	// Full regenerate: clear the namespace, then write the current set. A post that lost all its
 	// mentions ends up with no file (so display renders nothing) rather than a stale leftover.
 	dir := webmention.CacheDir(root)
 	if err := os.RemoveAll(dir); err != nil {
 		return fmt.Errorf("clear mentions cache: %w", err)
 	}
-	total := 0
+	total, blocked, posts := 0, 0, 0
 	for key, m := range data {
+		before := len(m.Mentions)
+		m.Mentions = block.Filter(m.Mentions)
+		blocked += before - len(m.Mentions)
+		if len(m.Mentions) == 0 {
+			continue // nothing left after moderation → no file for this post
+		}
 		if err := webmention.SaveCached(dir, key, m); err != nil {
 			return err
 		}
+		posts++
 		total += len(m.Mentions)
 		if c.Verbose {
 			log.Detail("WEBMENTION", m.Target, "mentions", len(m.Mentions))
 		}
 	}
-	log.Step("WEBMENTION", "fetch", "domain", domain, "posts", len(data), "mentions", total)
+	log.Step("WEBMENTION", "fetch", "domain", domain, "posts", posts, "mentions", total, "blocked", blocked)
 	return nil
 }
 
