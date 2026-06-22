@@ -2,10 +2,10 @@
 
 > Status: **partly built** · relates to PLAN §10 (Federation & IndieWeb), §6 (build pipeline).
 > Builds on the microformats2 markup now shipped in the themes. **Shipped:** the
-> `<link rel="webmention">` discovery tag, emitted site-wide when
-> `federation.indieweb.webmention.receiver` is set (`internal/build/webmention.go`). **Not yet
-> built:** the `send`/`fetch`/`publish` commands, the `_mentions/` assets, display modes, and
-> moderation — the rest of this design.
+> `<link rel="webmention">` discovery tag (`internal/build/webmention.go`); **`colophon webmention
+> send`** — outbound-link scan + endpoint discovery + POST + sent-cache (`internal/webmention/`,
+> `internal/cli/webmention.go`). **Not yet built:** `fetch`/`publish`, the `_mentions/` assets,
+> display modes, and moderation — the rest of this design.
 
 Goal: let a colophon site participate in [Webmention](https://www.w3.org/TR/webmention/) — the
 W3C standard for "site A notified site B that it linked to / replied to / liked B's post" —

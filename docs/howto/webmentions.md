@@ -1,9 +1,10 @@
 # How to show webmentions (replies, likes, reposts)
 
-> Status: **partly shipped.** The `<link rel="webmention">` discovery tag is emitted today (set
-> `federation.indieweb.webmention.receiver`); `rel=me` and microformats2 (which sign-in and parsing
-> rely on) are shipped. The `colophon webmention fetch/publish/send` commands and response *display*
-> below are the designed interface ([../design/webmention.md](../design/webmention.md)), not yet built.
+> Status: **partly shipped.** Emitted today: the `<link rel="webmention">` discovery tag (set
+> `federation.indieweb.webmention.receiver`), `rel=me`, microformats2, and **`colophon webmention
+> send`** (notify the sites you link to). The `webmention fetch`/`publish` commands and the response
+> *display* below are the designed interface ([../design/webmention.md](../design/webmention.md)),
+> not yet built.
 
 Webmentions let other sites' replies/likes/reposts appear under your posts — "comments without a
 database." A static site can't receive POSTs, so a hosted receiver ([webmention.io](https://webmention.io))
@@ -36,10 +37,13 @@ collects them and colophon pulls them in at build/refresh time.
    ```
    JS-rendered themes fetch that asset live, so a scheduled `webmention publish` keeps responses
    fresh **without rebuilding the site**. (No-JS/text themes show them as of the last build.)
-5. **(Optional) Send webmentions** when *you* link to others, so you show up in their comments:
+5. **Send webmentions** when *you* link to others, so you show up in their comments *(shipped)*:
    ```sh
-   colophon webmention send         # run after publish; the source URL must be live
+   colophon webmention send --env production   # run AFTER publish; the source URLs must be live
    ```
+   It scans the built output's outbound links (per page's canonical URL), discovers each target's
+   endpoint, and POSTs. A sent-cache (`.colophon/cache/webmention-sent.json`) makes re-runs send only
+   new links and re-ping removed ones. `--dry-run` reports without sending.
 6. **(Optional) Social replies via Bridgy** — connect your silo accounts at <https://brid.gy>; it
    backfeeds replies/likes from Mastodon/Bluesky to your webmention.io endpoint, so they appear the
    same way. No extra colophon config.
