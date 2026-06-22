@@ -4,17 +4,99 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/jmylchreest/colophon/internal/config"
+	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/webmention"
 )
 
 // WebmentionCmd groups the webmention operations. Sending is implemented; fetching/
 // publishing received mentions (display) are the designed Tier-2 layer (docs/design/webmention.md).
 type WebmentionCmd struct {
-	Send WebmentionSendCmd `cmd:"" help:"Notify the sites your live posts link to (run after publish)"`
+	Send  WebmentionSendCmd  `cmd:"" help:"Notify the sites your live posts link to (run after publish)"`
+	Fetch WebmentionFetchCmd `cmd:"" help:"Pull received mentions from the configured receiver into the local cache"`
+}
+
+// WebmentionFetchCmd reads received mentions back from the configured receiver's read API
+// (the jf2 driver) and fully regenerates the local cache (.colophon/cache/webmentions/), so
+// deletions self-heal. The build (asset mode) and `webmention publish` read that cache.
+type WebmentionFetchCmd struct {
+	Domain  string `help:"Domain to fetch mentions for (default: the site base_url host)"`
+	Verbose bool   `short:"v" help:"Log each post that received mentions"`
+}
+
+func (c *WebmentionFetchCmd) Run() error {
+	root, err := findRoot()
+	if err != nil {
+		return err
+	}
+	cfg, err := config.Load(root)
+	if err != nil {
+		return err
+	}
+	log := newLogger(c.Verbose)
+	if len(cfg.Sites) == 0 {
+		return fmt.Errorf("no sites configured")
+	}
+	site := cfg.Sites[0]
+
+	wm := webmentionConf(site)
+	if wm == nil {
+		return fmt.Errorf("no federation.indieweb.webmention configured")
+	}
+	endpoint := webmention.ReadEndpoint(wm.Source, wm.Receiver)
+	if endpoint == "" {
+		return fmt.Errorf("set federation.indieweb.webmention.receiver (or .source) so the read API can be derived")
+	}
+	domain := c.Domain
+	if domain == "" {
+		if u, err := url.Parse(site.BaseURL); err == nil {
+			domain = u.Host
+		}
+	}
+	if domain == "" {
+		return fmt.Errorf("could not determine domain; set --domain or the site base_url")
+	}
+	if strings.TrimSpace(wm.Token) == "" {
+		log.Step("WEBMENTION", "fetch", "warning",
+			"no token set — webmention.io domain reads need federation.indieweb.webmention.token: {env:WEBMENTION_IO_TOKEN}")
+	}
+
+	data, err := webmention.FetchJF2(context.Background(), webmention.DefaultClient, endpoint, domain, wm.Token)
+	if err != nil {
+		return err
+	}
+
+	// Full regenerate: clear the namespace, then write the current set. A post that lost all its
+	// mentions ends up with no file (so display renders nothing) rather than a stale leftover.
+	dir := webmention.CacheDir(root)
+	if err := os.RemoveAll(dir); err != nil {
+		return fmt.Errorf("clear mentions cache: %w", err)
+	}
+	total := 0
+	for key, m := range data {
+		if err := webmention.SaveCached(dir, key, m); err != nil {
+			return err
+		}
+		total += len(m.Mentions)
+		if c.Verbose {
+			log.Detail("WEBMENTION", m.Target, "mentions", len(m.Mentions))
+		}
+	}
+	log.Step("WEBMENTION", "fetch", "domain", domain, "posts", len(data), "mentions", total)
+	return nil
+}
+
+// webmentionConf returns the site's webmention config, or nil.
+func webmentionConf(site core.Site) *core.WebmentionConf {
+	if iw := site.Federation.IndieWeb; iw != nil {
+		return iw.Webmention
+	}
+	return nil
 }
 
 // WebmentionSendCmd scans a built environment's HTML for outbound links and sends a

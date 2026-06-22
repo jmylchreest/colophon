@@ -100,6 +100,7 @@ type IndieWeb struct {
 type WebmentionConf struct {
 	Receiver       string             `yaml:"receiver,omitempty"` // advertised <link rel="webmention">
 	Driver         string             `yaml:"driver,omitempty"`   // reader driver for received mentions; default jf2
+	Source         string             `yaml:"source,omitempty"`   // reader read-API URL; derived from receiver when empty
 	Token          string             `yaml:"token,omitempty"`    // read-API token, via {env:VAR}; never a literal
 	Display        *WebmentionDisplay `yaml:"display,omitempty"`
 	BridgyBackfeed bool               `yaml:"bridgy_backfeed,omitempty"`
