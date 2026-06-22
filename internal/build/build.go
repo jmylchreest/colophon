@@ -135,6 +135,8 @@ type page struct {
 	Attachments    []pageAttachment // downloadable files shipped with the post (Downloads block + feeds)
 	HasAttachments bool             // post ships at least one attachment (theme marker + filtering)
 
+	Syndication []string // URLs this post also lives at (manual POSSE / ledger) — u-syndication links
+
 	Tags       []string
 	Categories []string
 	Author     string        // author id from frontmatter (the byline)
@@ -393,6 +395,9 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"attachments":      attachmentVars(p.Attachments),
 			"attachments_html": attachmentsHTML(p.Attachments),
 			"has_attachments":  p.HasAttachments,
+			"syndication":      p.Syndication,
+			"syndication_html": syndicationHTML(p.Syndication),
+			"has_syndication":  len(p.Syndication) > 0,
 			"tags":             tagLinks(p.Tags, basePath),
 			"category":         pageCategory(p),
 			"read_time":        readingTime(p.HTML),
@@ -753,6 +758,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		p.HasMath = strings.Contains(html, `class="math`)
 		p.HasCode = strings.Contains(html, "<pre><code")
 		p.Tags = fm.Tags
+		p.Syndication = normalizeSyndication(fm.Syndication)
 		p.Categories = fm.Categories
 		p.Author = fm.Author
 		p.Persona = fm.Persona

@@ -27,6 +27,7 @@
 {% if tags %}<p class="tags">{% for tg in tags %}<a class="tag" href="{{ tg.url }}">#{{ tg.name }}</a> {% endfor %}</p>{% endif %}
 {# Engine-rendered Downloads list (no JS). Drop-in; or build your own from the `attachments` list. #}
 {{ attachments_html|safe }}
+{{ syndication_html|safe }}
 </article>
 </main>
 <footer class="site-footer">Built with <a href="https://github.com/jmylchreest/colophon">colophon</a></footer>

@@ -23,6 +23,7 @@
 {% if tags %}<p class="meta">Tags:{% for tg in tags %} <a href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</p>{% endif %}
 {# Engine-rendered Downloads list (no JS). Drop-in; or build your own from the `attachments` list. #}
 {{ attachments_html|safe }}
+{{ syndication_html|safe }}
 </article>
 </main>
 <footer><a href="{{ base_path }}">← {{ site_title }}</a></footer>

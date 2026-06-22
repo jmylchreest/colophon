@@ -67,6 +67,7 @@
 
   {# Engine-rendered Downloads list (no JS). Drop-in; or build your own from the `attachments` list. #}
   {{ attachments_html|safe }}
+  {{ syndication_html|safe }}
 
   <aside class="side-col">
     {% if toc %}

@@ -99,7 +99,11 @@ type Frontmatter struct {
 	Publish      *bool      `yaml:"publish,omitempty"`
 	PublishAfter *time.Time `yaml:"publish_after,omitempty"`
 
-	Syndicate []string `yaml:"syndicate,omitempty"`
+	// Syndicate selects syndication targets (driver ids) for POSSE — Tier 3, not yet read.
+	// Syndication lists URLs where this post already lives elsewhere (manual or, later, the
+	// syndication ledger); each renders as a u-syndication link ("Also posted on…").
+	Syndicate   []string `yaml:"syndicate,omitempty"`
+	Syndication []string `yaml:"syndication,omitempty"`
 
 	// SEO is optional search/social metadata. Every field has a single rendering effect
 	// (canonical/robots/Open Graph/Twitter/JSON-LD), so it is also the precise target an

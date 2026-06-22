@@ -123,6 +123,8 @@
         </div>
       </div>
       {% endif %}
+      {# "Also posted on…" — mf2 u-syndication links (manual list now; syndication ledger later). #}
+      {{ syndication_html|safe }}
     </footer>
 
     {# Engine-rendered Downloads list (no JS). Drop-in; or build your own from the `attachments` list. #}

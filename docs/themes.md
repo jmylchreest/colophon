@@ -215,6 +215,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `audio_listen`, `audio_play`, `audio_pause` | Localised player UI strings (figcaption + play/pause aria-labels), in the page's language. Present only when `has_audio`. |
 | `has_attachments`, `attachments`, `attachments_html` | Downloads. `attachments_html` is a ready-to-drop-in, no-JS block (`{{ attachments_html\|safe }}`); `attachments` is the structured list — `{url, label, description, name, type, type_label, size, bytes}` — if you'd rather build your own. `has_attachments` is the flag. See [Audio, video & downloads](#audio-video--downloads). |
 | `mentions_enabled`, `has_mentions`, `mentions`, `mentions_html`, `mentions_src` | Webmentions (replies/likes/reposts). What's populated depends on the site's `display.mode` — see [Webmentions](#webmentions-responses-planned). *(Planned — ships with the webmention display feature.)* |
+| `has_syndication`, `syndication`, `syndication_html` | "Also posted on…" links from the post's `syndication:` frontmatter (absolute URLs). `syndication_html` is a no-JS drop-in of mf2 `u-syndication` links (`{{ syndication_html\|safe }}`, empty when none); `syndication` is the raw URL list to build your own. |
 
 ### `index.html` (the post list, and per-tag pages)
 
