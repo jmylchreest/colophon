@@ -24,7 +24,7 @@ collects them and colophon pulls them in at build/refresh time.
          receiver: https://webmention.io/yourdomain/webmention  # emitted as <link rel="webmention"> (shipped)
          provider: jf2                                          # read API shape (planned)
          display:
-           mode: asset                                          # live | asset | baked (planned)
+           mode: asset                                          # live | asset | disabled (planned)
    # export WEBMENTION_IO_TOKEN=...   (CI secret)
    ```
 3. **Build** — colophon emits `<link rel="webmention">` site-wide today; the per-post responses block
