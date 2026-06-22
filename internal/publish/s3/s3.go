@@ -169,7 +169,40 @@ func (p *Publisher) Commit(ctx context.Context, tree fs.FS, plan *core.Plan) (co
 		p.log.Detail("PUBLISH", p.id, "committed",
 			"uploaded", res.Uploaded, "deleted", res.Deleted, "bytes", res.Bytes)
 	}
+	if err == nil {
+		p.applyRedirects(ctx, tree)
+	}
 	return res, err
+}
+
+// applyRedirects upgrades alias stubs to real 301s on S3 *website* hosting by setting the
+// x-amz-website-redirect-location header on each redirect object (read from the build's
+// _redirects file). Best-effort: the meta-refresh stub already works without it, so a failure
+// only warns. No-op when this publisher's tree carries no _redirects (e.g. an assets-only
+// target) or on stores that ignore the header (R2/MinIO without website hosting).
+func (p *Publisher) applyRedirects(ctx context.Context, tree fs.FS) {
+	data, err := fs.ReadFile(tree, "_redirects")
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		f := strings.Fields(strings.TrimSpace(line))
+		if len(f) < 2 || strings.HasPrefix(f[0], "#") {
+			continue
+		}
+		key := strings.Trim(f[0], "/")
+		if key == "" {
+			continue
+		}
+		key += "/index.html"
+		body, err := fs.ReadFile(tree, key)
+		if err != nil {
+			continue // stub not in this tree (routing/subpath) — leave it as meta-refresh
+		}
+		if err := p.s3.PutRedirect(ctx, key, f[1], body); err != nil && p.log != nil {
+			p.log.Step("PUBLISH", p.id, "redirect_warning", key, "err", err.Error())
+		}
+	}
 }
 
 func (p *Publisher) Invalidate(ctx context.Context, paths []string) error { return nil }

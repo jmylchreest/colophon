@@ -148,7 +148,7 @@ func (c *Client) List(ctx context.Context) (core.State, error) {
 			return nil, err
 		}
 		req.URL.RawQuery = params.Encode()
-		signV4(req, "/"+c.Bucket, c.AccessKey, c.SecretKey, c.Region, emptyPayloadHash, c.clock())
+		signV4(req, "/"+c.Bucket, c.AccessKey, c.SecretKey, c.Region, emptyPayloadHash, c.clock(), nil)
 		resp, err := c.httpClient().Do(req)
 		if err != nil {
 			return nil, err
@@ -190,7 +190,7 @@ func (c *Client) PutCORS(ctx context.Context, origins []string) error {
 	req.Header.Set("Content-Type", "application/xml")
 	sum := md5.Sum(body) // AWS requires Content-MD5 on PutBucketCors; harmless on R2/Tigris
 	req.Header.Set("Content-MD5", base64.StdEncoding.EncodeToString(sum[:]))
-	signV4(req, "/"+c.Bucket, c.AccessKey, c.SecretKey, c.Region, hexSHA256(body), c.clock())
+	signV4(req, "/"+c.Bucket, c.AccessKey, c.SecretKey, c.Region, hexSHA256(body), c.clock(), nil)
 
 	resp, err := c.httpClient().Do(req)
 	if err != nil {
@@ -239,6 +239,25 @@ func (c *Client) Put(ctx context.Context, name string, b []byte) error {
 	return nil
 }
 
+// PutRedirect uploads an object that also carries an S3 website redirect to target. The body
+// (a meta-refresh stub) is still stored, so the plain REST endpoint serves it; the S3 *website*
+// endpoint returns a 301 to target instead. No-op upgrade on stores that ignore the header
+// (R2, MinIO without website hosting).
+func (c *Client) PutRedirect(ctx context.Context, name, target string, b []byte) error {
+	resp, err := c.doSigned(ctx, http.MethodPut, c.objectPath(name), b,
+		map[string]string{"x-amz-website-redirect-location": target})
+	if err != nil {
+		return err
+	}
+	defer drain(resp)
+	if resp.StatusCode/100 != 2 {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("s3 put-redirect %s: %s: %s", name, resp.Status, strings.TrimSpace(string(msg)))
+	}
+	c.log("put-redirect", name, "to", target)
+	return nil
+}
+
 // Delete removes an object; a missing object (404) is not an error. It satisfies
 // publish.FileWriter.Delete.
 func (c *Client) Delete(ctx context.Context, name string) error {
@@ -266,6 +285,12 @@ func (c *Client) objectPath(key string) string { return "/" + c.Bucket + "/" + e
 // do builds, signs and sends a request to an already-encoded path. A non-nil body is sent with
 // its SHA-256 and a content type inferred from the path; a nil body signs as empty.
 func (c *Client) do(ctx context.Context, method, encodedPath string, body []byte) (*http.Response, error) {
+	return c.doSigned(ctx, method, encodedPath, body, nil)
+}
+
+// doSigned is do with extra x-amz-* headers that must be part of the signature (e.g. a website
+// redirect). extra keys are lower-case.
+func (c *Client) doSigned(ctx context.Context, method, encodedPath string, body []byte, extra map[string]string) (*http.Response, error) {
 	hash := emptyPayloadHash
 	var r io.Reader
 	if body != nil {
@@ -282,7 +307,7 @@ func (c *Client) do(ctx context.Context, method, encodedPath string, body []byte
 			req.Header.Set("Content-Type", ct)
 		}
 	}
-	signV4(req, encodedPath, c.AccessKey, c.SecretKey, c.Region, hash, c.clock())
+	signV4(req, encodedPath, c.AccessKey, c.SecretKey, c.Region, hash, c.clock(), extra)
 	return c.httpClient().Do(req)
 }
 

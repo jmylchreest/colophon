@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 )
@@ -14,9 +15,12 @@ const emptyPayloadHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599
 
 // signV4 adds an AWS Signature Version 4 Authorization header to req for the S3 service.
 // canonicalURI is the already-encoded request path (it must match what the server sees);
-// payloadHash is the hex SHA-256 of the body. R2 uses region "auto". Only host, x-amz-date
-// and x-amz-content-sha256 are signed; any other header (e.g. Content-Type) rides unsigned.
-func signV4(req *http.Request, canonicalURI, accessKey, secretKey, region, payloadHash string, now time.Time) {
+// payloadHash is the hex SHA-256 of the body. R2 uses region "auto". host, x-amz-date and
+// x-amz-content-sha256 are always signed; any non-x-amz header (e.g. Content-Type) rides
+// unsigned. Additional x-amz-* headers must be signed (AWS rejects unsigned x-amz-* headers),
+// so callers that set one (e.g. x-amz-website-redirect-location) pass it in extra — keys lower
+// case — and it is set on the request and included in the signature.
+func signV4(req *http.Request, canonicalURI, accessKey, secretKey, region, payloadHash string, now time.Time, extra map[string]string) {
 	amzDate := now.UTC().Format("20060102T150405Z")
 	dateStamp := now.UTC().Format("20060102")
 	host := req.URL.Host
@@ -24,10 +28,28 @@ func signV4(req *http.Request, canonicalURI, accessKey, secretKey, region, paylo
 	req.Header.Set("X-Amz-Date", amzDate)
 	req.Header.Set("X-Amz-Content-Sha256", payloadHash)
 
-	const signedHeaders = "host;x-amz-content-sha256;x-amz-date"
-	canonicalHeaders := "host:" + host + "\n" +
-		"x-amz-content-sha256:" + payloadHash + "\n" +
-		"x-amz-date:" + amzDate + "\n"
+	// The set of signed headers, keyed lower-case → value, sorted for the canonical form.
+	signed := map[string]string{
+		"host":                 host,
+		"x-amz-content-sha256": payloadHash,
+		"x-amz-date":           amzDate,
+	}
+	for k, v := range extra {
+		k = strings.ToLower(k)
+		signed[k] = v
+		req.Header.Set(k, v)
+	}
+	keys := make([]string, 0, len(signed))
+	for k := range signed {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var ch strings.Builder
+	for _, k := range keys {
+		ch.WriteString(k + ":" + signed[k] + "\n")
+	}
+	signedHeaders := strings.Join(keys, ";")
+	canonicalHeaders := ch.String()
 	canonicalRequest := strings.Join([]string{
 		req.Method,
 		canonicalURI,
