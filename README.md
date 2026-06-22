@@ -2,9 +2,11 @@
 
 > Write it once. Own it forever. Publish anywhere.
 
-A themed Markdown static-site generator with pluggable publishers. Point it at a folder of
-Markdown (or an Obsidian vault), pick a theme, and deploy the rendered site to Cloudflare Pages,
-an S3/R2 bucket, a git branch, or anywhere a command can reach.
+A static site generator **for bloggers** — a simple CLI that turns a folder of Markdown (or an
+Obsidian vault) into a fast, themed blog. Built on a principle of **freedom**: own your words,
+host them anywhere (Cloudflare Pages, an S3/R2 bucket, a git branch, or any command), and
+federate them (RSS/Atom/JSON feeds, IndieWeb microformats) so your writing is never tied to a
+platform.
 
 ## Features
 
