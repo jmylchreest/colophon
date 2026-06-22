@@ -27,6 +27,7 @@ import (
 	"github.com/jmylchreest/colophon/internal/render"
 	"github.com/jmylchreest/colophon/internal/source"
 	"github.com/jmylchreest/colophon/internal/telemetry"
+	"github.com/jmylchreest/colophon/internal/webmention"
 	"github.com/jmylchreest/colophon/markdown"
 )
 
@@ -135,7 +136,8 @@ type page struct {
 	Attachments    []pageAttachment // downloadable files shipped with the post (Downloads block + feeds)
 	HasAttachments bool             // post ships at least one attachment (theme marker + filtering)
 
-	Syndication []string // URLs this post also lives at (manual POSSE / ledger) — u-syndication links
+	Syndication    []string // URLs this post also lives at (manual POSSE / ledger) — u-syndication links
+	WebmentionsOff bool     // post opted out of the responses display (frontmatter webmentions: false)
 
 	Tags       []string
 	Categories []string
@@ -273,6 +275,13 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// author, so they stay per-author rather than site-wide.
 	feedHead := feedDiscoveryLinks(site, formats) + webmentionHead(site)
 	siteLang := defaultLang(site.Lang)
+
+	// Webmention responses display: resolve the mode once, plus where the browser fetches
+	// _mentions/ from and where the fetched cache lives. Per-post wiring happens in the loop.
+	wmMode := webmentionMode(site)
+	mentionsURL := mentionsBaseURL(router, basePath)
+	mentionsDir := webmention.CacheDir(cfg.Root)
+	anyMentions := false
 
 	favicon, err := writeFavicon(write, eng, cfg.Root, site)
 	if err != nil {
@@ -423,11 +432,52 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		for k, v := range seriesVars(&p, basePath) {
 			ctx[k] = v
 		}
+		// Webmention responses (per post). Defaults are the "nothing" state; when the site mode is
+		// active and the post hasn't opted out, expose the data the theme renders. In asset mode the
+		// synced cache is read at build (so a theme may bake it) and emitted as a _mentions/ asset for
+		// the JS path; live mode ships only the receiver descriptor (no build-time data).
+		wmEnabled := wmMode != "disabled" && !p.WebmentionsOff
+		ctx["mentions_enabled"] = wmEnabled
+		ctx["has_mentions"] = false
+		ctx["mentions"] = []map[string]any{}
+		ctx["mentions_html"] = ""
+		ctx["mentions_src"] = ""
+		if wmEnabled {
+			anyMentions = true
+			key := webmention.KeyForURL(p.URL)
+			if wmMode == "asset" {
+				m, err := webmention.LoadCached(mentionsDir, key)
+				if err != nil {
+					return Result{}, err
+				}
+				if len(m.Mentions) > 0 {
+					ctx["has_mentions"] = true
+					ctx["mentions"] = mentionVars(m.Mentions)
+					ctx["mentions_html"] = mentionsHTML(m)
+					data, err := mentionsAssetJSON(m)
+					if err != nil {
+						return Result{}, err
+					}
+					if err := write(mentionsAssetName(key), data); err != nil {
+						return Result{}, err
+					}
+				}
+				ctx["mentions_src"] = mentionsURL + mentionsAssetKey(key) + ".json"
+			}
+		}
 		html, err := eng.Render(templateFor(eng, p.Type), ctx)
 		if err != nil {
 			return Result{}, err
 		}
 		if err := write(p.Out, []byte(html)); err != nil {
+			return Result{}, err
+		}
+	}
+
+	// Ship the shared responses renderer once when any page enables webmentions in a JS mode,
+	// mirroring the player/search assets — themes get responses with just the placeholder markup.
+	if anyMentions && wmMode != "disabled" {
+		if err := write("mentions.js", mentionsJS); err != nil {
 			return Result{}, err
 		}
 	}
@@ -760,6 +810,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		p.HasCode = strings.Contains(html, "<pre><code")
 		p.Tags = fm.Tags
 		p.Syndication = normalizeSyndication(fm.Syndication)
+		p.WebmentionsOff = fm.Webmentions != nil && !*fm.Webmentions
 		p.Categories = fm.Categories
 		p.Author = fm.Author
 		p.Persona = fm.Persona

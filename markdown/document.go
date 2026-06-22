@@ -105,6 +105,10 @@ type Frontmatter struct {
 	Syndicate   []string `yaml:"syndicate,omitempty"`
 	Syndication []string `yaml:"syndication,omitempty"`
 
+	// Webmentions opts a post out of the responses display when the site mode is active
+	// (nil = default on; false = no placeholder/data for this post).
+	Webmentions *bool `yaml:"webmentions,omitempty"`
+
 	// SEO is optional search/social metadata. Every field has a single rendering effect
 	// (canonical/robots/Open Graph/Twitter/JSON-LD), so it is also the precise target an
 	// AI skill fills in. Absent fields fall back to title/description/tags/date/persona.

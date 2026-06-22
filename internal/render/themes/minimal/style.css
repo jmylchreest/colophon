@@ -23,3 +23,12 @@ blockquote { border-left: 3px solid rgba(127,127,127,.4); margin: 0; padding-lef
 
 /* speech markup: <notts>/<tts> are transparent for layout */
 notts, tts { display: contents; }
+
+/* Webmention responses (baked, no JS) */
+.responses { margin: 2rem 0; }
+.responses ul { list-style: none; padding: 0; margin: 0; }
+.response-faces { display: flex; flex-wrap: wrap; gap: .3rem; }
+.response-faces .u-photo { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; }
+.response-replies li { padding: .6rem 0; border-top: 1px solid rgba(127,127,127,.2); }
+.response-replies .p-name { font-weight: 600; }
+.response-perma { font-size: .85rem; opacity: .7; }

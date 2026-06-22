@@ -100,3 +100,16 @@ pre.mermaid { text-align: center; background: none; }
 
 /* speech markup: <notts>/<tts> are transparent for layout */
 notts, tts { display: contents; }
+
+/* Webmention responses: a facepile of likes/reposts + reply cards (mentions.js / baked) */
+.responses { margin: 2rem 0; }
+.responses ul { list-style: none; padding: 0; margin: 0; }
+.response-faces { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; }
+.response-faces .response > a { width: 2.2rem; height: 2.2rem; border-radius: 50%; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; font-size: .8rem; background: rgba(127,127,127,.15); text-decoration: none; }
+.response-faces .u-photo { width: 2.2rem; height: 2.2rem; object-fit: cover; }
+.response-replies li { display: grid; grid-template-columns: 2.2rem 1fr; gap: .2rem .6rem; padding: .8rem 0; border-top: 1px solid rgba(127,127,127,.18); }
+.response-replies .p-author { grid-row: 1 / span 3; }
+.response-replies .u-photo { width: 2.2rem; height: 2.2rem; border-radius: 50%; object-fit: cover; }
+.response-replies .p-name { font-weight: 600; }
+.response-replies .p-content { margin: .15rem 0; }
+.response-perma { font-size: .85rem; opacity: .7; }

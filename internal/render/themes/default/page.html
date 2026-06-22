@@ -29,6 +29,8 @@
 {{ attachments_html|safe }}
 {{ syndication_html|safe }}
 </article>
+{# Webmention responses: sibling of .e-content (never read by TTS). asset mode bakes mentions_html; mentions.js refreshes/populates. #}
+{% if mentions_enabled %}<section class="responses" data-mentions="{{ mentions_src }}" aria-label="Responses">{{ mentions_html|safe }}</section>{% endif %}
 </main>
 <footer class="site-footer">Built with <a href="https://github.com/jmylchreest/colophon">colophon</a></footer>
 
@@ -57,6 +59,7 @@ document.addEventListener('DOMContentLoaded', function () {
 {% if has_mermaid %}
 <script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({ startOnLoad: true })"></script>
 {% endif %}
+{% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}
 {% if glossary_head %}{{ glossary_head|safe }}{% endif %}
 {% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>

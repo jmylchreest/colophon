@@ -98,8 +98,18 @@ type IndieWeb struct {
 }
 
 type WebmentionConf struct {
-	Receiver       string `yaml:"receiver,omitempty"`
-	BridgyBackfeed bool   `yaml:"bridgy_backfeed,omitempty"`
+	Receiver       string             `yaml:"receiver,omitempty"` // advertised <link rel="webmention">
+	Driver         string             `yaml:"driver,omitempty"`   // reader driver for received mentions; default jf2
+	Token          string             `yaml:"token,omitempty"`    // read-API token, via {env:VAR}; never a literal
+	Display        *WebmentionDisplay `yaml:"display,omitempty"`
+	BridgyBackfeed bool               `yaml:"bridgy_backfeed,omitempty"`
+}
+
+// WebmentionDisplay selects how received mentions reach the page: live (browser → receiver
+// directly), asset (browser → our published _mentions/, also bakeable at build), or disabled
+// (nothing shipped). Default disabled. See docs/design/webmention.md.
+type WebmentionDisplay struct {
+	Mode string `yaml:"mode,omitempty"`
 }
 
 type Fediverse struct {
