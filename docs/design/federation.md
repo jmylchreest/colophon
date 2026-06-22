@@ -2,7 +2,7 @@
 
 > Status: **substrate shipped, the rest designed.** Built: microformats2 (h-entry/h-card/h-feed),
 > `rel=me`, RSS/Atom/JSON feeds, and `aliases` redirects (URL stability). Webmention is detailed in
-> [webmention.md](webmention.md); this is the umbrella — the posture, the two provider abstractions,
+> [webmention.md](webmention.md); this is the umbrella — the posture, the reader/syndicator abstractions,
 > POSSE, WebSub, and the cross-cutting concerns. No POSSE/WebSub code yet. Relates to PLAN §10.
 
 Goal: let a colophon blog participate fully in the social web — be followable, get replies/likes
@@ -21,19 +21,21 @@ emit standards and run small, decoupled senders.
 
 ## Abstractions only where mechanisms diverge
 
-colophon already uses "interface + driver/provider + config" for publishers (`internal/publish`)
-and generation (`internal/generate`). Federation reuses the same pattern in exactly **two** places —
-the non-standardised ones — and nowhere else.
+colophon has two existing naming conventions, split by *shape*: a **list of pluggable
+destinations** uses `driver` (publishers and sources are both `{id, driver, settings}`), while the
+**single external service that produces/serves content** for a modality uses `provider`
+(generation). Federation adds one of each — and matches the convention by shape:
 
-### 1. Reader provider — reading webmentions back
+### 1. Reader (`provider`) — reading webmentions back
 
+There's one receiver per site, so this is the *single-service* shape → `provider`, like generation.
 The Webmention spec standardises *receiving*, not *reading back*, so each receiver exposes a
-different read API. Model it as a `Reader` interface + receiver **profiles** (default
-`webmention.io`/JF2, plus a `custom` JF2 source for self-hosted/compatible), selected by config.
+different read API. Model it as a `Reader` interface + a `provider` (default `webmention.io`/JF2,
+plus a `custom` JF2 source for self-hosted/compatible), selected by config.
 Bridgy *backfeed* arrives in your receiver as ordinary webmentions, so it is read through the same
 Reader — not a separate provider. Full detail in [webmention.md](webmention.md).
 
-### 2. Syndicator provider — POSSE (cross-posting)
+### 2. Syndicator (`driver`) — POSSE (cross-posting)
 
 POSSE matters for anyone with real social reach, and Bridgy-only POSSE gives little control over
 per-network formatting/threading and depends on a relay — so native syndication is a first-class
@@ -41,19 +43,20 @@ goal. Each target is a `Syndicator`:
 
 ```
 type Syndicator interface { Syndicate(ctx, post) (siloURL string, err error) }
-//   providers (mirroring publish drivers / generate providers):
+//   drivers (mirroring publishers/sources):
 //     mastodon – instance URL + access token (env); statuses + media API
 //     bluesky  – handle + app password (env); AT-proto createRecord + blob upload
 //     bridgy   – POST to brid.gy/publish, parse the created silo URL from the response
 //     command  – run a user command; stdout = silo URL (empty stdout = fire-and-forget webhook)
 ```
 
-Each entry is `{ id, provider, …provider fields }` — the same shape as a publisher
-(`id` + `driver`) or a generation `provider`. The `provider` is the concrete mechanism
-(`mastodon`, `bluesky`, `bridgy`, `command`); `id` is an arbitrary handle that `syndicate:`
-(per-env and per-post) references. A site may configure **many** syndicators (the `syndication:`
-list, like the publishers list). Bridgy is simply `provider: bridgy` with a `network:` field naming
-the silo to publish to — not a special "via".
+Syndication is the *list-of-destinations* shape, so it uses **`driver`** — each entry is
+`{ id, driver, …settings }`, byte-for-byte the `PublisherConfig`/`SourceConfig` shape (`id` +
+`driver` + remaining settings). `driver` is the concrete mechanism (`mastodon`, `bluesky`,
+`bridgy`, `command`); `id` is an arbitrary handle that `syndicate:` (per-env and per-post)
+references. A site may configure **many** syndicators (the `syndication:` list, like the publishers
+list). Bridgy is simply `driver: bridgy` with a `network:` field naming the silo to publish to —
+not a special "via". (It really is "publishers, for silos.")
 
 **The `command` syndicator is also a publish webhook.** Mirroring the `command` *publisher*, it
 runs a user-defined command per post with interpolated placeholders (`{url}` canonical, `{title}`,
@@ -70,11 +73,11 @@ a **fire-and-forget publish webhook**. No separate hook system — the same inte
   Reader. **Not modeled** — it's invisible infrastructure.
 - *POSSE (outbound):* Bridgy does **not** auto-publish new posts, so automating cross-posting means
   colophon **actively** POSTs to `brid.gy/publish` and records the returned silo URL. That's an
-  explicit syndication action → it's a `Syndicator` provider like the rest. (Implementation note:
-  Bridgy verifies the source links to `brid.gy/publish/{silo}`, so the provider includes that link
+  explicit syndication action → it's a `Syndicator` driver like the rest. (Implementation note:
+  Bridgy verifies the source links to `brid.gy/publish/{silo}`, so the driver includes that link
   in the source it sends.)
 
-So `provider: bridgy` buys cross-posting to networks without a native provider (or without holding
+So `driver: bridgy` buys cross-posting to networks without a native driver (or without holding
 their API tokens yourself), at the cost of per-network formatting control.
 
 Syndication runs as a **post-publish step** (`colophon syndicate`, after the canonical URL is live),
@@ -166,11 +169,11 @@ sites:
         webmention:
           endpoint: https://webmention.io/blog.example.com/webmention   # advertised rel=webmention
           source:   https://webmention.io/api/mentions.jf2              # read API (JF2 reader)
-      syndication:                             # a list — many syndicators per site (id + provider + fields)
-        - { id: mastodon, provider: mastodon, instance: https://hachyderm.io }   # token from env MASTODON_TOKEN
-        - { id: bluesky,  provider: bluesky,  handle: me.bsky.social }           # app password from env
-        - { id: discord,  provider: command,  command: "curl -sf -X POST $DISCORD_WEBHOOK -d @{json}" }  # webhook: no stdout → fire-and-forget
-        - { id: twitter,  provider: bridgy,   network: twitter }                 # via brid.gy/publish/twitter
+      syndication:                             # a list — many syndicators per site (id + driver + settings)
+        - { id: mastodon, driver: mastodon, instance: https://hachyderm.io }   # token from env MASTODON_TOKEN
+        - { id: bluesky,  driver: bluesky,  handle: me.bsky.social }           # app password from env
+        - { id: discord,  driver: command,  command: "curl -sf -X POST $DISCORD_WEBHOOK -d @{json}" }  # webhook: no stdout → fire-and-forget
+        - { id: twitter,  driver: bridgy,   network: twitter }                 # via brid.gy/publish/twitter
 
 environments:
   - name: production
@@ -194,7 +197,7 @@ ever post.)
   ping, webmention send. Unlocks Bridgy + Bridgy Fed + instant feeds with little stateful code.
 - **Tier 2 — receive/display:** webmention `fetch` + `_mentions/` assets ([webmention.md](webmention.md)).
 - **Tier 3 — POSSE:** the `Syndicator` abstraction + sidecar ledger + `colophon syndicate`, with
-  `bridgy`, `mastodon`, `bluesky`, `command` providers and per-network formatting.
+  `bridgy`, `mastodon`, `bluesky`, `command` drivers and per-network formatting.
 
 ## Out of scope
 
