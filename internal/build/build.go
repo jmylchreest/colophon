@@ -27,6 +27,7 @@ import (
 	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/render"
 	"github.com/jmylchreest/colophon/internal/source"
+	"github.com/jmylchreest/colophon/internal/syndicate"
 	"github.com/jmylchreest/colophon/internal/telemetry"
 	"github.com/jmylchreest/colophon/internal/webmention"
 	"github.com/jmylchreest/colophon/markdown"
@@ -283,6 +284,12 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	mentionsURL := mentionsBaseURL(router, basePath)
 	mentionsDir := webmention.CacheDir(cfg.Root)
 	anyMentions := false
+	// The syndication ledger feeds u-syndication: a post's recorded silo URLs render as
+	// "Also posted on…" alongside any manual syndication: frontmatter. Missing ledger → nil.
+	synLedger, _, synErr := syndicate.LoadLedger(cfg.Root)
+	if synErr != nil {
+		synLedger = nil
+	}
 	// In live mode the browser fetches the receiver's read API directly; resolve it once.
 	var wmReadEndpoint string
 	if wmMode == "live" {
@@ -430,9 +437,9 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"attachments":      attachmentVars(p.Attachments),
 			"attachments_html": attachmentsHTML(p.Attachments),
 			"has_attachments":  p.HasAttachments,
-			"syndication":      p.Syndication,
-			"syndication_html": syndicationHTML(p.Syndication),
-			"has_syndication":  len(p.Syndication) > 0,
+			"syndication":      pageSyndication(p, synLedger),
+			"syndication_html": syndicationHTML(pageSyndication(p, synLedger)),
+			"has_syndication":  len(pageSyndication(p, synLedger)) > 0,
 			"tags":             tagLinks(p.Tags, basePath),
 			"category":         pageCategory(p),
 			"read_time":        readingTime(p.HTML),

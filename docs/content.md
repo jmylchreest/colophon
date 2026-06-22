@@ -40,7 +40,9 @@ All fields are optional unless noted.
 | `audio_file` | Attach a pre-recorded audio file (a path or `[[embed]]`) instead of generating one — no AI. Wins over `audio`. |
 | `audio_voice` | Override the reading voice id (generated audio only); else the author's/persona's `voice`, else the site default. |
 | `attachments` | Downloadable files shipped with the post (scripts, archives, datasets, PDFs…). A list of paths or `{path, label, feed}` mappings — see [Attachments (downloads)](#attachments-downloads). |
-| `syndication` | URLs where this post also lives (e.g. a Mastodon/Bluesky copy you cross-posted). A list of absolute URLs, rendered as mf2 `u-syndication` "Also posted on…" links. |
+| `syndication` | URLs where this post also lives (e.g. a Mastodon/Bluesky copy you cross-posted). A list of absolute URLs, rendered as mf2 `u-syndication` "Also posted on…" links. The `colophon syndicate` ledger also feeds these automatically. |
+| `syndicate` | POSSE control for `colophon syndicate`: `false` opts this post out; a list (`[mastodon]`) picks a subset of the environment's targets; absent = all of them. |
+| `syndicate_text` | Optional custom blurb for the syndicated copy (else the driver derives one from the title/summary). |
 | `lang` | Per-post language (BCP-47, e.g. `fr`), overriding the site `lang`. Emitted as `<html lang>`. |
 | `glossary` | `false` turns off automatic [glossary](#glossary) decoration for this post; an explicit `<abbr>` still works. |
 | `draft` | `true` keeps the post out of production builds (shown in preview/serve). |

@@ -5,7 +5,21 @@ import (
 	"html"
 	"net/url"
 	"strings"
+
+	"github.com/jmylchreest/colophon/internal/syndicate"
 )
+
+// pageSyndication merges a post's manual syndication: frontmatter with the silo URLs the
+// syndication ledger recorded for it (deduped, frontmatter first), for the u-syndication links.
+func pageSyndication(p page, ledger *syndicate.Ledger) []string {
+	urls := p.Syndication
+	if ledger != nil {
+		if extra := ledger.URLs(strings.Trim(p.URL, "/")); len(extra) > 0 {
+			urls = append(append([]string{}, p.Syndication...), extra...)
+		}
+	}
+	return normalizeSyndication(urls)
+}
 
 // normalizeSyndication trims, drops blanks, and de-duplicates the frontmatter
 // syndication URL list (preserving order). These are absolute URLs where the post

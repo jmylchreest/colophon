@@ -10,19 +10,26 @@ import (
 // posts` (listing, cross-referencing) and slug uniqueness in `colophon new`. It renders
 // nothing; drafts and embargoed posts are included since this is authoring metadata.
 type Entry struct {
-	SourcePath string    `json:"source_path"`
-	Slug       string    `json:"slug"`
-	URL        string    `json:"url"`
-	Title      string    `json:"title"`
-	Type       string    `json:"type"`
-	Author     string    `json:"author,omitempty"`
-	Persona    string    `json:"persona,omitempty"`
-	Tags       []string  `json:"tags,omitempty"`
-	Draft      bool      `json:"draft"`
-	Date       time.Time `json:"date,omitempty"`
+	SourcePath  string    `json:"source_path"`
+	Slug        string    `json:"slug"`
+	URL         string    `json:"url"`
+	Title       string    `json:"title"`
+	Type        string    `json:"type"`
+	Author      string    `json:"author,omitempty"`
+	Persona     string    `json:"persona,omitempty"`
+	Tags        []string  `json:"tags,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Draft       bool      `json:"draft"`
+	Date        time.Time `json:"date,omitempty"`
 	// Predecessor is the raw frontmatter `predecessor:` (slug/filename of the preceding post in a
 	// series), unresolved — tooling (doctor) resolves it against the slug set.
 	Predecessor string `json:"predecessor,omitempty"`
+	// Syndication (POSSE) frontmatter, resolved for `colophon syndicate`: SyndicateOff opts the
+	// post out; SyndicateTargets is the chosen subset of env targets (nil = all); SyndicateText
+	// is an optional custom blurb.
+	SyndicateOff     bool     `json:"syndicate_off,omitempty"`
+	SyndicateTargets []string `json:"syndicate_targets,omitempty"`
+	SyndicateText    string   `json:"syndicate_text,omitempty"`
 }
 
 // Entries gathers every content document across the configured sources and resolves each to
@@ -37,17 +44,21 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 		fm := d.doc.Frontmatter
 		slug := slugFor(d.doc.SourcePath, fm.Slug)
 		out = append(out, Entry{
-			SourcePath:  d.doc.SourcePath,
-			Slug:        slug,
-			URL:         slug + "/",
-			Title:       fm.Title,
-			Type:        resolvePageType(fm),
-			Author:      fm.Author,
-			Persona:     resolvePersona(fm),
-			Tags:        fm.Tags,
-			Draft:       fm.Draft,
-			Date:        fm.Date,
-			Predecessor: fm.Predecessor,
+			SourcePath:       d.doc.SourcePath,
+			Slug:             slug,
+			URL:              slug + "/",
+			Title:            fm.Title,
+			Type:             resolvePageType(fm),
+			Author:           fm.Author,
+			Persona:          resolvePersona(fm),
+			Tags:             fm.Tags,
+			Description:      fm.Description,
+			Draft:            fm.Draft,
+			Date:             fm.Date,
+			Predecessor:      fm.Predecessor,
+			SyndicateOff:     fm.Syndicate.Off,
+			SyndicateTargets: fm.Syndicate.Targets,
+			SyndicateText:    fm.SyndicateText,
 		})
 	}
 	return out, nil

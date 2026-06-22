@@ -62,8 +62,11 @@ func (p PublisherConfig) Merged(overrides map[string]any) PublisherConfig {
 // chooses which publishers to deploy to, whether drafts are included, optional site
 // overrides, and per-publisher setting overrides.
 type Environment struct {
-	Name          string   `yaml:"name"`
-	Publish       []string `yaml:"publish"`
+	Name    string   `yaml:"name"`
+	Publish []string `yaml:"publish"`
+	// Syndicate lists the syndicator ids this environment may POSSE to. Empty = never syndicate,
+	// so preview/draft envs that omit it never post to a silo.
+	Syndicate     []string `yaml:"syndicate,omitempty"`
 	IncludeDrafts bool     `yaml:"include_drafts"`
 	// AllowPublish gates deploys for this environment. Nil/true: deploy normally.
 	// False: require the --allow-publish flag (a safety latch for production).

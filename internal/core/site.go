@@ -77,10 +77,20 @@ type RouteRule struct {
 // Federation toggles feeds and IndieWeb/fediverse features. Deferred to M4; carried
 // here so config validates and round-trips today.
 type Federation struct {
-	Feeds     []string   `yaml:"feeds,omitempty"`
-	IndieWeb  *IndieWeb  `yaml:"indieweb,omitempty"`
-	Fediverse *Fediverse `yaml:"fediverse,omitempty"`
-	WebSub    *WebSub    `yaml:"websub,omitempty"`
+	Feeds       []string         `yaml:"feeds,omitempty"`
+	IndieWeb    *IndieWeb        `yaml:"indieweb,omitempty"`
+	Fediverse   *Fediverse       `yaml:"fediverse,omitempty"`
+	WebSub      *WebSub          `yaml:"websub,omitempty"`
+	Syndication []SyndicatorConf `yaml:"syndication,omitempty"`
+}
+
+// SyndicatorConf configures one POSSE syndicator (driver instance). Like sources/publishers it
+// is {id, driver, settings}: the driver picks the mechanic (command|mastodon|bluesky|bridgy) and
+// Settings carries its options (e.g. command, instance, handle). Tokens come via {env:VAR}.
+type SyndicatorConf struct {
+	ID       string         `yaml:"id"`
+	Driver   string         `yaml:"driver"`
+	Settings map[string]any `yaml:",remain"`
 }
 
 // WebSub advertises one or more WebSub hubs in the feeds (rel="hub") so subscribers

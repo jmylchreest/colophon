@@ -70,6 +70,7 @@ type CLI struct {
 	Search        SearchCmd        `cmd:"" help:"Search content (lexical or semantic)"`
 	Skills        SkillsCmd        `cmd:"" help:"Install colophon's authoring skills into a detected agent harness"`
 	Webmention    WebmentionCmd    `cmd:"" help:"Send webmentions to the sites your live posts link to (run after publish)"`
+	Syndicate     SyndicateCmd     `cmd:"" help:"Cross-post (POSSE) to the environment's configured syndicators"`
 	Sync          SyncCmd          `cmd:"" hidden:"" help:"Pull API sources (notion/hackmd) into content/ (planned)"`
 	Doctor        DoctorCmd        `cmd:"" help:"Validate the project config and report problems"`
 	Env           EnvCmd           `cmd:"" help:"List the environment variables this project uses"`

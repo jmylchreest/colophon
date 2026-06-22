@@ -99,11 +99,13 @@ type Frontmatter struct {
 	Publish      *bool      `yaml:"publish,omitempty"`
 	PublishAfter *time.Time `yaml:"publish_after,omitempty"`
 
-	// Syndicate selects syndication targets (driver ids) for POSSE — Tier 3, not yet read.
-	// Syndication lists URLs where this post already lives elsewhere (manual or, later, the
+	// Syndicate controls POSSE for this post: `false` opts out, a list picks a subset of the
+	// environment's targets, absent = all of them. SyndicateText is an optional custom blurb.
+	// Syndication lists URLs where this post already lives elsewhere (manual or, via the
 	// syndication ledger); each renders as a u-syndication link ("Also posted on…").
-	Syndicate   []string `yaml:"syndicate,omitempty"`
-	Syndication []string `yaml:"syndication,omitempty"`
+	Syndicate     SyndicateChoice `yaml:"syndicate,omitempty"`
+	SyndicateText string          `yaml:"syndicate_text,omitempty"`
+	Syndication   []string        `yaml:"syndication,omitempty"`
 
 	// Webmentions opts a post out of the responses display when the site mode is active
 	// (nil = default on; false = no placeholder/data for this post).
@@ -143,6 +145,28 @@ type Attachment struct {
 	Label       string `yaml:"label,omitempty"`       // link text; defaults to the file name
 	Description string `yaml:"description,omitempty"` // one-line description shown under the label
 	Feed        bool   `yaml:"feed,omitempty"`        // also emit as a feed enclosure/attachment
+}
+
+// SyndicateChoice is a post's `syndicate:` setting: `false` (opt out), a list of syndicator ids
+// (a subset of the environment's targets), or absent (Set=false → default: all env targets).
+type SyndicateChoice struct {
+	Set     bool     // the key appeared in frontmatter
+	Off     bool     // syndicate: false
+	Targets []string // syndicate: [ids]
+}
+
+// UnmarshalYAML accepts a bool (false = opt out; true = default) or a list of ids.
+func (s *SyndicateChoice) UnmarshalYAML(value *yaml.Node) error {
+	s.Set = true
+	if value.Kind == yaml.ScalarNode {
+		var b bool
+		if err := value.Decode(&b); err != nil {
+			return err
+		}
+		s.Off = !b
+		return nil
+	}
+	return value.Decode(&s.Targets)
 }
 
 // UnmarshalYAML accepts either a scalar path or a {path,label,feed} mapping.
