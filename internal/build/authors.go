@@ -31,6 +31,7 @@ type authorGroup struct {
 	avatarStyle string
 	initials    string
 	url         string
+	relMe       string // <link rel="me"> tags for this author's urls, for the author feed page <head>
 	items       []map[string]any
 }
 
@@ -56,6 +57,7 @@ func collectAuthors(cfg *config.Config, pages []page, list []map[string]any, bas
 				avatarStyle: imageStyle(author.AvatarFit, author.AvatarPosition),
 				initials:    initials(author.Name),
 				url:         basePath + "authors/" + id + "/",
+				relMe:       relMeLinks(author.URLs),
 			}
 			byID[id] = g
 			order = append(order, g)
@@ -93,7 +95,8 @@ func writeAuthorPages(write func(string, []byte) error, eng render.Engine, chrom
 	for _, g := range groups {
 		heading := "By " + g.name
 		html, err := chrome.render(eng, heading, g.items, map[string]any{
-			"seo_head": chrome.seoHead("authors/"+g.id+"/", heading, false),
+			"seo_head":  chrome.seoHead("authors/"+g.id+"/", heading, false),
+			"feed_head": chrome.feedHead + g.relMe, // + this author's rel="me" identity links
 		})
 		if err != nil {
 			return err

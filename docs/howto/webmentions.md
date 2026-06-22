@@ -12,9 +12,16 @@ collects them and colophon pulls them in at build/refresh time.
 
 ## Steps
 
-1. **Sign in to [webmention.io](https://webmention.io)** with your domain. It authenticates via
-   IndieAuth using the `rel="me"` links colophon already emits (e.g. to your GitHub/Mastodon), so
-   make sure your author has `urls:` set. webmention.io gives you:
+1. **Sign in to [webmention.io](https://webmention.io)** via IndieAuth, which needs `rel="me"` on the
+   **exact URL you sign in with**, linking *bidirectionally* to a provider it can authenticate
+   (GitHub is the easy path). colophon emits an author's `rel="me"` (all of their `urls:`) in the
+   `<head>` of **their posts and their author feed page**, so:
+   - Sign in with your **author feed page** — `https://example.com/authors/<your-id>/` — not the bare
+     domain (the home page lists all authors, so it has no `rel="me"`).
+   - Make the link **bidirectional**: set your GitHub profile's *website* field to that **same**
+     author-page URL (colophon already emits `rel="me"` → your GitHub from your `urls:`).
+
+   webmention.io then gives you:
    - a receiver endpoint: `https://webmention.io/yourdomain/webmention`
    - an **API token** (for reading your mentions back).
 2. **Configure it** (token via env, never in config):

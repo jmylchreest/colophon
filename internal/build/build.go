@@ -267,9 +267,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	}
 
 	formats := feedFormats(site)
-	// feedHead carries the site-wide <head> discovery links: feed autodiscovery plus
-	// the webmention endpoint (when configured) — both are link-rel hints senders/readers
-	// look for, emitted on every page via the themes' {{ feed_head }}.
+	// feedHead carries the site-wide <head> discovery links, emitted on every page via the
+	// themes' {{ feed_head }}: feed autodiscovery + the webmention endpoint. Author rel="me"
+	// identity links are appended per-page (to posts and author feed pages) from that page's
+	// author, so they stay per-author rather than site-wide.
 	feedHead := feedDiscoveryLinks(site, formats) + webmentionHead(site)
 	siteLang := defaultLang(site.Lang)
 
@@ -369,7 +370,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"base_url":         site.BaseURL,
 			"base_path":        basePath,
 			"permalink":        absURL(site.BaseURL, p.URL),
-			"feed_head":        feedHead,
+			"feed_head":        feedHead + relMeLinks(author.URLs), // + this post author's rel="me"
 			"analytics_head":   analyticsHead(site.Analytics, basePath, &p),
 			"glossary_head":    pageGlossary,
 			"seo_head":         seoHead(site, p, author),

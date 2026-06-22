@@ -10,8 +10,11 @@ you running an ActivityPub server or even having a Mastodon/Bluesky account.
 ## Steps
 
 1. **Publish your site** with colophon as usual. It already emits:
-   - `h-entry`/`h-card`/`h-feed` microformats2, an RSS/Atom/JSON feed, and `rel="me"` on your
-     author links. (Confirm the feed link and an `h-card` are on your home page.)
+   - `h-entry`/`h-card`/`h-feed` microformats2, an RSS/Atom/JSON feed, and `rel="me"` identity
+     links. An author's `rel="me"` (all of their `urls:`) is emitted in the `<head>` of **their
+     posts and their author feed page** (`/authors/<id>/`) — your IndieWeb identity URL is that
+     author page, not the bare domain (the home page lists every author, so it carries no single
+     identity).
 2. **Add a webmention endpoint pointing at Bridgy Fed** so it can receive interactions for you:
    ```yaml
    federation:
