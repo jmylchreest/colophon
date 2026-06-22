@@ -116,7 +116,7 @@ func writeFeeds(write func(string, []byte) error, site core.Site, cfg *config.Co
 		}
 	}
 
-	fs := feed.Site{Title: site.Title, BaseURL: base, Author: feedByline(cfg)}
+	fs := feed.Site{Title: site.Title, BaseURL: base, Author: feedByline(cfg), Hubs: webSubHubs(site)}
 	renderers := map[string]func(feed.Site, []feed.Item) ([]byte, error){
 		"rss": feed.RSS, "atom": feed.Atom, "json": feed.JSON,
 	}
@@ -125,6 +125,7 @@ func writeFeeds(write func(string, []byte) error, site core.Site, cfg *config.Co
 		if !ok {
 			continue
 		}
+		fs.Self = base + "/" + spec.file // rel="self": this format's own URL (WebSub)
 		data, err := renderers[f](fs, items)
 		if err != nil {
 			return fmt.Errorf("render %s feed: %w", f, err)

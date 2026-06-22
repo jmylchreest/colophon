@@ -80,6 +80,14 @@ type Federation struct {
 	Feeds     []string   `yaml:"feeds,omitempty"`
 	IndieWeb  *IndieWeb  `yaml:"indieweb,omitempty"`
 	Fediverse *Fediverse `yaml:"fediverse,omitempty"`
+	WebSub    *WebSub    `yaml:"websub,omitempty"`
+}
+
+// WebSub advertises one or more WebSub hubs in the feeds (rel="hub") so subscribers
+// get real-time push, and is pinged after publish to announce new content. Hubs are
+// public URLs (e.g. https://pubsubhubbub.appspot.com/), not secrets.
+type WebSub struct {
+	Hubs []string `yaml:"hubs,omitempty"`
 }
 
 type IndieWeb struct {

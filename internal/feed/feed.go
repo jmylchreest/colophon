@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,10 @@ type Site struct {
 	Title   string
 	BaseURL string // absolute site root, e.g. https://blog.example.com
 	Author  string // optional byline
+	// Self is this feed's own absolute URL (rel="self"); Hubs are WebSub hub URLs
+	// (rel="hub"). Both are emitted for real-time push discovery when set.
+	Self string
+	Hubs []string
 }
 
 // Item is one syndicated entry. URL is absolute; Content is rendered HTML.
@@ -69,11 +74,33 @@ type rssRoot struct {
 }
 
 type rssChannel struct {
-	Title         string    `xml:"title"`
-	Link          string    `xml:"link"`
-	Description   string    `xml:"description"`
+	Title         string       `xml:"title"`
+	Link          string       `xml:"link"`
+	Description   string       `xml:"description"`
 	LastBuildDate string    `xml:"lastBuildDate,omitempty"`
+	AtomLinks     string    `xml:",innerxml"` // pre-rendered Atom <link rel=self/hub> for WebSub
 	Items         []rssItem `xml:"item"`
+}
+
+// rssAtomLinks renders the WebSub self/hub discovery links for an RSS channel as Atom
+// <link> elements. RSS has no native self/hub link, so the convention is to embed Atom's;
+// the inline xmlns puts each in the Atom namespace without needing a prefix declaration.
+func rssAtomLinks(s Site) string {
+	const ns = `xmlns="http://www.w3.org/2005/Atom"`
+	var b strings.Builder
+	if s.Self != "" {
+		fmt.Fprintf(&b, `<link %s rel="self" type="application/rss+xml" href="%s"/>`, ns, xmlAttr(s.Self))
+	}
+	for _, h := range s.Hubs {
+		fmt.Fprintf(&b, `<link %s rel="hub" href="%s"/>`, ns, xmlAttr(h))
+	}
+	return b.String()
+}
+
+// xmlAttr escapes a string for use in a double-quoted XML attribute (feed URLs can carry
+// & in query strings). Used only for the innerxml-rendered RSS self/hub links above.
+func xmlAttr(s string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;").Replace(s)
 }
 
 type rssItem struct {
@@ -98,7 +125,7 @@ type rssGUID struct {
 
 // RSS renders an RSS 2.0 document.
 func RSS(s Site, items []Item) ([]byte, error) {
-	ch := rssChannel{Title: s.Title, Link: s.BaseURL, Description: s.Title}
+	ch := rssChannel{Title: s.Title, Link: s.BaseURL, Description: s.Title, AtomLinks: rssAtomLinks(s)}
 	if t := updated(items); !t.IsZero() {
 		ch.LastBuildDate = t.UTC().Format(time.RFC1123Z)
 	}
@@ -123,11 +150,11 @@ func RSS(s Site, items []Item) ([]byte, error) {
 // --- Atom 1.0 ---
 
 type atomRoot struct {
-	XMLName xml.Name    `xml:"http://www.w3.org/2005/Atom feed"`
-	Title   string      `xml:"title"`
-	ID      string      `xml:"id"`
-	Updated string      `xml:"updated"`
-	Link    atomLink    `xml:"link"`
+	XMLName    xml.Name    `xml:"http://www.w3.org/2005/Atom feed"`
+	Title      string      `xml:"title"`
+	ID         string      `xml:"id"`
+	Updated    string      `xml:"updated"`
+	Links   []atomLink  `xml:"link"` // rel="alternate" (site) + rel="self"/rel="hub" (WebSub)
 	Author  *atomAuthor `xml:"author,omitempty"`
 	Entries []atomEntry `xml:"entry"`
 }
@@ -164,7 +191,13 @@ func Atom(s Site, items []Item) ([]byte, error) {
 		Title:   s.Title,
 		ID:      s.BaseURL,
 		Updated: stamp(updated(items)),
-		Link:    atomLink{Href: s.BaseURL, Rel: "alternate"},
+		Links:   []atomLink{{Href: s.BaseURL, Rel: "alternate"}},
+	}
+	if s.Self != "" {
+		root.Links = append(root.Links, atomLink{Href: s.Self, Rel: "self", Type: "application/atom+xml"})
+	}
+	for _, h := range s.Hubs {
+		root.Links = append(root.Links, atomLink{Href: h, Rel: "hub"})
 	}
 	if s.Author != "" {
 		root.Author = &atomAuthor{Name: s.Author}
@@ -200,8 +233,15 @@ type jsonRoot struct {
 	Version     string       `json:"version"`
 	Title       string       `json:"title"`
 	HomePageURL string       `json:"home_page_url,omitempty"`
+	FeedURL     string       `json:"feed_url,omitempty"`
 	Authors     []jsonAuthor `json:"authors,omitempty"`
+	Hubs        []jsonHub    `json:"hubs,omitempty"`
 	Items       []jsonItem   `json:"items"`
+}
+
+type jsonHub struct {
+	Type string `json:"type"`
+	URL  string `json:"url"`
 }
 
 type jsonAuthor struct {
@@ -226,9 +266,12 @@ type jsonAttachment struct {
 
 // JSON renders a JSON Feed 1.1 document.
 func JSON(s Site, items []Item) ([]byte, error) {
-	root := jsonRoot{Version: "https://jsonfeed.org/version/1.1", Title: s.Title, HomePageURL: s.BaseURL}
+	root := jsonRoot{Version: "https://jsonfeed.org/version/1.1", Title: s.Title, HomePageURL: s.BaseURL, FeedURL: s.Self}
 	if s.Author != "" {
 		root.Authors = []jsonAuthor{{Name: s.Author}}
+	}
+	for _, h := range s.Hubs {
+		root.Hubs = append(root.Hubs, jsonHub{Type: "WebSub", URL: h})
 	}
 	for _, it := range items {
 		ji := jsonItem{ID: it.URL, URL: it.URL, Title: it.Title, Summary: it.Description, ContentHTML: it.Content}

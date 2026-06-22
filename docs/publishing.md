@@ -335,6 +335,26 @@ becomes a redirect depends on the host:
 So redirects work everywhere; hosts that support server-side rules get a true 301, the rest fall
 back to the (always-emitted) stub. `colophon doctor` warns about alias conflicts before you ship.
 
+## WebSub (real-time feeds)
+
+[WebSub](https://www.w3.org/TR/websub/) lets subscribers get your new posts pushed instantly
+instead of polling. List one or more public hubs and colophon does both halves: it advertises them
+in every feed (`<link rel="hub">` in RSS/Atom, a `hubs` entry in JSON Feed, plus `rel="self"`), and
+**pings them after each successful publish** so the hub re-fetches and fans out to subscribers.
+
+```yaml
+sites:
+  - id: main
+    federation:
+      websub:
+        hubs:
+          - https://pubsubhubbub.appspot.com/   # Google's public hub (or run your own)
+```
+
+The ping is best-effort: it runs only on a real deploy (a public `base_url`, not gated), and a hub
+that's slow or down only logs a `WEBSUB … ping failed` line — it never fails the publish. No hubs
+configured → nothing is advertised or pinged.
+
 ## On-site search
 
 colophon builds a **static search index** at build time — a sharded, content-addressed BM25 index

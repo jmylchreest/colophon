@@ -14,6 +14,7 @@ import (
 	"github.com/jmylchreest/colophon/internal/profiling"
 	"github.com/jmylchreest/colophon/internal/publish"
 	"github.com/jmylchreest/colophon/internal/telemetry"
+	"github.com/jmylchreest/colophon/internal/websub"
 )
 
 // PublishCmd builds and deploys one or more environments. Each --env is built with its
@@ -175,7 +176,35 @@ func (c *PublishCmd) publishEnv(ctx context.Context, root string, cfg *config.Co
 		return err
 	}
 	writeManifests(ctx, cfg, targets, name, siteURL, log)
+	pingWebSubHubs(ctx, cfg, siteURL, log)
 	return nil
+}
+
+// pingWebSubHubs notifies the configured WebSub hubs that the site's feeds changed, after
+// a successful deploy. Best-effort: the feed must be live (so it needs a public siteURL),
+// and a failed ping only logs — it never fails the publish.
+func pingWebSubHubs(ctx context.Context, cfg *config.Config, siteURL string, log *clog.Logger) {
+	if siteURL == "" || len(cfg.Sites) == 0 {
+		return
+	}
+	site := cfg.Sites[0]
+	if site.Federation.WebSub == nil || len(site.Federation.WebSub.Hubs) == 0 {
+		return
+	}
+	feeds := build.FeedURLs(site, siteURL)
+	for _, hub := range site.Federation.WebSub.Hubs {
+		hub = strings.TrimSpace(hub)
+		if hub == "" {
+			continue
+		}
+		for _, topic := range feeds {
+			if err := websub.Ping(ctx, websub.DefaultClient, hub, topic); err != nil {
+				log.Step("WEBSUB", hub, "topic", topic, "ping", "failed", "error", err.Error())
+				continue
+			}
+			log.Detail("WEBSUB", hub, "topic", topic, "ping", "ok")
+		}
+	}
 }
 
 // openTargets opens every publisher the environment deploys to, wiring each a logger if it
