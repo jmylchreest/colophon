@@ -148,12 +148,12 @@ Crucially, in `live` the engine has **no build-time data** — so `has_mentions`
 at build**. The placeholder ships whenever the page is enabled (not gated on a count), and JS fills
 in the count (and hides the section if it resolves to zero). So themes **cannot bake** in `live` mode.
 
-Because each reader speaks its own API, the **JS is parameterised by the reader provider**: the
-provider declares a small **client descriptor** (endpoint URL template, query params, and the
-mapping from its response → our normalised shape). One shared `mentions.js` consumes the descriptor
-and handles any JF2-shaped provider (webmention.io and compatibles); a provider with an exotic API
-may ship its own client module. So *"the fetch JS is provided by the specific driver"* — yes, via
-the descriptor, without forking the renderer per provider.
+Because a reader speaks a specific read API, the **JS is parameterised by the reader driver**: the
+driver declares a small **client descriptor** (endpoint URL template, query params, and the mapping
+from its response → our normalised shape). One shared `mentions.js` consumes the descriptor and
+handles any JF2-shaped endpoint (webmention.io and compatibles — all one `jf2` driver); a service
+with an exotic API would be a different driver shipping its own client module. So *"the fetch JS is
+provided by the specific driver"* — yes, via the descriptor, without forking the renderer per service.
 
 Moderation still applies: the **distilled glob blocklist is shipped to the client** (it's
 spam-hiding, not a secret) and filtered in-browser. Semantic rules can't run client-side (no
@@ -167,7 +167,7 @@ The default is the same placeholder + `mentions.js`, but pointed at *our* server
 `_mentions/<key>.json` on R2. Freshness comes from a scheduled **`webmention publish`** — `fetch` +
 push of **only** the `_mentions/` prefix, **no site build** (see
 [Separate publish pipeline](#separate-publish-pipeline)) — near-realtime to whatever cron cadence you
-pick, with full server-side moderation (glob + semantic), self-hosting, and provider-neutrality.
+pick, with full server-side moderation (glob + semantic), self-hosting, and driver-neutrality.
 
 **Because the synced mentions list already exists at build time in this mode, the engine also exposes
 it to the template** (`mentions`/`mentions_html`/`has_mentions`) so a theme that *wants* to
@@ -186,7 +186,7 @@ Rendering remains a **template responsibility** — the engine only **exposes th
 | `has_mentions` | unknown at build → `false` (JS fills count) | accurate (from synced list) | `false` |
 | `mentions` | empty (no build-time data) | structured `[{type, author{name,url,photo}, url, content, published}]` — bake your own | empty |
 | `mentions_html` | empty | engine-rendered drop-in block (empty when none) | empty |
-| `mentions_src` | provider client-descriptor endpoint | our `_mentions/<key>.json` | unset |
+| `mentions_src` | driver client-descriptor endpoint | our `_mentions/<key>.json` | unset |
 | `mentions_enabled` | `true` unless page opted out | `true` unless page opted out | `false` |
 
 Bundled themes drop the placeholder + `mentions.js` for the JS modes; `minimal` (no-JS) uses
@@ -344,7 +344,7 @@ sites:
         webmention:
           receiver: https://webmention.io/blog.example.com/webmention  # the rel=webmention endpoint
           # token read from env, e.g. WEBMENTION_IO_TOKEN, never written here
-          provider: jf2                # reader provider (read API + client descriptor); default jf2
+          driver: jf2                  # reader driver (read API + client descriptor); default jf2
           display:
             mode: asset                # live | asset | disabled   (see Display)
           # blocklist lives in .colophon/webmention-block.yml (committed), not inline
@@ -373,7 +373,7 @@ is configured (the discovery tag senders look for).
    *may* bake it (baking is a theme capability within `asset`, not a mode); `disabled` = nothing
    ships, zero counts, page toggle ignored. Per-page opt-out via `webmentions: false`. The engine
    exposes `mentions`/`mentions_html`/`has_mentions`/`mentions_src`/`mentions_enabled`; the theme
-   renders. `live` mode's fetch JS is parameterised by the **reader provider's client descriptor**.
+   renders. `live` mode's fetch JS is parameterised by the **reader driver's client descriptor**.
 4b. **Moderation is a declarative, committed blocklist** of glob rules over mention attributes
    (`.colophon/webmention-block.yml`), re-applied every `fetch` (and shipped to the client in `live`
    mode). Future **semantic** rules run server-side; a **`moderate-mentions` skill** distills
@@ -410,15 +410,15 @@ is configured (the discovery tag senders look for).
 
 ## Files to create (when built)
 
-- `internal/webmention/` — endpoint discovery + sender (sent-cache) + reader **provider** (server
+- `internal/webmention/` — endpoint discovery + sender (sent-cache) + reader **driver** (server
   fetch **+ client descriptor**) + normaliser + the **blocklist filter pipeline**.
 - `internal/cli/webmention.go` — the `webmention {send,fetch,publish}` command group; `publish`
   supports the incremental (changed-mention-posts-only) re-render for `baked`.
 - build: expose `mentions`/`mentions_html`/`has_mentions`/`mentions_src` to templates, emit
-  `_mentions/` assets + the `<link rel="webmention">` head tag; in `live` mode emit the provider
+  `_mentions/` assets + the `<link rel="webmention">` head tag; in `live` mode emit the driver
   client descriptor + the distilled blocklist for client-side filtering.
 - `internal/render/themes/*/…` — a `data-mentions` placeholder + engine-emitted `mentions.js`
-  (parameterised by the provider descriptor; applies glob blocklist in `live`) and a pongo-baked
+  (parameterised by the driver descriptor; applies glob blocklist in `live`) and a pongo-baked
   block (text themes), kept outside the content/`e-content` element.
 - `contrib/skills/` (+ wiring) — a `moderate-mentions` skill that flags spam/abuse and distills
   confirmed cases into blocklist rules.

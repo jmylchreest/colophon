@@ -382,7 +382,7 @@ the engine-emitted `mentions.js` refresh it (or, in `live` mode, populate it):
 ```
 
 With JS off (and `asset` mode) the baked `mentions_html` still shows; with JS on, `mentions.js` reads
-`data-mentions` and renders/refreshes. `mentions.js` is parameterised per reader provider, so the
+`data-mentions` and renders/refreshes. `mentions.js` is parameterised per reader driver, so the
 same markup works across receivers.
 
 **Build your own from the structured list** (`asset` mode), e.g. to restyle or split by type:

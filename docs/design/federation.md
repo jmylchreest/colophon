@@ -26,14 +26,14 @@ destinations** uses `driver` (publishers and sources are both `{id, driver, sett
 **single external service that produces/serves content** for a modality uses `provider`
 (generation). Federation adds one of each — and matches the convention by shape:
 
-### 1. Reader (`provider`) — reading webmentions back
+### 1. Reader (`driver`) — reading webmentions back
 
 There's one receiver per site, so this is the *single-service* shape → `provider`, like generation.
 The Webmention spec standardises *receiving*, not *reading back*, so each receiver exposes a
-different read API. Model it as a `Reader` interface + a `provider` (default `webmention.io`/JF2,
+different read API. Model it as a `Reader` interface + a `driver` (default `jf2`,
 plus a `custom` JF2 source for self-hosted/compatible), selected by config.
 Bridgy *backfeed* arrives in your receiver as ordinary webmentions, so it is read through the same
-Reader — not a separate provider. Full detail in [webmention.md](webmention.md).
+Reader driver — not a separate abstraction. Full detail in [webmention.md](webmention.md).
 
 ### 2. Syndicator (`driver`) — POSSE (cross-posting)
 

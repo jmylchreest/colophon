@@ -30,7 +30,7 @@ collects them and colophon pulls them in at build/refresh time.
      indieweb:
        webmention:
          receiver: https://webmention.io/yourdomain/webmention  # emitted as <link rel="webmention"> (shipped)
-         provider: jf2                                          # read API shape (planned)
+         driver: jf2                                            # reader driver (read API); planned
          display:
            mode: asset                                          # live | asset | disabled (planned)
    # export WEBMENTION_IO_TOKEN=...   (CI secret)
@@ -58,6 +58,6 @@ collects them and colophon pulls them in at build/refresh time.
 ## Notes
 
 - Self-hosting: webmention.io is open source, or use a JF2-compatible receiver — point `source:` at
-  its API (`provider: jf2`).
+  its API (`driver: jf2`).
 - Privacy/spam: a bl[ock]list and avatar caching are part of the design; treat displayed third-party
   content accordingly.
