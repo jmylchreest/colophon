@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -42,6 +43,32 @@ func postJSON(ctx context.Context, url, bearer string, body, out any) error {
 	if out != nil {
 		if err := json.Unmarshal(data, out); err != nil {
 			return fmt.Errorf("decode %s: %w", url, err)
+		}
+	}
+	return nil
+}
+
+// postForm POSTs form values (application/x-www-form-urlencoded), requests JSON, and decodes a
+// 2xx response into out (nil to ignore) — for APIs like Bridgy's publish endpoint.
+func postForm(ctx context.Context, endpoint string, form url.Values, out any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("%s → %s: %s", endpoint, resp.Status, truncate(string(data), 240))
+	}
+	if out != nil {
+		if err := json.Unmarshal(data, out); err != nil {
+			return fmt.Errorf("decode %s: %w", endpoint, err)
 		}
 	}
 	return nil

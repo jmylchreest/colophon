@@ -10,7 +10,8 @@ Short, zero-to-published recipes. The design behind them is in
 | [Syndicate with a command](syndicate-command.md) — POSSE to any target | **shipped** (the `command` driver) |
 | [Syndicate to Mastodon](syndicate-mastodon.md) | **shipped** (native `mastodon` driver) |
 | [Syndicate to Bluesky](syndicate-bluesky.md) | **shipped** (native `bluesky` driver) |
+| Syndicate via Bridgy — [no-credentials POSSE](../syndication.md#bridgy--let-bridgy-post-for-you-no-credentials-in-colophon) | **shipped** (`bridgy` driver) |
 
-> Syndication ships: the harness (ledger, env/per-post gating, `--dry-run`) plus the `command`,
-> `mastodon`, and `bluesky` drivers. The remaining federation piece is the `bridgy` driver
-> (delegated auth) — see [../design/federation.md](../design/federation.md).
+> Syndication ships in full: the harness (ledger, env/per-post gating, `--dry-run`) plus the
+> `command`, `mastodon`, `bluesky`, and `bridgy` drivers. The complete reference (every driver, how
+> each works, when to use which) is [../syndication.md](../syndication.md).

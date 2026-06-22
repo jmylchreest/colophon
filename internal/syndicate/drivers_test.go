@@ -99,11 +99,54 @@ func TestMastodonTextKeepsLink(t *testing.T) {
 	}
 }
 
+func TestBridgySyndicator(t *testing.T) {
+	var gotSource, gotTarget string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		gotSource, gotTarget = r.PostFormValue("source"), r.PostFormValue("target")
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"url":"https://hachyderm.io/@me/999"}`))
+	}))
+	defer srv.Close()
+
+	s, err := Open(core.SyndicatorConf{ID: "bf", Driver: "bridgy", Settings: map[string]any{
+		"network": "mastodon", "endpoint": srv.URL,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	url, err := s.Syndicate(context.Background(), Post{URL: "https://b.example/posts/x/", Title: "Hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if url != "https://hachyderm.io/@me/999" {
+		t.Errorf("bridgy url = %q", url)
+	}
+	if gotSource != "https://b.example/posts/x/" || gotTarget != "https://brid.gy/publish/mastodon" {
+		t.Errorf("bridgy posted source=%q target=%q", gotSource, gotTarget)
+	}
+}
+
+func TestBridgyError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error":"no Bridgy account for this domain"}`))
+	}))
+	defer srv.Close()
+	s, _ := Open(core.SyndicatorConf{ID: "bf", Driver: "bridgy", Settings: map[string]any{"network": "bluesky", "endpoint": srv.URL}})
+	if _, err := s.Syndicate(context.Background(), Post{URL: "https://b/x/"}); err == nil {
+		t.Error("expected error from Bridgy 4xx")
+	}
+}
+
 func TestDriverConfigErrors(t *testing.T) {
 	if _, err := Open(core.SyndicatorConf{ID: "x", Driver: "bluesky", Settings: map[string]any{"handle": "h"}}); err == nil {
 		t.Error("bluesky without app_password should error")
 	}
 	if _, err := Open(core.SyndicatorConf{ID: "x", Driver: "mastodon", Settings: map[string]any{"instance": "https://i"}}); err == nil {
 		t.Error("mastodon without token should error")
+	}
+	if _, err := Open(core.SyndicatorConf{ID: "x", Driver: "bridgy", Settings: map[string]any{}}); err == nil {
+		t.Error("bridgy without network should error")
 	}
 }

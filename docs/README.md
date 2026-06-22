@@ -15,6 +15,8 @@ End-user guides for authoring, theming and publishing a colophon site.
   write-as context (style guide + relevant exemplars) for an AI author.
 - **[Publishing](publishing.md)** — environments vs publishers, credentials, and routing
   assets to an object store.
+- **[Syndication (POSSE)](syndication.md)** — cross-post to Mastodon/Bluesky/anywhere with
+  `colophon syndicate`: the ledger, gating, and the `command`/`mastodon`/`bluesky`/`bridgy` drivers.
 - **[Agent skills](skills.md)** *(design)* — the planned authoring skills (seo, draft, tag,
   social…) and the prompt packs that drive them.
 
