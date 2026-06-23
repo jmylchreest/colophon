@@ -183,3 +183,19 @@ pre.mermaid { background: none; border: none; text-align: center; }
 
 /* speech markup: <notts>/<tts> are transparent for layout */
 notts, tts { display: contents; }
+
+/* Webmention responses (card + facepile + replies) */
+.responses { margin-top: 1.5rem; padding: 1.3rem; border: 1px solid rgba(127,127,127,.25); border-radius: 12px; background: rgba(127,127,127,.05); }
+.responses:empty { display: none; }
+.responses-title { font-weight: 600; font-size: .95rem; margin-bottom: .85rem; }
+.responses ul { list-style: none; padding: 0; margin: 0; }
+.response-faces { display: flex; flex-wrap: wrap; gap: .4rem; }
+.response-faces + .response-replies { margin-top: .8rem; }
+.response-faces .response > a { width: 2rem; height: 2rem; border-radius: 50%; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; font-size: .72rem; background: rgba(127,127,127,.18); text-decoration: none; color: inherit; }
+.response-faces .u-photo { width: 2rem; height: 2rem; object-fit: cover; }
+.response-replies li { padding: .8rem 0; border-top: 1px solid rgba(127,127,127,.18); }
+.response-replies li:first-child { border-top: 0; padding-top: .2rem; }
+.response-replies .p-author { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; color: inherit; text-decoration: none; }
+.response-replies .u-photo { width: 1.75rem; height: 1.75rem; border-radius: 50%; object-fit: cover; }
+.response-replies .p-content { margin: .4rem 0 .25rem; font-size: .93rem; line-height: 1.5; }
+.response-replies .response-perma { font-size: .8rem; opacity: .7; text-decoration: none; }

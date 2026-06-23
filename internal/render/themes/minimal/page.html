@@ -26,7 +26,7 @@
 {{ syndication_html|safe }}
 </article>
 {# Webmention responses, baked (minimal is no-JS): asset-mode mentions_html, sibling of .e-content. #}
-{% if mentions_enabled %}{{ mentions_html|safe }}{% endif %}
+{% if mentions_enabled %}<section class="responses" aria-label="Responses">{{ mentions_html|safe }}</section>{% endif %}
 </main>
 <footer><a href="{{ base_path }}">← {{ site_title }}</a></footer>
 {# minimal is the text-only, no-JS theme: no glossary decorator, just the tiny analytics beacon. #}

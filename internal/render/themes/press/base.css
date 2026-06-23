@@ -252,6 +252,28 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 .note-links a { color: var(--muted); text-decoration: none; }
 .note-links a:hover { color: var(--accent); }
 
+/* ---------- webmention responses (a card below the author box) ---------- */
+.responses { margin-top: 1.25rem; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.4rem; }
+.responses:empty { display: none; }
+.responses-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.9rem; }
+.responses ul { list-style: none; margin: 0; padding: 0; }
+.response-faces { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.response-faces .response > a { display: inline-flex; width: 34px; height: 34px; border-radius: 50%;
+  overflow: hidden; align-items: center; justify-content: center; background: var(--elevated);
+  color: var(--muted); font-size: 0.72rem; text-decoration: none; }
+.response-faces .u-photo { width: 34px; height: 34px; object-fit: cover; }
+.response-faces + .response-replies { margin-top: 0.8rem; }
+.response-replies li { padding: 0.85rem 0; border-top: 1px solid var(--border); }
+.response-replies li:first-child { border-top: 0; padding-top: 0.2rem; }
+.response-replies .p-author { display: inline-flex; align-items: center; gap: 0.5rem;
+  font-weight: 600; color: var(--text); text-decoration: none; }
+.response-replies .p-author:hover { color: var(--accent); }
+.response-replies .u-photo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.response-replies .p-content { margin: 0.4rem 0 0.25rem; color: var(--text); font-size: 0.93rem; line-height: 1.55; }
+.response-replies .response-perma { font-size: 0.8rem; color: var(--muted); text-decoration: none; }
+.response-replies .response-perma:hover { color: var(--accent); text-decoration: underline; }
+
 /* ---------- author avatar strip (topbar) ---------- */
 .authors { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
 .auth-track { display: flex; align-items: center; gap: 0.4rem; overflow-x: auto; scroll-behavior: smooth;

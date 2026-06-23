@@ -111,15 +111,16 @@ func mentionsHTML(m webmention.Mentions) string {
 			replies.WriteString(mentionReply(x))
 		}
 	}
+	// Inner content only — the theme provides the <section class="responses"> wrapper (and the
+	// JS path replaces these same children), so there is no nested section / double box.
 	var b strings.Builder
-	b.WriteString(`<section class="responses" aria-label="Responses">`)
+	b.WriteString(`<div class="responses-title">Responses</div>`)
 	if nFaces > 0 {
 		b.WriteString(`<ul class="response-faces">` + faces.String() + `</ul>`)
 	}
 	if replies.Len() > 0 {
 		b.WriteString(`<ul class="response-replies">` + replies.String() + `</ul>`)
 	}
-	b.WriteString(`</section>`)
 	return b.String()
 }
 

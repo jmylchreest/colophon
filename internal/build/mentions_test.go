@@ -46,7 +46,7 @@ func TestMentionsHTML(t *testing.T) {
 	}}
 	got := mentionsHTML(m)
 	for _, want := range []string{
-		`class="responses"`, `response-faces`, `response-replies`,
+		`class="responses-title"`, `response-faces`, `response-replies`,
 		`class="response like h-cite"`, `u-photo`,
 		`class="p-content">Nice &amp; sharp<`, // content HTML-escaped
 		`Bob &lt;b&gt;`,                       // author name escaped

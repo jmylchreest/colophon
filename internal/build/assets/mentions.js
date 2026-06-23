@@ -83,10 +83,12 @@
   // ---- rendering (text only; never innerHTML for third-party data) --------
 
   function render(el, mentions) {
-    if (!mentions.length) { el.replaceChildren(); return; }
+    if (!mentions.length) { el.replaceChildren(); return; } // empty section → .responses:empty hides it
     const faces = mentions.filter((m) => m.type === "like" || m.type === "repost");
     const replies = mentions.filter((m) => m.type !== "like" && m.type !== "repost");
     const frag = document.createDocumentFragment();
+    const title = elem("div", "responses-title"); title.textContent = "Responses";
+    frag.appendChild(title);
     if (faces.length) frag.appendChild(facepile(faces));
     if (replies.length) frag.appendChild(replyList(replies));
     el.replaceChildren(frag);
