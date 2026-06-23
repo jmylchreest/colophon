@@ -1,0 +1,46 @@
+# Curated silo icon set: glyphs pulled from one or more font packs and merged into a single
+# colophon "silos" woff2. Edit this, then run ./build.py — it fetches the sources (or uses local
+# paths), extracts each named glyph, reassigns it our own codepoint, merges, and writes
+# silos.woff2 + silos.json into `output`.
+#
+# Why multiple sources: no single pack has every mark at the quality/recency we want — e.g.
+# Bluesky/X live in current Font Awesome Brands, while older marks are fine from a Nerd Font.
+
+output = "../../../internal/build/assets"   # where silos.woff2 + silos.json are written
+family = "Colophon Silos"                   # @font-face family name to declare in theme CSS
+upem = 1000                                 # all sources scaled to this units-per-em before merge
+codepoint_start = "F300"                    # our PUA base; silos get sequential codepoints from here
+
+# --- sources: each is a font pack, referenced by id from a [[silo]] below ---------------------
+# Give a local `path` OR a `url` (fetched + cached under .cache/). A current pack is needed for
+# Bluesky/X — point fa-brands at "Font Awesome 6 Brands" (desktop OTF) or a recent Nerd Font.
+
+[sources.nerd]
+path = "/usr/share/fonts/TTF/JetBrainsMonoNerdFontMono-Regular.ttf"
+# url = "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/NerdFontsSymbolsOnly.zip#SymbolsNerdFont-Regular.ttf"
+
+[sources.fa-brands]
+# Download "Font Awesome 6 Brands-Regular-400.otf" (free desktop) and set path, or a direct url.
+# path = "/path/to/Font Awesome 6 Brands-Regular-400.otf"
+url = ""
+
+# --- silos: id is what colophon's host→silo map uses; glyph is a name or U+XXXX in `source` ----
+[[silo]]
+id = "bluesky"
+source = "fa-brands"
+glyph = "bluesky"
+
+[[silo]]
+id = "mastodon"
+source = "nerd"
+glyph = "fa-mastodon"
+
+[[silo]]
+id = "github"
+source = "nerd"
+glyph = "fa-github"
+
+[[silo]]
+id = "x"
+source = "fa-brands"
+glyph = "x-twitter"
