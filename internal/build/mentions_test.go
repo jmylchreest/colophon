@@ -46,11 +46,12 @@ func TestMentionsHTML(t *testing.T) {
 	}}
 	got := mentionsHTML(m)
 	for _, want := range []string{
-		`class="responses-title"`, `response-faces`, `response-replies`,
+		`class="responses-title"`, `response-faces`, `response-list`,
 		`class="response like h-cite"`, `u-photo`,
 		`class="p-content">Nice &amp; sharp<`, // content HTML-escaped
 		`Bob &lt;b&gt;`,                       // author name escaped
-		`dt-published">2026-06-22<`,
+		`datetime="2026-06-22"`,               // raw ISO in the datetime attr
+		`>22 Jun 2026<`,                       // human date rendered
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("mentionsHTML missing %q in:\n%s", want, got)
