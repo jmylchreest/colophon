@@ -263,6 +263,9 @@ func (ar *audioResolver) run(write func(string, []byte) error, now time.Time) er
 		} else {
 			ar.log.Step("AUDIO", ar.jobs[k].kind, r.logArgs...)
 		}
+		for _, w := range r.warns {
+			ar.log.Step("AUDIO", ar.jobs[k].kind, "warn", w)
+		}
 		if r.bytes != nil {
 			if err := write(k, r.bytes); err != nil {
 				return err
@@ -317,7 +320,26 @@ type audioOutcome struct {
 	bytes   []byte
 	logArgs []any
 	detail  bool
+	warns   []string // extra warn lines (e.g. waveform failures), replayed after the main line
 	fatal   error
+}
+
+// computePeaks renders the job's text a second time as raw PCM (colophon carries no MP3
+// decoder, so it asks the provider for samples directly) and reduces it to waveform peaks. It
+// returns an error rather than dropping the waveform silently, so the caller can warn — the
+// published audio is unaffected either way.
+func computePeaks(gen generate.SpeechGenerator, req generate.SpeechRequest) ([]float64, error) {
+	preq := req
+	preq.Format = "pcm"
+	res, err := gen.Generate(context.Background(), preq)
+	if err != nil {
+		return nil, err
+	}
+	pk, ok := peaksFromPCM(res.Bytes)
+	if !ok {
+		return nil, fmt.Errorf("pcm render returned no usable 16-bit samples (%d bytes)", len(res.Bytes))
+	}
+	return pk, nil
 }
 
 func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechGenerator, error), now time.Time) (out audioOutcome) {
@@ -344,6 +366,21 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 			if meta, err := os.ReadFile(j.cache + ".json"); err == nil {
 				j.peaks = parsePeaks(meta) // peaks persisted in the cache sidecar at generation
 			}
+			// Backfill: a cached clip with no waveform (older cache, or a build where the PCM
+			// render failed) can get just its waveform without re-synthesizing the audio — a
+			// PCM-only render, gated on --generate-ai so plain builds never make network calls.
+			if len(j.peaks) == 0 && ar.generateAI && ar.speech != nil && ar.speech.Waveform {
+				if gen, gerr := ensureTTS(); gerr == nil {
+					if pk, perr := computePeaks(gen, j.req); perr != nil {
+						out.warns = append(out.warns, fmt.Sprintf("waveform for %q: %v", path.Base(j.outPath), perr))
+					} else {
+						j.peaks = pk
+						if err := addPeaksToSidecar(j.cache+".json", pk); err != nil {
+							_ = writeAudioSidecar(j.cache, j.req, j.mime, now, pk) // no prior sidecar → write a fresh one
+						}
+					}
+				}
+			}
 			out.bytes, out.detail, out.logArgs = b, true, []any{"cached", path.Base(j.outPath), "bytes", len(b)}
 			return out
 		}
@@ -362,14 +399,13 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 			return out
 		}
 		// Waveform peaks via a PCM render from the same provider (no audio-decoder dependency).
-		// Best-effort: a failure just leaves the player to use its live visualiser.
+		// A failure leaves the player to use its live visualiser, but is warned (not swallowed)
+		// so a provider that rejects format=pcm is visible rather than a silently missing waveform.
 		if ar.speech != nil && ar.speech.Waveform {
-			preq := j.req
-			preq.Format = "pcm"
-			if pres, perr := gen.Generate(context.Background(), preq); perr == nil {
-				if pk, ok := peaksFromPCM(pres.Bytes); ok {
-					j.peaks = pk
-				}
+			if pk, perr := computePeaks(gen, j.req); perr != nil {
+				out.warns = append(out.warns, fmt.Sprintf("waveform for %q: %v", path.Base(j.outPath), perr))
+			} else {
+				j.peaks = pk
 			}
 		}
 		if err := os.MkdirAll(ar.cacheDir, 0o755); err != nil {
@@ -385,6 +421,26 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 		out.bytes, out.logArgs = res.Bytes, []any{"generated", path.Base(j.outPath), "voice", j.req.Voice, "bytes", len(res.Bytes)}
 		return out
 	}
+}
+
+// addPeaksToSidecar merges waveform peaks into an existing cache sidecar, preserving its other
+// fields (generated time, voice, model…) — used when backfilling a waveform onto already-cached
+// audio. Errors if the sidecar is absent, so the caller can fall back to writing a fresh one.
+func addPeaksToSidecar(path string, peaks []float64) error {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	m["peaks"] = peaks
+	out, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(out, '\n'), 0o644)
 }
 
 func writeAudioSidecar(audioPath string, req generate.SpeechRequest, mime string, now time.Time, peaks []float64) error {
