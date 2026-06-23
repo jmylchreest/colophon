@@ -252,28 +252,43 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 .note-links a { color: var(--muted); text-decoration: none; }
 .note-links a:hover { color: var(--accent); }
 
-/* ---------- webmention responses (a card below the author box) ---------- */
+/* ---------- webmention responses (compact, post-listing style) + syndication ---------- */
 @font-face { font-family: "Colophon Silos"; src: url("silos.woff2") format("woff2"); font-display: swap; }
-.responses { margin-top: 1.25rem; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 14px; padding: 1.4rem; }
+.responses { margin-top: 1.75rem; }
 .responses:empty { display: none; }
-.responses-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.9rem; }
-.responses ul { list-style: none; margin: 0; padding: 0; }
-.response-faces { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.response-faces .response > a { display: inline-flex; width: 34px; height: 34px; border-radius: 50%;
-  overflow: hidden; align-items: center; justify-content: center; background: var(--elevated);
-  color: var(--muted); font-size: 0.72rem; text-decoration: none; }
-.response-faces .u-photo { width: 34px; height: 34px; object-fit: cover; }
-.response-faces + .response-replies { margin-top: 0.8rem; }
-.response-replies li { padding: 0.85rem 0; border-top: 1px solid var(--border); }
-.response-replies li:first-child { border-top: 0; padding-top: 0.2rem; }
-.response-replies .p-author { display: inline-flex; align-items: center; gap: 0.5rem;
-  font-weight: 600; color: var(--text); text-decoration: none; }
-.response-replies .p-author:hover { color: var(--accent); }
-.response-replies .u-photo { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
-.response-replies .p-content { margin: 0.4rem 0 0.25rem; color: var(--text); font-size: 0.93rem; line-height: 1.55; }
-.response-replies .response-perma { font-size: 0.8rem; color: var(--muted); text-decoration: none; }
-.response-replies .response-perma:hover { color: var(--accent); text-decoration: underline; }
+.responses-title { font-family: var(--serif); font-weight: 500; font-size: 1.15rem; margin-bottom: 0.25rem; }
+.responses ul, .responses ol { list-style: none; margin: 0; padding: 0; }
+/* reactions facepile */
+.response-faces { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; padding: 0.7rem 0; }
+.response-faces .response > a { width: 1.9rem; height: 1.9rem; border-radius: 50%; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center; background: var(--elevated);
+  color: var(--muted); font-size: 0.68rem; text-decoration: none; }
+.response-faces .u-photo { width: 100%; height: 100%; object-fit: cover; }
+/* reply rows — mirror .post-row: source+date column, then author + one-line preview */
+.response-list li { position: relative; display: grid; grid-template-columns: 6.5rem 1fr;
+  gap: 1rem; align-items: baseline; padding: 0.7rem 0; border-top: 1px solid var(--border); }
+.response-perma { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--faint);
+  font-size: 0.82rem; text-decoration: none; white-space: nowrap; }
+.response-perma:hover { color: var(--accent); }
+.response-perma .silo { font-family: "Colophon Silos"; font-size: 0.95rem; line-height: 1; }
+.response-body { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.response-body .p-author { display: inline-flex; align-items: center; gap: 0.4rem; flex: 0 0 auto;
+  font-weight: 600; color: var(--text); text-decoration: none; white-space: nowrap; }
+.response-body .p-author:hover { color: var(--accent); }
+.response-body .u-photo { width: 1.4rem; height: 1.4rem; border-radius: 50%; object-fit: cover; align-self: center; }
+.response-body .p-content { color: var(--muted); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) {
+  .response-list li { grid-template-columns: 1fr; gap: 0.2rem; }
+  .response-body { flex-wrap: wrap; }
+  .response-body .p-content { white-space: normal; }
+}
+/* "Also posted on" — labelled chips with the silo mark + network name */
+.post-syndication { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 1.25rem; font-size: 0.85rem; }
+.post-syndication .syn-label { color: var(--muted); }
+.syn-link { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text); text-decoration: none;
+  border: 1px solid var(--border); border-radius: 999px; padding: 0.1rem 0.65rem; transition: all 0.2s; }
+.syn-link:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.syn-link .silo { font-family: "Colophon Silos"; font-size: 0.9rem; line-height: 1; }
 
 /* ---------- author avatar strip (topbar) ---------- */
 .authors { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }

@@ -1,7 +1,6 @@
 package build
 
 import (
-	"fmt"
 	"html"
 	"net/url"
 	"strings"
@@ -58,18 +57,28 @@ func syndicationHost(raw string) string {
 	return strings.TrimPrefix(u.Host, "www.")
 }
 
-// syndicationHTML renders the engine "Also posted on…" block as microformats2
-// u-syndication links — a no-JS drop-in (empty string when there are none), mirroring
-// attachmentsHTML. Themes can use this or build their own from the `syndication` list.
+// syndicationHTML renders the engine "Also posted on…" block as microformats2 u-syndication
+// links — a labelled row of chips, each with the silo's icon + network name (e.g. "Bluesky")
+// when recognised, else a globe + the host. No-JS drop-in; empty string when there are none.
 func syndicationHTML(urls []string) string {
 	if len(urls) == 0 {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString(`<nav class="post-syndication" aria-label="Also posted on">`)
+	b.WriteString(`<span class="syn-label">Also posted on</span>`)
 	for _, u := range urls {
-		fmt.Fprintf(&b, `<a class="u-syndication" rel="syndication" href="%s">%s</a>`,
-			html.EscapeString(u), html.EscapeString(syndicationHost(u)))
+		host := syndicationHost(u)
+		id := siloForHost(host)
+		text := siloLabels[id] // "Bluesky", "GitHub", … ; "Website" for the generic
+		if id == "website" || id == "" {
+			text = host // for unknown hosts the domain is more useful than "Website"
+		}
+		b.WriteString(`<a class="u-syndication syn-link" rel="syndication" href="` + html.EscapeString(u) + `" title="` + html.EscapeString(text) + `">`)
+		if g := siloGlyph[id]; g != 0 {
+			b.WriteString(`<span class="silo" aria-hidden="true">` + string(g) + `</span>`)
+		}
+		b.WriteString(`<span class="syn-name">` + html.EscapeString(text) + `</span></a>`)
 	}
 	b.WriteString(`</nav>`)
 	return b.String()

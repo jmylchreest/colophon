@@ -43,11 +43,15 @@ func TestSyndicationHTML(t *testing.T) {
 	if syndicationHTML(nil) != "" {
 		t.Error("no URLs should render empty")
 	}
-	got := syndicationHTML([]string{"https://hachyderm.io/@me/1", "https://bsky.app/x?a=1&b=2"})
+	got := syndicationHTML([]string{"https://hachyderm.io/@me/1", "https://bsky.app/x?a=1&b=2", "https://blog.example/p"})
 	for _, want := range []string{
-		`class="u-syndication"`, `rel="syndication"`,
-		`href="https://hachyderm.io/@me/1"`, `>hachyderm.io<`,
-		`a=1&amp;b=2`, // query ampersand escaped
+		`syn-label">Also posted on<`,
+		`class="u-syndication syn-link"`, `rel="syndication"`,
+		`href="https://hachyderm.io/@me/1"`, `>Mastodon<`, // known silo → network name
+		`>Bluesky<`,
+		`a=1&amp;b=2`,    // query ampersand escaped
+		`>blog.example<`, // unknown host → bare host text
+		`class="silo"`,   // silo glyph span present
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("syndicationHTML missing %q in:\n%s", want, got)

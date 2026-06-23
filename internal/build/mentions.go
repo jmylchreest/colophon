@@ -160,6 +160,9 @@ func mentionFace(x webmention.Mention) string {
 		html.EscapeString(x.Type), html.EscapeString(link), html.EscapeString(title), inner)
 }
 
+// mentionReply renders one reply as a compact row mirroring the post-listing style: a left column
+// with the source silo mark + date, and a right column with the author and a one-line content
+// preview (the theme truncates it). Whole-content lives in the title for hover.
 func mentionReply(x webmention.Mention) string {
 	name := x.Author.Name
 	if name == "" {
@@ -167,13 +170,8 @@ func mentionReply(x webmention.Mention) string {
 	}
 	var b strings.Builder
 	b.WriteString(`<li class="response reply h-cite">`)
-	b.WriteString(`<a class="p-author h-card u-url" href="` + html.EscapeString(authorLink(x)) + `">`)
-	if x.Author.Photo != "" {
-		b.WriteString(`<img class="u-photo" src="` + html.EscapeString(x.Author.Photo) + `" alt="" loading="lazy">`)
-	}
-	b.WriteString(`<span class="p-name">` + html.EscapeString(name) + `</span></a>`)
-	// Source + date, linking to the original. The silo mark is a glyph from the silos font —
-	// a brand when we recognise the host, else a generic website globe.
+
+	// Left column: source silo + date, linking to the original.
 	if x.URL != "" {
 		glyph, label := siloMark(mentionHost(x))
 		b.WriteString(`<a class="response-perma u-url" href="` + html.EscapeString(x.URL) + `"`)
@@ -191,10 +189,18 @@ func mentionReply(x webmention.Mention) string {
 		}
 		b.WriteString(`</a>`)
 	}
-	if x.Content != "" {
-		b.WriteString(`<div class="p-content">` + html.EscapeString(x.Content) + `</div>`)
+
+	// Right column: author + one-line content preview.
+	b.WriteString(`<div class="response-body">`)
+	b.WriteString(`<a class="p-author h-card u-url" href="` + html.EscapeString(authorLink(x)) + `">`)
+	if x.Author.Photo != "" {
+		b.WriteString(`<img class="u-photo" src="` + html.EscapeString(x.Author.Photo) + `" alt="" loading="lazy">`)
 	}
-	b.WriteString(`</li>`)
+	b.WriteString(`<span class="p-name">` + html.EscapeString(name) + `</span></a>`)
+	if x.Content != "" {
+		b.WriteString(`<span class="p-content" title="` + html.EscapeString(x.Content) + `">` + html.EscapeString(x.Content) + `</span>`)
+	}
+	b.WriteString(`</div></li>`)
 	return b.String()
 }
 

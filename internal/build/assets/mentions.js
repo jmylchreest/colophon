@@ -123,16 +123,7 @@
     const ol = elem("ol", "response-list");
     replies.forEach((m) => {
       const li = elem("li", "response reply h-cite");
-      const who = elem("a", "p-author h-card u-url");
-      who.href = m.author.url || m.url || "#";
-      if (m.author.photo) {
-        const img = elem("img", "u-photo");
-        img.src = m.author.photo; img.alt = ""; img.loading = "lazy";
-        who.appendChild(img);
-      }
-      const nm = elem("span", "p-name"); nm.textContent = m.author.name || "Someone";
-      who.appendChild(nm);
-      li.appendChild(who);
+      // Left column: source silo + date.
       if (m.url) {
         const perma = elem("a", "response-perma u-url"); perma.href = m.url;
         const silo = siloFor(hostOf(m.url) || hostOf(m.author.url));
@@ -150,10 +141,23 @@
         }
         li.appendChild(perma);
       }
-      if (m.content) {
-        const c = elem("div", "p-content"); c.textContent = m.content;
-        li.appendChild(c);
+      // Right column: author + one-line content preview.
+      const body = elem("div", "response-body");
+      const who = elem("a", "p-author h-card u-url");
+      who.href = m.author.url || m.url || "#";
+      if (m.author.photo) {
+        const img = elem("img", "u-photo");
+        img.src = m.author.photo; img.alt = ""; img.loading = "lazy";
+        who.appendChild(img);
       }
+      const nm = elem("span", "p-name"); nm.textContent = m.author.name || "Someone";
+      who.appendChild(nm);
+      body.appendChild(who);
+      if (m.content) {
+        const c = elem("span", "p-content"); c.textContent = m.content; c.title = m.content;
+        body.appendChild(c);
+      }
+      li.appendChild(body);
       ol.appendChild(li);
     });
     return ol;
