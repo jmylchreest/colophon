@@ -99,7 +99,7 @@ func Discover(ctx context.Context, client *http.Client, target string) (string, 
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	final := resp.Request.URL // after redirects
 
 	if ep := endpointFromLinkHeader(resp.Header.Values("Link")); ep != "" {
@@ -131,8 +131,8 @@ func Send(ctx context.Context, client *http.Client, endpoint, source, target str
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("endpoint %s returned %s", endpoint, resp.Status)
 	}

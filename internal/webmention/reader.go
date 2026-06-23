@@ -40,8 +40,9 @@ type jf2Content struct {
 	HTML string `json:"html"`
 }
 
-// JF2ReadURL is the conventional read API for a webmention.io-style receiver. ReadEndpoint
-// derives it from the receiver's host when no explicit source is configured.
+// ReadEndpoint returns the reader's read-API URL: the explicit source if set, else the
+// conventional webmention.io-style /api/mentions.jf2 derived from the receiver's host. "" when
+// neither is configured.
 func ReadEndpoint(source, receiver string) string {
 	if s := strings.TrimSpace(source); s != "" {
 		return s
@@ -112,7 +113,7 @@ func fetchJF2Page(ctx context.Context, client *http.Client, endpoint, domain, to
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
 	if err != nil {
 		return nil, err

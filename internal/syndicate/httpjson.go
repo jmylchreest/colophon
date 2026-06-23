@@ -35,7 +35,7 @@ func postJSON(ctx context.Context, url, bearer string, body, out any) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("%s → %s: %s", url, resp.Status, truncate(string(data), 240))
@@ -61,7 +61,7 @@ func postForm(ctx context.Context, endpoint string, form url.Values, out any) er
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("%s → %s: %s", endpoint, resp.Status, truncate(string(data), 240))

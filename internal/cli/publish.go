@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -363,7 +362,7 @@ func deployAll(ctx context.Context, env *config.Environment, name string, target
 			tel.Publish(t.driver, t.id, "skipped", 0, 0)
 			continue
 		}
-		var tree fs.FS = base
+		tree := base
 		if router.Active() || extraKeep != nil {
 			id := t.id
 			tree = selectFS{base: base, keep: func(p string) bool {

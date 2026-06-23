@@ -99,7 +99,7 @@ func (l *Ledger) Has(key, driver string) bool {
 	return ok
 }
 
-// Record stores a syndication result.
+// Set stores a syndication result (post key → driver → {url, time}).
 func (l *Ledger) Set(key, driver, url, at string) {
 	if l.Entries[key] == nil {
 		l.Entries[key] = map[string]Record{}
