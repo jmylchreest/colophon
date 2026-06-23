@@ -369,19 +369,27 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 			// Backfill: a cached clip with no waveform (older cache, or a build where the PCM
 			// render failed) can get just its waveform without re-synthesizing the audio — a
 			// PCM-only render, gated on --generate-ai so plain builds never make network calls.
+			backfilled := false
 			if len(j.peaks) == 0 && ar.generateAI && ar.speech != nil && ar.speech.Waveform {
 				if gen, gerr := ensureTTS(); gerr == nil {
 					if pk, perr := computePeaks(gen, j.req); perr != nil {
 						out.warns = append(out.warns, fmt.Sprintf("waveform for %q: %v", path.Base(j.outPath), perr))
 					} else {
 						j.peaks = pk
+						backfilled = true
 						if err := addPeaksToSidecar(j.cache+".json", pk); err != nil {
 							_ = writeAudioSidecar(j.cache, j.req, j.mime, now, pk) // no prior sidecar → write a fresh one
 						}
 					}
 				}
 			}
-			out.bytes, out.detail, out.logArgs = b, true, []any{"cached", path.Base(j.outPath), "bytes", len(b)}
+			if backfilled {
+				// Visible (not detail) so a backfill — which makes a network call and changes
+				// what's published — is observable, unlike a plain cache hit.
+				out.bytes, out.logArgs = b, []any{"cached", path.Base(j.outPath), "waveform", "backfilled", "bytes", len(b)}
+			} else {
+				out.bytes, out.detail, out.logArgs = b, true, []any{"cached", path.Base(j.outPath), "bytes", len(b)}
+			}
 			return out
 		}
 		if !ar.generateAI {

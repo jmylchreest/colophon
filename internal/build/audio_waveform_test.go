@@ -125,6 +125,13 @@ func TestWaveformBackfillOnCacheHit(t *testing.T) {
 	if len(j.peaks) != waveformBuckets {
 		t.Fatalf("backfill should compute %d peaks, got %d", waveformBuckets, len(j.peaks))
 	}
+	// A backfill is observable (visible Step, not a hidden detail line) and says so.
+	if out.detail {
+		t.Error("a backfill should log visibly, not at detail level")
+	}
+	if !strings.Contains(strings.Join(toStrings(out.logArgs), " "), "backfilled") {
+		t.Errorf("backfill log should mention it; got %v", out.logArgs)
+	}
 	// Sidecar updated with peaks, other fields preserved.
 	var m map[string]any
 	b, _ := os.ReadFile(j.cache + ".json")
@@ -159,6 +166,14 @@ func TestWaveformNoBackfillWithoutGenerateAI(t *testing.T) {
 	if len(j.peaks) != 0 || len(out.warns) != 0 {
 		t.Errorf("plain build should be inert; peaks=%d warns=%v", len(j.peaks), out.warns)
 	}
+}
+
+func toStrings(args []any) []string {
+	out := make([]string, len(args))
+	for i, a := range args {
+		out[i], _ = a.(string)
+	}
+	return out
 }
 
 func sidecarPeaks(t *testing.T, path string) []float64 {
