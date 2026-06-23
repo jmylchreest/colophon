@@ -9,13 +9,16 @@
   font-display: swap;
 }
 
-.responses { margin-top: 1.75rem; }
+/* A bordered section break (matching the post-foot / post-row dividers) so responses read as
+   their own region rather than floating in the whitespace below the post footer. */
+.responses { margin-top: 2rem; padding-top: 1.75rem; border-top: 1px solid var(--border, rgba(127, 127, 127, 0.18)); }
 .responses:empty { display: none; }
 .responses-title {
   font-family: var(--serif, inherit);
-  font-weight: 600;
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
+  font-weight: 500;
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.75rem;
 }
 .responses ul, .responses ol { list-style: none; margin: 0; padding: 0; }
 
