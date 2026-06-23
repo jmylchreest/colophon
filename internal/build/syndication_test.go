@@ -45,7 +45,7 @@ func TestSyndicationHTML(t *testing.T) {
 	}
 	got := syndicationHTML([]string{"https://hachyderm.io/@me/1", "https://bsky.app/x?a=1&b=2", "https://blog.example/p"})
 	for _, want := range []string{
-		`syn-label">Also posted on<`,
+		`syn-label">Also posted on:<`,
 		`class="u-syndication syn-link"`, `rel="syndication"`,
 		`href="https://hachyderm.io/@me/1"`, `>Mastodon<`, // known silo → network name
 		`>Bluesky<`,

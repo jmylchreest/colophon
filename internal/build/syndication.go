@@ -54,7 +54,7 @@ func syndicationHTML(urls []string) string {
 	}
 	var b strings.Builder
 	b.WriteString(`<nav class="post-syndication" aria-label="Also posted on">`)
-	b.WriteString(`<span class="syn-label">Also posted on</span>`)
+	b.WriteString(`<span class="syn-label">Also posted on:</span>`)
 	for _, u := range urls {
 		host := hostOf(u)
 		id := siloForHost(host)
