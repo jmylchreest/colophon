@@ -189,8 +189,8 @@ func mentionReply(x webmention.Mention) string {
 	var b strings.Builder
 	b.WriteString(`<li class="response reply h-cite">`)
 
-	// Left column: source silo + relative date, linking to the original. data-pop carries the
-	// network + full timestamp for the themed hover tooltip.
+	// Left column: relative date then source silo (right-aligned), linking to the original.
+	// data-pop carries the network + full timestamp for the themed hover tooltip.
 	if x.URL != "" {
 		glyph, label := siloMark(mentionHost(x))
 		var parts []string
@@ -205,12 +205,13 @@ func mentionReply(x webmention.Mention) string {
 			b.WriteString(` data-pop="` + html.EscapeString(pop) + `"`)
 		}
 		b.WriteString(`>`)
+		r := relativeDate(x.Published)
+		if r != "" {
+			b.WriteString(`<time class="dt-published" datetime="` + html.EscapeString(x.Published) + `">` + html.EscapeString(r) + `</time>`)
+		}
 		if glyph != 0 {
 			b.WriteString(`<span class="silo" aria-hidden="true">` + string(glyph) + `</span>`)
-		}
-		if r := relativeDate(x.Published); r != "" {
-			b.WriteString(`<time class="dt-published" datetime="` + html.EscapeString(x.Published) + `">` + html.EscapeString(r) + `</time>`)
-		} else if glyph == 0 {
+		} else if r == "" {
 			b.WriteString(`<span class="response-go" aria-hidden="true">↗</span>`)
 		}
 		b.WriteString(`</a>`)

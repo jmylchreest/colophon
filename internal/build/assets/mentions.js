@@ -129,7 +129,7 @@
     const ol = elem("ol", "response-list");
     replies.forEach((m) => {
       const li = elem("li", "response reply h-cite");
-      // Left column: source silo + relative date; data-pop = network + full timestamp.
+      // Left column: relative date then source silo (right-aligned); data-pop = network + full timestamp.
       if (m.url) {
         const perma = elem("a", "response-perma u-url"); perma.href = m.url;
         const silo = siloFor(hostOf(m.url) || hostOf(m.author.url));
@@ -137,15 +137,15 @@
         if (silo) parts.push(silo.label);
         const fd = fullDate(m.published); if (fd) parts.push(fd);
         if (parts.length) perma.setAttribute("data-pop", parts.join(" · "));
-        if (silo) {
-          const s = elem("span", "silo"); s.setAttribute("aria-hidden", "true"); s.textContent = silo.glyph;
-          perma.appendChild(s);
-        }
         const r = relDate(m.published);
         if (r) {
           const t = elem("time", "dt-published"); t.dateTime = m.published; t.textContent = r;
           perma.appendChild(t);
-        } else if (!silo) {
+        }
+        if (silo) {
+          const s = elem("span", "silo"); s.setAttribute("aria-hidden", "true"); s.textContent = silo.glyph;
+          perma.appendChild(s);
+        } else if (!r) {
           const g = elem("span", "response-go"); g.setAttribute("aria-hidden", "true"); g.textContent = "↗";
           perma.appendChild(g);
         }
