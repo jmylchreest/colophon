@@ -33,6 +33,10 @@ var silosWoff2 []byte
 // _search/. Routed to the asset store alongside _search/ when routing is configured.
 const mentionsBase = "_mentions"
 
+// maxFaces caps the reactions facepile (likes/reposts) so a viral post renders a handful of
+// avatars + a "+N" count rather than thousands. Shared with mentions.js (the live path).
+const maxFaces = 16
+
 // webmentionMode resolves the per-site display mode: "live", "asset", or "disabled" (default).
 func webmentionMode(site core.Site) string {
 	iw := site.Federation.IndieWeb
@@ -112,20 +116,27 @@ func mentionsHTML(m webmention.Mentions) string {
 	}
 	ms := mentionsNewestFirst(m.Mentions)
 	var faces, replies strings.Builder
-	nFaces := 0
+	totalFaces, shownFaces := 0, 0
 	for _, x := range ms {
 		switch x.Type {
 		case "like", "repost":
-			nFaces++
-			faces.WriteString(mentionFace(x))
+			totalFaces++
+			if shownFaces < maxFaces { // cap the facepile so a viral post can't render thousands of avatars
+				faces.WriteString(mentionFace(x))
+				shownFaces++
+			}
 		default: // reply | mention
 			replies.WriteString(mentionReply(x))
 		}
 	}
 	var b strings.Builder
 	b.WriteString(`<div class="responses-title">Responses</div>`)
-	if nFaces > 0 {
-		b.WriteString(`<ul class="response-faces" aria-label="Reactions">` + faces.String() + `</ul>`)
+	if shownFaces > 0 {
+		facesHTML := faces.String()
+		if totalFaces > maxFaces {
+			facesHTML += fmt.Sprintf(`<li class="response-more">+%d</li>`, totalFaces-maxFaces)
+		}
+		b.WriteString(`<ul class="response-faces" aria-label="Reactions">` + facesHTML + `</ul>`)
 	}
 	if replies.Len() > 0 {
 		b.WriteString(`<ol class="response-list">` + replies.String() + `</ol>`)
@@ -171,34 +182,46 @@ func mentionReply(x webmention.Mention) string {
 	var b strings.Builder
 	b.WriteString(`<li class="response reply h-cite">`)
 
-	// Left column: source silo + date, linking to the original.
+	// Left column: source silo + relative date, linking to the original. data-pop carries the
+	// network + full timestamp for the themed hover tooltip.
 	if x.URL != "" {
 		glyph, label := siloMark(mentionHost(x))
-		b.WriteString(`<a class="response-perma u-url" href="` + html.EscapeString(x.URL) + `"`)
+		var parts []string
 		if label != "" {
-			b.WriteString(` title="` + html.EscapeString(label) + `"`)
+			parts = append(parts, label)
+		}
+		if fd := fullDate(x.Published); fd != "" {
+			parts = append(parts, fd)
+		}
+		b.WriteString(`<a class="response-perma u-url" href="` + html.EscapeString(x.URL) + `"`)
+		if pop := strings.Join(parts, " · "); pop != "" {
+			b.WriteString(` data-pop="` + html.EscapeString(pop) + `"`)
 		}
 		b.WriteString(`>`)
 		if glyph != 0 {
 			b.WriteString(`<span class="silo" aria-hidden="true">` + string(glyph) + `</span>`)
 		}
-		if d := shortDate(x.Published); d != "" {
-			b.WriteString(`<time class="dt-published" datetime="` + html.EscapeString(x.Published) + `">` + html.EscapeString(d) + `</time>`)
+		if r := relativeDate(x.Published); r != "" {
+			b.WriteString(`<time class="dt-published" datetime="` + html.EscapeString(x.Published) + `">` + html.EscapeString(r) + `</time>`)
 		} else if glyph == 0 {
 			b.WriteString(`<span class="response-go" aria-hidden="true">↗</span>`)
 		}
 		b.WriteString(`</a>`)
 	}
 
-	// Right column: author + one-line content preview.
-	b.WriteString(`<div class="response-body">`)
+	// Right column: author + one-line content preview (full content in data-pop for the tooltip).
+	b.WriteString(`<div class="response-body"`)
+	if x.Content != "" {
+		b.WriteString(` data-pop="` + html.EscapeString(x.Content) + `"`)
+	}
+	b.WriteString(`>`)
 	b.WriteString(`<a class="p-author h-card u-url" href="` + html.EscapeString(authorLink(x)) + `">`)
 	if x.Author.Photo != "" {
 		b.WriteString(`<img class="u-photo" src="` + html.EscapeString(x.Author.Photo) + `" alt="" loading="lazy">`)
 	}
 	b.WriteString(`<span class="p-name">` + html.EscapeString(name) + `</span></a>`)
 	if x.Content != "" {
-		b.WriteString(`<span class="p-content" title="` + html.EscapeString(x.Content) + `">` + html.EscapeString(x.Content) + `</span>`)
+		b.WriteString(`<span class="p-content">` + html.EscapeString(x.Content) + `</span>`)
 	}
 	b.WriteString(`</div></li>`)
 	return b.String()
@@ -229,13 +252,45 @@ func mentionTime(s string) time.Time {
 	return time.Time{}
 }
 
-// shortDate formats a mention timestamp compactly (e.g. "2 Jan 2006"); "" when unparseable/empty.
-func shortDate(s string) string {
-	if t := mentionTime(s); !t.IsZero() {
+// relativeDate formats a mention timestamp as a compact relative age ("3h", "2d", "5mo", "2y",
+// or "now"); "" when unparseable/empty. Built at render time, so it's as-of-build for baked pages
+// and live for the JS path (which recomputes it client-side).
+func relativeDate(s string) string {
+	t := mentionTime(s)
+	if t.IsZero() {
+		return ""
+	}
+	d := buildNow().Sub(t)
+	switch {
+	case d < time.Minute:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd", int(d.Hours()/24))
+	case d < 365*24*time.Hour:
+		return fmt.Sprintf("%dmo", int(d.Hours()/(24*30)))
+	default:
+		return fmt.Sprintf("%dy", int(d.Hours()/(24*365)))
+	}
+}
+
+// fullDate is the readable absolute timestamp for the tooltip (with time when the source has one).
+func fullDate(s string) string {
+	t := mentionTime(s)
+	if t.IsZero() {
+		return ""
+	}
+	if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 {
 		return t.Format("2 Jan 2006")
 	}
-	return ""
+	return t.Format("2 Jan 2006, 15:04")
 }
+
+// buildNow is the reference instant for relative dates; a var so it stays stable within a build.
+var buildNow = time.Now
 
 // mentionHost is the source host (the silo the mention came from) — the source URL's host, else
 // the author URL's.

@@ -98,14 +98,16 @@
   function isReaction(m) { return m.type === "like" || m.type === "repost"; }
   function mtime(s) { const t = Date.parse(s || ""); return isNaN(t) ? 0 : t; }
 
+  const MAX_FACES = 16; // keep in sync with mentions.go maxFaces
+
   function facepile(faces) {
     const ul = elem("ul", "response-faces");
     ul.setAttribute("aria-label", "Reactions");
-    faces.forEach((m) => {
+    faces.slice(0, MAX_FACES).forEach((m) => {
       const li = elem("li", "response " + m.type + " h-cite");
       const a = elem("a", "p-author h-card u-url");
       a.href = m.author.url || m.url || "#";
-      a.title = ((m.author.name || "") + (m.type === "repost" ? " reposted" : " liked") + " this").trim();
+      a.setAttribute("data-pop", ((m.author.name || "Someone") + (m.type === "repost" ? " reposted" : " liked") + " this").trim());
       if (m.author.photo) {
         const img = elem("img", "u-photo");
         img.src = m.author.photo; img.alt = m.author.name || ""; img.loading = "lazy";
@@ -116,6 +118,10 @@
       li.appendChild(a);
       ul.appendChild(li);
     });
+    if (faces.length > MAX_FACES) {
+      const more = elem("li", "response-more"); more.textContent = "+" + (faces.length - MAX_FACES);
+      ul.appendChild(more);
+    }
     return ul;
   }
 
@@ -123,17 +129,21 @@
     const ol = elem("ol", "response-list");
     replies.forEach((m) => {
       const li = elem("li", "response reply h-cite");
-      // Left column: source silo + date.
+      // Left column: source silo + relative date; data-pop = network + full timestamp.
       if (m.url) {
         const perma = elem("a", "response-perma u-url"); perma.href = m.url;
         const silo = siloFor(hostOf(m.url) || hostOf(m.author.url));
+        const parts = [];
+        if (silo) parts.push(silo.label);
+        const fd = fullDate(m.published); if (fd) parts.push(fd);
+        if (parts.length) perma.setAttribute("data-pop", parts.join(" · "));
         if (silo) {
-          perma.title = silo.label;
           const s = elem("span", "silo"); s.setAttribute("aria-hidden", "true"); s.textContent = silo.glyph;
           perma.appendChild(s);
         }
-        if (m.published) {
-          const t = elem("time", "dt-published"); t.dateTime = m.published; t.textContent = shortDate(m.published);
+        const r = relDate(m.published);
+        if (r) {
+          const t = elem("time", "dt-published"); t.dateTime = m.published; t.textContent = r;
           perma.appendChild(t);
         } else if (!silo) {
           const g = elem("span", "response-go"); g.setAttribute("aria-hidden", "true"); g.textContent = "↗";
@@ -141,8 +151,9 @@
         }
         li.appendChild(perma);
       }
-      // Right column: author + one-line content preview.
+      // Right column: author + one-line content preview (full content in data-pop for the tooltip).
       const body = elem("div", "response-body");
+      if (m.content) body.setAttribute("data-pop", m.content);
       const who = elem("a", "p-author h-card u-url");
       who.href = m.author.url || m.url || "#";
       if (m.author.photo) {
@@ -154,7 +165,7 @@
       who.appendChild(nm);
       body.appendChild(who);
       if (m.content) {
-        const c = elem("span", "p-content"); c.textContent = m.content; c.title = m.content;
+        const c = elem("span", "p-content"); c.textContent = m.content;
         body.appendChild(c);
       }
       li.appendChild(body);
@@ -166,10 +177,25 @@
   // ---- source (silo) detection + date ------------------------------------
 
   function hostOf(u) { try { return new URL(u).host.replace(/^www\./, ""); } catch (_) { return ""; } }
-  function shortDate(s) {
-    const t = Date.parse(s);
-    if (isNaN(t)) return "";
-    return new Date(t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+  // relDate: compact relative age ("3h", "2d", "5mo", "2y", "now"). fullDate: absolute for the tooltip.
+  function relDate(s) {
+    const t = Date.parse(s); if (isNaN(t)) return "";
+    const d = (Date.now() - t) / 1000;
+    if (d < 60) return "now";
+    if (d < 3600) return Math.floor(d / 60) + "m";
+    if (d < 86400) return Math.floor(d / 3600) + "h";
+    if (d < 2592000) return Math.floor(d / 86400) + "d";
+    if (d < 31536000) return Math.floor(d / 2592000) + "mo";
+    return Math.floor(d / 31536000) + "y";
+  }
+  function fullDate(s) {
+    const t = Date.parse(s); if (isNaN(t)) return "";
+    const dt = new Date(t);
+    const base = { day: "numeric", month: "short", year: "numeric" };
+    return (dt.getHours() || dt.getMinutes())
+      ? dt.toLocaleString(undefined, { ...base, hour: "2-digit", minute: "2-digit" })
+      : dt.toLocaleDateString(undefined, base);
   }
 
   const KNOWN_MASTODON = new Set(["hachyderm.io", "fosstodon.org", "mas.to", "mstdn.social",

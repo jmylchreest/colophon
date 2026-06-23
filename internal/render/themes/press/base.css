@@ -257,37 +257,29 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 @font-face { font-family: "Colophon Silos"; src: url("silos.woff2") format("woff2"); font-display: swap; }
 .responses { margin-top: 1.75rem; }
 .responses:empty { display: none; }
-.responses-title { font-family: var(--serif); font-weight: 500; font-size: 1.15rem; margin-bottom: 0.25rem; }
+.responses-title { font-family: var(--serif); font-weight: 500; font-size: 1.15rem; margin-bottom: 0.5rem; }
 .responses ul, .responses ol { list-style: none; margin: 0; padding: 0; }
-/* reactions facepile */
-.response-faces { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; padding: 0.7rem 0; }
-.response-faces .response > a { width: 1.9rem; height: 1.9rem; border-radius: 50%; overflow: hidden;
-  display: inline-flex; align-items: center; justify-content: center; background: var(--elevated);
-  color: var(--muted); font-size: 0.68rem; text-decoration: none; }
-.response-faces .u-photo { width: 100%; height: 100%; object-fit: cover; }
-/* reply rows — mirror .post-row: source+date column, then author + one-line preview */
-.response-list li { position: relative; display: grid; grid-template-columns: auto 1fr;
-  gap: 1rem; align-items: baseline; padding: 0.7rem 0; border-top: 1px solid var(--border); }
-.response-perma { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--faint);
-  font-size: 0.82rem; text-decoration: none; white-space: nowrap; }
+.response-faces { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; padding: 0.6rem 0; }
+.response-faces > * { flex: 0 0 auto; }
+.response-faces .response > a { display: flex; align-items: center; justify-content: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; overflow: hidden; background: var(--elevated); color: var(--muted); font-size: 0.7rem; font-weight: 600; line-height: 1; text-decoration: none; }
+.response-faces .u-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+.response-more { display: flex; align-items: center; height: 1.8rem; padding: 0 0.4rem; font-size: 0.75rem; color: var(--muted); }
+.response-faces + .response-list { margin-top: 0.5rem; }
+.response-list li { position: relative; display: grid; grid-template-columns: auto 1fr; gap: 0.75rem; align-items: center; padding: 0.6rem 0; border-top: 1px solid var(--border); font-size: 0.9rem; }
+.response-perma { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--faint); font-size: 0.8rem; text-decoration: none; white-space: nowrap; }
 .response-perma:hover { color: var(--accent); }
 .response-perma .silo { font-family: "Colophon Silos"; font-size: 0.95rem; line-height: 1; }
-.response-body { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
-.response-body .p-author { display: inline-flex; align-items: center; gap: 0.4rem; flex: 0 0 auto;
-  font-weight: 600; color: var(--text); text-decoration: none; white-space: nowrap; }
+.response-body { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.response-body .p-author { display: inline-flex; align-items: center; gap: 0.4rem; flex: 0 0 auto; font-weight: 600; color: var(--text); text-decoration: none; white-space: nowrap; }
 .response-body .p-author:hover { color: var(--accent); }
-.response-body .u-photo { width: 1.4rem; height: 1.4rem; border-radius: 50%; object-fit: cover; align-self: center; }
-.response-body .p-content { color: var(--muted); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 600px) {
-  .response-list li { grid-template-columns: 1fr; gap: 0.2rem; }
-  .response-body { flex-wrap: wrap; }
-  .response-body .p-content { white-space: normal; }
-}
-/* "Also posted on" — labelled chips with the silo mark + network name */
+.response-body .u-photo { width: 1.4rem; height: 1.4rem; border-radius: 50%; object-fit: cover; }
+.response-body .p-content { color: var(--muted); font-weight: 400; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 600px) { .response-list li { grid-template-columns: 1fr; gap: 0.15rem; } .response-body { flex-wrap: wrap; } .response-body .p-content { white-space: normal; } }
+[data-pop] { position: relative; }
+[data-pop]:hover::after, [data-pop]:focus-visible::after { content: attr(data-pop); position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; max-width: min(26rem, 80vw); white-space: normal; font-size: 0.8rem; line-height: 1.45; font-weight: 400; color: var(--text); background: var(--elevated); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.6rem; box-shadow: 0 8px 24px rgba(0,0,0,0.28); pointer-events: none; }
 .post-syndication { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 1.25rem; font-size: 0.85rem; }
 .post-syndication .syn-label { color: var(--muted); }
-.syn-link { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text); text-decoration: none;
-  border: 1px solid var(--border); border-radius: 999px; padding: 0.1rem 0.65rem; transition: all 0.2s; }
+.syn-link { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 0.1rem 0.65rem; transition: all 0.2s; }
 .syn-link:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .syn-link .silo { font-family: "Colophon Silos"; font-size: 0.9rem; line-height: 1; }
 

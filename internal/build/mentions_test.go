@@ -49,9 +49,9 @@ func TestMentionsHTML(t *testing.T) {
 		`class="responses-title"`, `response-faces`, `response-list`, `response-body`,
 		`class="response like h-cite"`, `u-photo`,
 		`class="p-content"`, `>Nice &amp; sharp<`, // content span + HTML-escaped text
-		`Bob &lt;b&gt;`,         // author name escaped
-		`datetime="2026-06-22"`, // raw ISO in the datetime attr
-		`>22 Jun 2026<`,         // human date rendered
+		`Bob &lt;b&gt;`,                    // author name escaped
+		`datetime="2026-06-22"`,            // raw ISO in the datetime attr
+		`data-pop="Website · 22 Jun 2026"`, // full date in the hover tooltip
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("mentionsHTML missing %q in:\n%s", want, got)
