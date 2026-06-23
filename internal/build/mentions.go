@@ -22,6 +22,13 @@ import (
 //go:embed assets/mentions.js
 var mentionsJS []byte
 
+// silosWoff2 is the curated silo icon font (Bluesky/Mastodon/GitHub/… + a generic website globe),
+// merged from Font Awesome packs by contrib/scripts/silo-font/build.py. Emitted once at the site
+// root and declared @font-face by the themes; the glyph codepoints below mirror its silos.json.
+//
+//go:embed assets/silos.woff2
+var silosWoff2 []byte
+
 // mentionsBase is the output dir (and URL path) the per-post mention JSON lives under, mirroring
 // _search/. Routed to the asset store alongside _search/ when routing is configured.
 const mentionsBase = "_mentions"
@@ -165,23 +172,21 @@ func mentionReply(x webmention.Mention) string {
 		b.WriteString(`<img class="u-photo" src="` + html.EscapeString(x.Author.Photo) + `" alt="" loading="lazy">`)
 	}
 	b.WriteString(`<span class="p-name">` + html.EscapeString(name) + `</span></a>`)
-	// Source + date, linking to the original. The silo mark shows only when we recognise it for
-	// certain; otherwise it's omitted (no generic icon) and just the date/affordance remains.
+	// Source + date, linking to the original. The silo mark is a glyph from the silos font —
+	// a brand when we recognise the host, else a generic website globe.
 	if x.URL != "" {
-		icon, label := siloIcon(mentionHost(x))
+		glyph, label := siloMark(mentionHost(x))
 		b.WriteString(`<a class="response-perma u-url" href="` + html.EscapeString(x.URL) + `"`)
 		if label != "" {
 			b.WriteString(` title="` + html.EscapeString(label) + `"`)
 		}
 		b.WriteString(`>`)
-		if icon != "" {
-			b.WriteString(`<span class="silo">` + icon + `</span>`)
+		if glyph != 0 {
+			b.WriteString(`<span class="silo" aria-hidden="true">` + string(glyph) + `</span>`)
 		}
-		d := shortDate(x.Published)
-		switch {
-		case d != "":
+		if d := shortDate(x.Published); d != "" {
 			b.WriteString(`<time class="dt-published" datetime="` + html.EscapeString(x.Published) + `">` + html.EscapeString(d) + `</time>`)
-		case icon == "":
+		} else if glyph == 0 {
 			b.WriteString(`<span class="response-go" aria-hidden="true">↗</span>`)
 		}
 		b.WriteString(`</a>`)
@@ -243,39 +248,82 @@ func hostOf(raw string) string {
 }
 
 // knownMastodon is a small set of popular instances, since Mastodon can't be detected by host
-// shape; anything else unrecognised falls through to the generic icon + host text.
+// shape; other fediverse/unknown hosts fall through to the generic website glyph.
 var knownMastodon = map[string]bool{
 	"hachyderm.io": true, "fosstodon.org": true, "mas.to": true, "mstdn.social": true,
 	"infosec.exchange": true, "social.coop": true, "techhub.social": true, "indieweb.social": true,
 }
 
-// siloIcon returns the inline-SVG network icon + label for a source host, but ONLY when the silo
-// is recognised for certain. Unknown hosts return ("", "") so the renderer shows no icon (and no
-// generic/host fallback) — keeping the date/link placement intact.
-func siloIcon(host string) (svg, label string) {
+// siloGlyph maps a silo id to its codepoint in silos.woff2. KEEP IN SYNC with
+// contrib/scripts/silo-font/silos.json — regenerate both via that script when a silo changes.
+// (square variants also ship: bluesky-square F301, github-square F304, x-square F306.)
+var siloGlyph = map[string]rune{
+	"bluesky":    '\uf300',
+	"mastodon":   '\uf302',
+	"github":     '\uf303',
+	"x":          '\uf305',
+	"reddit":     '\uf307',
+	"hackernews": '\uf308',
+	"threads":    '\uf309',
+	"flickr":     '\uf30a',
+	"linkedin":   '\uf30b',
+	"tumblr":     '\uf30c',
+	"gitlab":     '\uf30d',
+	"website":    '\uf30e',
+}
+
+var siloLabels = map[string]string{
+	"bluesky": "Bluesky", "mastodon": "Mastodon", "github": "GitHub", "x": "X",
+	"reddit": "Reddit", "hackernews": "Hacker News", "threads": "Threads", "flickr": "Flickr",
+	"linkedin": "LinkedIn", "tumblr": "Tumblr", "gitlab": "GitLab", "website": "Website",
+}
+
+// siloForHost maps a source host to a silo id. Single-domain silos are matched exactly; Mastodon
+// is heuristic (multi-instance); any other http(s) host falls back to the generic "website".
+func siloForHost(host string) string {
 	h := strings.ToLower(host)
 	switch {
+	case h == "":
+		return ""
 	case strings.Contains(h, "bsky."):
-		return icoBluesky, "Bluesky"
+		return "bluesky"
 	case h == "github.com" || strings.HasSuffix(h, ".github.com"):
-		return icoGitHub, "GitHub"
+		return "github"
+	case h == "gitlab.com":
+		return "gitlab"
+	case h == "reddit.com" || strings.HasSuffix(h, ".reddit.com"):
+		return "reddit"
+	case h == "news.ycombinator.com":
+		return "hackernews"
+	case h == "threads.net" || strings.HasSuffix(h, ".threads.net"):
+		return "threads"
+	case h == "flickr.com" || strings.HasSuffix(h, ".flickr.com"):
+		return "flickr"
+	case h == "linkedin.com" || strings.HasSuffix(h, ".linkedin.com"):
+		return "linkedin"
+	case h == "tumblr.com" || strings.HasSuffix(h, ".tumblr.com"):
+		return "tumblr"
 	case h == "x.com" || h == "twitter.com" || strings.HasSuffix(h, ".x.com") || strings.HasSuffix(h, ".twitter.com"):
-		return icoX, "X"
+		return "x"
 	case strings.Contains(h, "mastodon") || strings.Contains(h, "mstdn") || knownMastodon[h]:
-		return icoMastodon, "Mastodon"
+		return "mastodon"
 	default:
-		return "", ""
+		return "website"
 	}
 }
 
-// Inline SVG silo marks (currentColor), kept small and brand-recognisable. Shared visual language
-// with assets/mentions.js (the live path renders the same set).
-const (
-	icoBluesky  = `<svg viewBox="0 0 600 530" aria-hidden="true"><path fill="currentColor" d="M135 44c66 50 137 151 163 205 26-54 97-155 163-205 48-36 126-64 126 25 0 18-10 150-16 171-21 73-95 91-161 80 115 20 144 85 81 150-120 124-172-31-185-66-2-6-3-9-3-7 0-2-1 1-3 7-13 35-65 190-185 66-63-65-34-130 81-150-66 11-140-7-161-80-6-21-16-153-16-171 0-89 78-61 126-25Z"/></svg>`
-	icoMastodon = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.27 5.3c-.36-2.66-2.69-4.76-5.45-5.17C17.36.06 15.6 0 12 0h-.03C8.37 0 7.6.06 7.14.13 4.46.53 2.01 2.42 1.42 5.11.83 7.81.77 10.8.88 13.55c.16 3.93.2 4.62.97 6.79.69 1.93 2.62 3.41 4.7 3.99 2.28.64 4.73.75 7.06.31.32-.06.64-.13.95-.21l-.04-2.07s-1.6.37-3.4.31c-1.78-.06-3.66-.19-3.95-2.38a4.5 4.5 0 0 1-.04-.61s1.75.42 3.96.52c1.35.06 2.62-.08 3.91-.23 2.48-.3 4.64-1.82 4.91-3.21.43-2.19.4-5.35.4-5.35 0-3.1-2.05-4.01-2.05-4.01M19.62 14.5h-2.28v-5.6c0-1.17-.49-1.77-1.48-1.77-1.09 0-1.64.71-1.64 2.1v3.04H11.96V9.23c0-1.39-.55-2.1-1.64-2.1-.99 0-1.48.6-1.48 1.77v5.6H6.56V8.73c0-1.17.3-2.1.9-2.79.61-.69 1.42-1.04 2.42-1.04 1.16 0 2.04.45 2.62 1.34l.57.95.57-.95c.58-.89 1.46-1.34 2.62-1.34 1 0 1.81.35 2.42 1.04.6.69.9 1.62.9 2.79z"/></svg>`
-	icoGitHub   = `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>`
-	icoX        = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117Z"/></svg>`
-)
+// siloMark returns the silo font glyph + human label for a source host (0/"" only for an empty host).
+func siloMark(host string) (rune, string) {
+	id := siloForHost(host)
+	if id == "" {
+		return 0, ""
+	}
+	g, ok := siloGlyph[id]
+	if !ok {
+		return 0, ""
+	}
+	return g, siloLabels[id]
+}
 
 func mentionsAssetJSON(m webmention.Mentions) ([]byte, error) {
 	b, err := json.Marshal(m)

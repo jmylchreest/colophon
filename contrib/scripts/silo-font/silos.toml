@@ -15,32 +15,94 @@ codepoint_start = "F300"                    # our PUA base; silos get sequential
 # Give a local `path` OR a `url` (fetched + cached under .cache/). A current pack is needed for
 # Bluesky/X — point fa-brands at "Font Awesome 6 Brands" (desktop OTF) or a recent Nerd Font.
 
-[sources.nerd]
-path = "/usr/share/fonts/TTF/JetBrainsMonoNerdFontMono-Regular.ttf"
-# url = "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/NerdFontsSymbolsOnly.zip#SymbolsNerdFont-Regular.ttf"
-
+# Font Awesome 6 Brands (free) — has Bluesky, X, Mastodon, GitHub, etc. by friendly glyph name.
 [sources.fa-brands]
-# Download "Font Awesome 6 Brands-Regular-400.otf" (free desktop) and set path, or a direct url.
-# path = "/path/to/Font Awesome 6 Brands-Regular-400.otf"
-url = ""
+url = "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/webfonts/fa-brands-400.ttf"
 
-# --- silos: id is what colophon's host→silo map uses; glyph is a name or U+XXXX in `source` ----
+# Font Awesome 6 Solid — for the generic "website" globe (brands has no globe). Multi-source merge.
+[sources.fa-solid]
+url = "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/webfonts/fa-solid-900.ttf"
+
+# Other packs can be added and mixed in per-silo, e.g. a Nerd Font for marks FA lacks:
+# [sources.nerd]
+# path = "/usr/share/fonts/TTF/JetBrainsMonoNerdFontMono-Regular.ttf"
+
+# --- silos: id is what colophon's host→silo map uses; glyph is a name (or U+XXXX) in `source` ---
 [[silo]]
 id = "bluesky"
 source = "fa-brands"
 glyph = "bluesky"
 
 [[silo]]
+id = "bluesky-square"
+source = "fa-brands"
+glyph = "square-bluesky"
+
+[[silo]]
 id = "mastodon"
-source = "nerd"
-glyph = "fa-mastodon"
+source = "fa-brands"
+glyph = "mastodon"
 
 [[silo]]
 id = "github"
-source = "nerd"
-glyph = "fa-github"
+source = "fa-brands"
+glyph = "github"
+
+[[silo]]
+id = "github-square"
+source = "fa-brands"
+glyph = "square-github"
 
 [[silo]]
 id = "x"
 source = "fa-brands"
 glyph = "x-twitter"
+
+[[silo]]
+id = "x-square"
+source = "fa-brands"
+glyph = "square-x-twitter"
+
+# (Font Awesome has no square Mastodon, so mastodon ships round only.)
+
+# Other reliably host-detectable silos (single canonical domain).
+[[silo]]
+id = "reddit"
+source = "fa-brands"
+glyph = "reddit-alien"
+
+[[silo]]
+id = "hackernews"
+source = "fa-brands"
+glyph = "hacker-news"
+
+[[silo]]
+id = "threads"
+source = "fa-brands"
+glyph = "threads"
+
+[[silo]]
+id = "flickr"
+source = "fa-brands"
+glyph = "flickr"
+
+[[silo]]
+id = "linkedin"
+source = "fa-brands"
+glyph = "linkedin-in"
+
+[[silo]]
+id = "tumblr"
+source = "fa-brands"
+glyph = "tumblr"
+
+[[silo]]
+id = "gitlab"
+source = "fa-brands"
+glyph = "gitlab"
+
+# Generic "a website linked you" mark for any other http(s) source (globe is in FA Solid).
+[[silo]]
+id = "website"
+source = "fa-solid"
+glyph = "globe"

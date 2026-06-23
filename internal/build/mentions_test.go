@@ -82,3 +82,28 @@ func TestKeyForURL(t *testing.T) {
 		}
 	}
 }
+
+func TestSiloForHost(t *testing.T) {
+	cases := map[string]string{
+		"bsky.app": "bluesky", "github.com": "github", "gist.github.com": "github",
+		"reddit.com": "reddit", "news.ycombinator.com": "hackernews", "threads.net": "threads",
+		"flickr.com": "flickr", "linkedin.com": "linkedin", "me.tumblr.com": "tumblr",
+		"gitlab.com": "gitlab", "x.com": "x", "twitter.com": "x",
+		"hachyderm.io": "mastodon", "mstdn.social": "mastodon",
+		"random.example": "website", "": "",
+	}
+	for h, want := range cases {
+		if got := siloForHost(h); got != want {
+			t.Errorf("siloForHost(%q) = %q, want %q", h, got, want)
+		}
+	}
+	if g, l := siloMark("bsky.app"); g != '\uf300' || l != "Bluesky" {
+		t.Errorf("siloMark(bsky) = %U %q", g, l)
+	}
+	if g, l := siloMark("random.example"); g != '\uf30e' || l != "Website" {
+		t.Errorf("siloMark(unknown) = %U %q", g, l)
+	}
+	if g, _ := siloMark(""); g != 0 {
+		t.Error("empty host should yield no glyph")
+	}
+}

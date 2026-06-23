@@ -253,6 +253,7 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 .note-links a:hover { color: var(--accent); }
 
 /* ---------- webmention responses (a card below the author box) ---------- */
+@font-face { font-family: "Colophon Silos"; src: url("silos.woff2") format("woff2"); font-display: swap; }
 .responses { margin-top: 1.25rem; background: var(--surface); border: 1px solid var(--border);
   border-radius: 14px; padding: 1.4rem; }
 .responses:empty { display: none; }

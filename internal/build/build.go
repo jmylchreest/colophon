@@ -521,6 +521,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		if err := write("mentions.js", mentionsJS); err != nil {
 			return Result{}, err
 		}
+		// The curated silo icon font, declared @font-face by the themes' responses CSS.
+		if err := write("silos.woff2", silosWoff2); err != nil {
+			return Result{}, err
+		}
 	}
 
 	// Emit the glossary data + decorator only if some page actually referenced a term, so a

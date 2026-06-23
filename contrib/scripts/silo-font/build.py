@@ -18,6 +18,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -128,7 +129,7 @@ def main() -> int:
     else:
         Merger().merge(parts).save(merged_ttf)
     subprocess.run(["woff2_compress", merged_ttf], check=True)  # writes silos.woff2 beside it
-    os.replace(os.path.join(tmp, "silos.woff2"), os.path.join(out_dir, "silos.woff2"))
+    shutil.move(os.path.join(tmp, "silos.woff2"), os.path.join(out_dir, "silos.woff2"))
     with open(os.path.join(out_dir, "silos.json"), "w") as fh:
         json.dump({"family": cfg.get("family", "Colophon Silos"), "glyphs": manifest}, fh, indent=2)
         fh.write("\n")
