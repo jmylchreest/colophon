@@ -100,7 +100,7 @@ func TestSiloForHost(t *testing.T) {
 	if g, l := siloMark("bsky.app"); g != '\uf300' || l != "Bluesky" {
 		t.Errorf("siloMark(bsky) = %U %q", g, l)
 	}
-	if g, l := siloMark("random.example"); g != '\uf30e' || l != "Website" {
+	if g, l := siloMark("random.example"); g != '\uf30b' || l != "Website" {
 		t.Errorf("siloMark(unknown) = %U %q", g, l)
 	}
 	if g, _ := siloMark(""); g != 0 {

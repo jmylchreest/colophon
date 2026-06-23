@@ -26,15 +26,15 @@ func TestNormalizeSyndication(t *testing.T) {
 	}
 }
 
-func TestSyndicationHost(t *testing.T) {
+func TestHostOf(t *testing.T) {
 	cases := map[string]string{
 		"https://hachyderm.io/@me/123": "hachyderm.io",
 		"https://www.example.com/p":    "example.com",
-		"not a url":                    "not a url",
+		"not a url":                    "", // no host → empty (caller falls back)
 	}
 	for in, want := range cases {
-		if got := syndicationHost(in); got != want {
-			t.Errorf("syndicationHost(%q) = %q, want %q", in, got, want)
+		if got := hostOf(in); got != want {
+			t.Errorf("hostOf(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

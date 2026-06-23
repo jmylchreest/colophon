@@ -2,19 +2,16 @@
   "family": "Colophon Silos",
   "glyphs": {
     "bluesky": "f300",
-    "bluesky-square": "f301",
-    "mastodon": "f302",
-    "github": "f303",
-    "github-square": "f304",
-    "x": "f305",
-    "x-square": "f306",
-    "reddit": "f307",
-    "hackernews": "f308",
-    "threads": "f309",
-    "flickr": "f30a",
-    "linkedin": "f30b",
-    "tumblr": "f30c",
-    "gitlab": "f30d",
-    "website": "f30e"
+    "mastodon": "f301",
+    "github": "f302",
+    "x": "f303",
+    "reddit": "f304",
+    "hackernews": "f305",
+    "threads": "f306",
+    "flickr": "f307",
+    "linkedin": "f308",
+    "tumblr": "f309",
+    "gitlab": "f30a",
+    "website": "f30b"
   }
 }

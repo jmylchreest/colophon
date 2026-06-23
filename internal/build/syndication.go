@@ -2,7 +2,6 @@ package build
 
 import (
 	"html"
-	"net/url"
 	"strings"
 
 	"github.com/jmylchreest/colophon/internal/syndicate"
@@ -46,20 +45,9 @@ func normalizeSyndication(urls []string) []string {
 	return out
 }
 
-// syndicationHost returns a short, human label for a syndication URL — the host with
-// a leading "www." stripped (e.g. "https://hachyderm.io/@me/123" → "hachyderm.io").
-// Falls back to the raw string when it doesn't parse as a URL with a host.
-func syndicationHost(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" {
-		return raw
-	}
-	return strings.TrimPrefix(u.Host, "www.")
-}
-
 // syndicationHTML renders the engine "Also posted on…" block as microformats2 u-syndication
 // links — a labelled row of chips, each with the silo's icon + network name (e.g. "Bluesky")
-// when recognised, else a globe + the host. No-JS drop-in; empty string when there are none.
+// when recognised, else the bare host. No-JS drop-in; empty string when there are none.
 func syndicationHTML(urls []string) string {
 	if len(urls) == 0 {
 		return ""
@@ -68,11 +56,14 @@ func syndicationHTML(urls []string) string {
 	b.WriteString(`<nav class="post-syndication" aria-label="Also posted on">`)
 	b.WriteString(`<span class="syn-label">Also posted on</span>`)
 	for _, u := range urls {
-		host := syndicationHost(u)
+		host := hostOf(u)
 		id := siloForHost(host)
-		text := siloLabels[id] // "Bluesky", "GitHub", … ; "Website" for the generic
+		text := siloLabels[id] // "Bluesky", "GitHub", …
 		if id == "website" || id == "" {
-			text = host // for unknown hosts the domain is more useful than "Website"
+			text = host // for unrecognised silos the domain is more useful than "Website"
+		}
+		if text == "" {
+			text = u // last resort if the URL had no parseable host
 		}
 		b.WriteString(`<a class="u-syndication syn-link" rel="syndication" href="` + html.EscapeString(u) + `" title="` + html.EscapeString(text) + `">`)
 		if g := siloGlyph[id]; g != 0 {

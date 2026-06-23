@@ -177,9 +177,9 @@
 
   // silo id → codepoint in silos.woff2 — KEEP IN SYNC with mentions.go siloGlyph / silos.json.
   const SILO_CP = {
-    bluesky: 0xf300, mastodon: 0xf302, github: 0xf303, x: 0xf305, reddit: 0xf307,
-    hackernews: 0xf308, threads: 0xf309, flickr: 0xf30a, linkedin: 0xf30b, tumblr: 0xf30c,
-    gitlab: 0xf30d, website: 0xf30e,
+    bluesky: 0xf300, mastodon: 0xf301, github: 0xf302, x: 0xf303, reddit: 0xf304,
+    hackernews: 0xf305, threads: 0xf306, flickr: 0xf307, linkedin: 0xf308, tumblr: 0xf309,
+    gitlab: 0xf30a, website: 0xf30b,
   };
   const SILO_LABEL = {
     bluesky: "Bluesky", mastodon: "Mastodon", github: "GitHub", x: "X", reddit: "Reddit",

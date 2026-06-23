@@ -119,7 +119,7 @@
         <div>
           <div class="nm">{% if author_url %}<a class="p-name u-url" href="{{ author_url }}" rel="me">{{ author_name }}</a>{% else %}<span class="p-name">{{ author_name }}</span>{% endif %}</div>
           {% if author_bio %}<div class="bio p-note">{{ author_bio }}</div>{% endif %}
-          {% if author_links %}<div class="note-links">{% for l in author_links %}<a href="{{ l.url }}" rel="me">{{ l.label }}</a>{% endfor %}</div>{% endif %}
+          {% if author_links %}<div class="note-links">{% for l in author_links %}<a href="{{ l.url }}" rel="me">{% if l.silo %}<span class="silo" aria-hidden="true">{{ l.silo }}</span>{% endif %}{{ l.label }}</a>{% endfor %}</div>{% endif %}
         </div>
       </div>
       {% endif %}

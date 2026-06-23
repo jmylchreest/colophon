@@ -265,17 +265,17 @@ var knownMastodon = map[string]bool{
 // (square variants also ship: bluesky-square F301, github-square F304, x-square F306.)
 var siloGlyph = map[string]rune{
 	"bluesky":    '\uf300',
-	"mastodon":   '\uf302',
-	"github":     '\uf303',
-	"x":          '\uf305',
-	"reddit":     '\uf307',
-	"hackernews": '\uf308',
-	"threads":    '\uf309',
-	"flickr":     '\uf30a',
-	"linkedin":   '\uf30b',
-	"tumblr":     '\uf30c',
-	"gitlab":     '\uf30d',
-	"website":    '\uf30e',
+	"mastodon":   '\uf301',
+	"github":     '\uf302',
+	"x":          '\uf303',
+	"reddit":     '\uf304',
+	"hackernews": '\uf305',
+	"threads":    '\uf306',
+	"flickr":     '\uf307',
+	"linkedin":   '\uf308',
+	"tumblr":     '\uf309',
+	"gitlab":     '\uf30a',
+	"website":    '\uf30b',
 }
 
 var siloLabels = map[string]string{

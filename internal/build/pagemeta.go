@@ -81,9 +81,20 @@ func authorVars(a core.Author) map[string]any {
 func authorLinks(a core.Author) []map[string]any {
 	out := make([]map[string]any, 0, len(a.URLs)+1)
 	for _, u := range a.URLs {
-		if u = strings.TrimSpace(u); u != "" {
-			out = append(out, map[string]any{"url": u, "label": linkLabel(u)})
+		if u = strings.TrimSpace(u); u == "" {
+			continue
 		}
+		m := map[string]any{"url": u, "label": linkLabel(u)}
+		// When the URL is a recognised silo, show its brand glyph (from the silos font) and use
+		// the canonical network name — reusing the same detection as webmentions/syndication, so
+		// author profiles, responses and "Also posted on" all read consistently.
+		if id := siloForHost(hostOf(u)); id != "" && id != "website" {
+			if g, ok := siloGlyph[id]; ok {
+				m["silo"] = string(g)
+				m["label"] = siloLabels[id]
+			}
+		}
+		out = append(out, m)
 	}
 	if e := strings.TrimSpace(a.Email); e != "" {
 		out = append(out, map[string]any{"url": "mailto:" + e, "label": "Email"})

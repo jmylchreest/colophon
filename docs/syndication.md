@@ -4,7 +4,8 @@
 your blog and pushes copies to social accounts ("silos") that link back. colophon does this with
 `colophon syndicate`: it walks your published posts, sends each to the configured **syndicators**,
 and records the result in a committed **ledger** so re-runs never double-post. The recorded silo
-URLs render on the post as `u-syndication` "Also posted on…" links.
+URLs render on the post as `u-syndication` "Also posted on…" chips, each with the silo's brand icon
+and network name (e.g. "Bluesky") — the same [silo icons](themes.md#silo-icons) used by responses.
 
 This page is the full reference; the [how-to guides](howto/) are quick per-silo recipes.
 

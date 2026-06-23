@@ -214,7 +214,7 @@ Templates are [pongo2](https://github.com/flosch/pongo2) — Jinja2/Django synta
 | `has_audio`, `audio`, `audio_type` | True when the post has an audio reading (recorded or generated TTS); `audio` is its URL and `audio_type` its MIME. See [Audio, video & downloads](#audio-video--downloads). |
 | `audio_listen`, `audio_play`, `audio_pause` | Localised player UI strings (figcaption + play/pause aria-labels), in the page's language. Present only when `has_audio`. |
 | `has_attachments`, `attachments`, `attachments_html` | Downloads. `attachments_html` is a ready-to-drop-in, no-JS block (`{{ attachments_html\|safe }}`); `attachments` is the structured list — `{url, label, description, name, type, type_label, size, bytes}` — if you'd rather build your own. `has_attachments` is the flag. See [Audio, video & downloads](#audio-video--downloads). |
-| `mentions_enabled`, `has_mentions`, `mentions`, `mentions_html`, `mentions_src` | Webmentions (replies/likes/reposts). What's populated depends on the site's `display.mode` — see [Webmentions](#webmentions-responses-planned). *(Planned — ships with the webmention display feature.)* |
+| `mentions_enabled`, `has_mentions`, `mentions`, `mentions_html`, `mentions_attrs`, `mentions_src` | Webmentions (replies/likes/reposts). What's populated depends on the site's `display.mode` — see [Webmentions](#webmentions-responses). |
 | `has_syndication`, `syndication`, `syndication_html` | "Also posted on…" links from the post's `syndication:` frontmatter (absolute URLs). `syndication_html` is a no-JS drop-in of mf2 `u-syndication` links (`{{ syndication_html\|safe }}`, empty when none); `syndication` is the raw URL list to build your own. |
 
 ### `index.html` (the post list, and per-tag pages)
@@ -404,6 +404,25 @@ fetches and renders/refreshes.
 Each `mentions` item is `{type (like|repost|reply|mention), author{name,url,photo}, url, content,
 published}`. A **no-JS / text theme** (e.g. `minimal`) just uses `asset` mode + `{{ mentions_html|safe }}`
 and skips the script entirely.
+
+### Silo icons
+
+Responses, the "Also posted on…" (`u-syndication`) links, and the author h-card links show a small
+**brand icon** when colophon recognises the source silo (Bluesky, Mastodon, GitHub, X, Reddit,
+Hacker News, Threads, Flickr, LinkedIn, Tumblr, GitLab — else a generic website globe). These are
+glyphs in a tiny webfont, **`silos.woff2`**, that the engine emits at the site root (when responses
+are active) and renders into `<span class="silo">`. A theme just declares the face and styles the
+span:
+
+```css
+@font-face { font-family: "Colophon Silos"; src: url("silos.woff2") format("woff2"); font-display: swap; }
+.silo { font-family: "Colophon Silos"; line-height: 1; }
+```
+
+The font is curated from Font Awesome (Brands + Solid) by
+[`contrib/scripts/silo-font`](../contrib/scripts/silo-font/) — re-run it to add a network or change
+the set. Detection (`host → silo`) lives in `internal/build/mentions.go` + `assets/mentions.js`, kept
+in sync with the font's `silos.json` codepoints.
 
 ## Analytics
 

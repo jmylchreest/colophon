@@ -32,36 +32,28 @@ url = "https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.7.2/webfonts
 id = "bluesky"
 source = "fa-brands"
 glyph = "bluesky"
+codepoint = "f300"
 
-[[silo]]
-id = "bluesky-square"
-source = "fa-brands"
-glyph = "square-bluesky"
 
 [[silo]]
 id = "mastodon"
 source = "fa-brands"
 glyph = "mastodon"
+codepoint = "f301"
 
 [[silo]]
 id = "github"
 source = "fa-brands"
 glyph = "github"
+codepoint = "f302"
 
-[[silo]]
-id = "github-square"
-source = "fa-brands"
-glyph = "square-github"
 
 [[silo]]
 id = "x"
 source = "fa-brands"
 glyph = "x-twitter"
+codepoint = "f303"
 
-[[silo]]
-id = "x-square"
-source = "fa-brands"
-glyph = "square-x-twitter"
 
 # (Font Awesome has no square Mastodon, so mastodon ships round only.)
 
@@ -70,39 +62,47 @@ glyph = "square-x-twitter"
 id = "reddit"
 source = "fa-brands"
 glyph = "reddit-alien"
+codepoint = "f304"
 
 [[silo]]
 id = "hackernews"
 source = "fa-brands"
 glyph = "hacker-news"
+codepoint = "f305"
 
 [[silo]]
 id = "threads"
 source = "fa-brands"
 glyph = "threads"
+codepoint = "f306"
 
 [[silo]]
 id = "flickr"
 source = "fa-brands"
 glyph = "flickr"
+codepoint = "f307"
 
 [[silo]]
 id = "linkedin"
 source = "fa-brands"
 glyph = "linkedin-in"
+codepoint = "f308"
 
 [[silo]]
 id = "tumblr"
 source = "fa-brands"
 glyph = "tumblr"
+codepoint = "f309"
 
 [[silo]]
 id = "gitlab"
 source = "fa-brands"
 glyph = "gitlab"
+codepoint = "f30a"
 
 # Generic "a website linked you" mark for any other http(s) source (globe is in FA Solid).
 [[silo]]
 id = "website"
 source = "fa-solid"
 glyph = "globe"
+codepoint = "f30b"

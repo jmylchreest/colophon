@@ -249,8 +249,9 @@ pre.mermaid { background: none; border: 0; text-align: center; }
 .note .nm { font-weight: 600; }
 .note .bio { color: var(--muted); font-size: 0.9rem; margin-top: 0.2rem; line-height: 1.5; }
 .note-links { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-top: 0.6rem; font-size: 0.82rem; }
-.note-links a { color: var(--muted); text-decoration: none; }
+.note-links a { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted); text-decoration: none; }
 .note-links a:hover { color: var(--accent); }
+.note-links .silo { font-family: "Colophon Silos"; font-size: 0.9rem; line-height: 1; }
 
 /* ---------- webmention responses (compact, post-listing style) + syndication ---------- */
 @font-face { font-family: "Colophon Silos"; src: url("silos.woff2") format("woff2"); font-display: swap; }
