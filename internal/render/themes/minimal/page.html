@@ -25,6 +25,7 @@
 {{ attachments_html|safe }}
 {{ syndication_html|safe }}
 </article>
+{% if mentions_enabled or has_syndication %}<link rel="stylesheet" href="{{ base_path }}mentions.css">{% endif %}
 {# Webmention responses, baked (minimal is no-JS): asset-mode mentions_html, sibling of .e-content. #}
 {% if mentions_enabled %}<section class="responses" aria-label="Responses">{{ mentions_html|safe }}</section>{% endif %}
 </main>

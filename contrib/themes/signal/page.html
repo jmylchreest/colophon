@@ -102,7 +102,7 @@ window.addEventListener('scroll',function(){var d=document.documentElement;docum
 {% if has_mermaid %}<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:(document.documentElement.dataset.theme==='light'?'default':'dark')})"></script>{% endif %}
 {% if search %}<script type="module" src="{{ base_path }}search-ui.js"></script>{% endif %}
 {% if has_audio %}<script defer src="{{ base_path }}player.js"></script>{% endif %}
-{% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}
+{% if mentions_enabled or has_syndication %}<link rel="stylesheet" href="{{ base_path }}mentions.css">{% endif %}{% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}
 {% if glossary_head %}{{ glossary_head|safe }}{% endif %}
 {% if analytics_head %}{{ analytics_head|safe }}{% endif %}
 </body>

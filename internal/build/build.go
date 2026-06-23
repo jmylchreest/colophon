@@ -284,6 +284,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	mentionsURL := mentionsBaseURL(router, basePath)
 	mentionsDir := webmention.CacheDir(cfg.Root)
 	anyMentions := false
+	anySyndication := false // any post renders an "Also posted on…" block
 	// The syndication ledger feeds u-syndication: a post's recorded silo URLs render as
 	// "Also posted on…" alongside any manual syndication: frontmatter. Missing ledger → nil.
 	synLedger, _, synErr := syndicate.LoadLedger(cfg.Root)
@@ -377,6 +378,10 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 
 	authorGroups := collectAuthors(cfg, posts, list, basePath)
 	authors := authorStrip(authorGroups)
+	// The silo icon font is also used by author profile links (their recognised silos), which
+	// render independently of webmentions/syndication — so the font must ship whenever any of the
+	// three consumers is present.
+	anyAuthorSilo := authorsUseSilos(cfg.Authors)
 
 	// slugSeen guards against two entries resolving to the same slug (URL/output path). A
 	// collision would silently overwrite one post, so it is warned with both source files.
@@ -468,6 +473,9 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		// active and the post hasn't opted out, expose the data the theme renders. In asset mode the
 		// synced cache is read at build (so a theme may bake it) and emitted as a _mentions/ asset for
 		// the JS path; live mode ships only the receiver descriptor (no build-time data).
+		if has, _ := ctx["has_syndication"].(bool); has {
+			anySyndication = true
+		}
 		wmEnabled := wmMode != "disabled" && !p.WebmentionsOff
 		ctx["mentions_enabled"] = wmEnabled
 		ctx["has_mentions"] = false
@@ -517,11 +525,22 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 
 	// Ship the shared responses renderer once when any page enables webmentions in a JS mode,
 	// mirroring the player/search assets — themes get responses with just the placeholder markup.
+	// Responses renderer: only needed when a page actually populates mentions client-side.
 	if anyMentions && wmMode != "disabled" {
 		if err := write("mentions.js", mentionsJS); err != nil {
 			return Result{}, err
 		}
-		// The curated silo icon font, declared @font-face by the themes' responses CSS.
+	}
+	// Engine-provided federation styling (theme-token aware, like glossary.css) — shipped when any
+	// page renders responses or an "Also posted on…" syndication block.
+	if (anyMentions && wmMode != "disabled") || anySyndication {
+		if err := write("mentions.css", mentionsCSS); err != nil {
+			return Result{}, err
+		}
+	}
+	// The curated silo icon font is used by responses, syndication and author profile links; ship
+	// it whenever any of those would render a glyph.
+	if (anyMentions && wmMode != "disabled") || anySyndication || anyAuthorSilo {
 		if err := write("silos.woff2", silosWoff2); err != nil {
 			return Result{}, err
 		}

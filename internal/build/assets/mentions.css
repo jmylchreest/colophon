@@ -1,0 +1,110 @@
+/* colophon webmention responses + syndication styling — engine-provided, so every theme gets a
+   working, good-looking responses block for free. It adapts to the active theme through that
+   theme's CSS custom properties (with neutral fallbacks for token-less themes). A theme may
+   override any of these in its own stylesheet for a bespoke look. Mirrors glossary.css. */
+
+@font-face {
+  font-family: "Colophon Silos";
+  src: url("silos.woff2") format("woff2");
+  font-display: swap;
+}
+
+.responses { margin-top: 1.75rem; }
+.responses:empty { display: none; }
+.responses-title {
+  font-family: var(--serif, inherit);
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+.responses ul, .responses ol { list-style: none; margin: 0; padding: 0; }
+
+/* Facepile (likes/reposts): equal circular avatars. The text-initial fallback is flex-centered
+   so it sits on the same baseline as the photos. Capped at maxFaces with a trailing "+N" chip. */
+.response-faces { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; padding: 0.6rem 0; }
+.response-faces > * { flex: 0 0 auto; }
+.response-faces .response > a {
+  display: flex; align-items: center; justify-content: center;
+  width: 1.8rem; height: 1.8rem; border-radius: 50%; overflow: hidden;
+  background: var(--elevated, rgba(127, 127, 127, 0.2));
+  color: var(--muted, inherit);
+  font-size: 0.7rem; font-weight: 600; line-height: 1; text-decoration: none;
+}
+.response-faces .u-photo { width: 100%; height: 100%; object-fit: cover; display: block; }
+.response-more {
+  display: flex; align-items: center; height: 1.8rem; padding: 0 0.4rem;
+  font-size: 0.75rem; color: var(--muted, inherit); opacity: 0.8;
+}
+
+/* Reply rows. A fixed left gutter (silo + relative date) keeps every author name aligned,
+   regardless of how short the date is ("now" vs "10mo"). */
+.response-faces + .response-list { margin-top: 0.5rem; }
+.response-list li {
+  position: relative;
+  display: grid; grid-template-columns: 4.75rem 1fr; gap: 0.75rem; align-items: center;
+  padding: 0.6rem 0; border-top: 1px solid var(--border, rgba(127, 127, 127, 0.18));
+  font-size: 0.9rem;
+}
+.response-perma {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  color: var(--faint, var(--muted, inherit)); opacity: 0.85;
+  font-size: 0.8rem; text-decoration: none; white-space: nowrap;
+}
+.response-perma:hover { color: var(--accent, inherit); opacity: 1; }
+.response-perma .silo { font-family: "Colophon Silos"; font-size: 0.95rem; line-height: 1; }
+.response-body { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.response-body .p-author {
+  display: inline-flex; align-items: center; gap: 0.4rem; flex: 0 0 auto;
+  font-weight: 600; color: var(--text, inherit); text-decoration: none; white-space: nowrap;
+}
+.response-body .p-author:hover { color: var(--accent, inherit); }
+.response-body .u-photo { width: 1.4rem; height: 1.4rem; border-radius: 50%; object-fit: cover; }
+.response-body .p-content {
+  color: var(--muted, inherit); font-weight: 400;
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+@media (max-width: 600px) {
+  .response-list li { grid-template-columns: 1fr; gap: 0.15rem; }
+  .response-body { flex-wrap: wrap; }
+  .response-body .p-content { white-space: normal; }
+}
+
+/* Hover tooltips. width:max-content sizes the box to its own content (capped at max-width)
+   instead of shrinking to the narrow anchor — so the timestamp pop stays on one comfortable
+   line rather than collapsing to day/month/year stacked. */
+[data-pop] { position: relative; }
+[data-pop]:hover::after, [data-pop]:focus-visible::after {
+  content: attr(data-pop);
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 30;
+  width: max-content; max-width: min(26rem, 80vw); white-space: nowrap;
+  font-size: 0.78rem; line-height: 1.4; font-weight: 400;
+  color: var(--text, #ededf1);
+  background: var(--elevated, var(--surface, #1c1c24));
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  border-radius: 8px; padding: 0.35rem 0.55rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+}
+
+/* A truncated reply's full text expands into the glossary card look (.gloss-tip): the same
+   dictionary-stanza popover the site uses for glossary terms — soft card, generous padding. */
+.response-body[data-pop]:hover::after, .response-body[data-pop]:focus-visible::after {
+  white-space: normal;
+  font-family: var(--sans, inherit);
+  font-size: 0.82rem; line-height: 1.5;
+  color: var(--muted, #ededf1);
+  border-radius: 12px; padding: 0.7rem 0.85rem 0.75rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34);
+}
+
+/* Syndication "Also posted on" pills. */
+.post-syndication { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 1.25rem; font-size: 0.85rem; }
+.post-syndication .syn-label { color: var(--muted, inherit); opacity: 0.8; }
+.syn-link {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  color: var(--text, inherit); text-decoration: none;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.3)); border-radius: 999px;
+  padding: 0.1rem 0.65rem; transition: all 0.2s;
+}
+.syn-link:hover { border-color: var(--accent, currentColor); color: var(--accent, inherit); }
+.syn-link .silo { font-family: "Colophon Silos"; font-size: 0.9rem; line-height: 1; }

@@ -102,6 +102,20 @@ func authorLinks(a core.Author) []map[string]any {
 	return out
 }
 
+// authorsUseSilos reports whether any configured author has a profile link to a recognised silo,
+// i.e. whether author links would render a glyph from the silos font. Used to decide whether to
+// ship silos.woff2 even on sites without webmentions or syndication.
+func authorsUseSilos(authors []core.Author) bool {
+	for _, a := range authors {
+		for _, l := range authorLinks(a) {
+			if _, ok := l["silo"]; ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // linkLabel names a URL by its platform, falling back to the bare host (or the raw string if it
 // won't parse). Kept deliberately small — unknown hosts read fine as a domain.
 func linkLabel(raw string) string {

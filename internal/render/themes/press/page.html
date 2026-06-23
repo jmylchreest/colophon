@@ -142,7 +142,7 @@
 <script defer src="{{ base_path }}app.js"></script>
 {% if has_audio %}<script defer src="{{ base_path }}player.js"></script>{% endif %}
 {% if search %}<script type="module" src="{{ base_path }}search-ui.js"></script>{% endif %}
-{% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}
+{% if mentions_enabled or has_syndication %}<link rel="stylesheet" href="{{ base_path }}mentions.css">{% endif %}{% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}
 {% if has_code %}
 <link rel="stylesheet" href="{{ base_path }}vendor/highlight/github-dark.min.css">
 <script defer src="{{ base_path }}vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>

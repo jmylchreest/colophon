@@ -22,6 +22,13 @@ import (
 //go:embed assets/mentions.js
 var mentionsJS []byte
 
+// mentionsCSS styles the responses block + syndication pills. Engine-provided (like glossary.css)
+// so every theme gets a working, theme-token-aware look without duplicating CSS; emitted once at
+// the site root alongside mentions.js. A theme may override any rule in its own stylesheet.
+//
+//go:embed assets/mentions.css
+var mentionsCSS []byte
+
 // silosWoff2 is the curated silo icon font (Bluesky/Mastodon/GitHub/… + a generic website globe),
 // merged from Font Awesome packs by contrib/scripts/silo-font/build.py. Emitted once at the site
 // root and declared @font-face by the themes; the glyph codepoints below mirror its silos.json.
