@@ -32,10 +32,6 @@ type SpeechGen struct {
 	APIPath     string `yaml:"api_path,omitempty"`    // overrides the profile request path
 	APIKey      string `yaml:"api_key,omitempty"`     // inline key, usually "{env:VAR}"; else profile env var
 	Concurrency int    `yaml:"concurrency,omitempty"` // max clips generated in parallel; <=0 → default
-	// Waveform precomputes an amplitude-peaks sidecar (decoding the audio) so the theme can draw
-	// an accurate static waveform; nil/true → on. When off/undecodable, the player falls back to
-	// a live Web Audio visualiser.
-	Waveform *bool `yaml:"waveform,omitempty"`
 	// Transcript controls how a post's content is turned into spoken text — what to do with
 	// blocks that don't read well aloud (code, math, tables, diagrams).
 	Transcript SpeechTranscript `yaml:"transcript,omitempty"`
@@ -94,9 +90,6 @@ func (g SpeechGen) Configured() bool { return strings.TrimSpace(g.Provider) != "
 // per-post `audio:` default: with a provider configured and this on, posts read aloud by
 // default unless they set `audio: false`.
 func (g SpeechGen) On() bool { return g.Enabled == nil || *g.Enabled }
-
-// Waveforms reports whether a waveform-peaks sidecar should be generated (default true).
-func (g SpeechGen) Waveforms() bool { return g.Waveform == nil || *g.Waveform }
 
 // ImageGen configures the image generator that satisfies `gen:` references in
 // frontmatter (hero:/image:) and content (![alt](<gen:…>)). Provider selects a

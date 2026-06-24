@@ -279,8 +279,9 @@ container marked `data-audioplayer` with the source and localised labels, plus t
 ```
 
 `player.js` progressively enhances the `<figure>` into a play/pause control with a scrubbable
-waveform (reading a `<src>.json` peaks sidecar when present, else live Web Audio, else idle);
-with JS off the native `<audio>` still plays. Style the enhanced parts via `.post-audio.ap-ready`,
+waveform (a `<src>.json` peaks sidecar when present, else peaks decoded from the audio in-browser
+on first play and cached, else live Web Audio, else idle); with JS off the native `<audio>` still
+plays. Style the enhanced parts via `.post-audio.ap-ready`,
 `.ap-toggle`, `.ap-wave`, `.ap-time` — see any bundled theme's CSS.
 
 > The *content* of a generated reading is shaped by authoring hints — type-aware cues for

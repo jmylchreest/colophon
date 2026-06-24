@@ -273,9 +273,6 @@ func (ar *audioResolver) run(write func(string, []byte) error, now time.Time) er
 		} else {
 			ar.log.Step("AUDIO", ar.jobs[k].kind, r.logArgs...)
 		}
-		for _, w := range r.warns {
-			ar.log.Step("AUDIO", ar.jobs[k].kind, "warn", w)
-		}
 		if r.bytes != nil {
 			if err := write(k, r.bytes); err != nil {
 				return err
@@ -330,26 +327,7 @@ type audioOutcome struct {
 	bytes   []byte
 	logArgs []any
 	detail  bool
-	warns   []string // extra warn lines (e.g. waveform failures), replayed after the main line
 	fatal   error
-}
-
-// computePeaks renders the job's text a second time as raw PCM (colophon carries no MP3
-// decoder, so it asks the provider for samples directly) and reduces it to waveform peaks. It
-// returns an error rather than dropping the waveform silently, so the caller can warn — the
-// published audio is unaffected either way.
-func computePeaks(gen generate.SpeechGenerator, req generate.SpeechRequest) ([]float64, error) {
-	preq := req
-	preq.Format = "pcm"
-	res, err := gen.Generate(context.Background(), preq)
-	if err != nil {
-		return nil, err
-	}
-	pk, ok := peaksFromPCM(res.Bytes)
-	if !ok {
-		return nil, fmt.Errorf("pcm render returned no usable 16-bit samples (%d bytes)", len(res.Bytes))
-	}
-	return pk, nil
 }
 
 func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechGenerator, error), now time.Time) (out audioOutcome) {
@@ -373,33 +351,12 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 	default: // tts
 		if b, err := os.ReadFile(j.cache); err == nil {
 			j.size = int64(len(b))
+			// Read any peaks an older build persisted (read-compat); current builds derive the
+			// waveform in the browser, so a cache hit with no peaks just ships no sidecar.
 			if meta, err := os.ReadFile(j.cache + ".json"); err == nil {
-				j.peaks = parsePeaks(meta) // peaks persisted in the cache sidecar at generation
+				j.peaks = parsePeaks(meta)
 			}
-			// Backfill: a cached clip with no waveform (older cache, or a build where the PCM
-			// render failed) can get just its waveform without re-synthesizing the audio — a
-			// PCM-only render, gated on --generate-ai so plain builds never make network calls.
-			backfilled := false
-			if len(j.peaks) == 0 && ar.generateAI && ar.speech != nil && ar.speech.Waveform {
-				if gen, gerr := ensureTTS(); gerr == nil {
-					if pk, perr := computePeaks(gen, j.req); perr != nil {
-						out.warns = append(out.warns, fmt.Sprintf("waveform for %q: %v", path.Base(j.outPath), perr))
-					} else {
-						j.peaks = pk
-						backfilled = true
-						if err := addPeaksToSidecar(j.cache+".json", pk); err != nil {
-							_ = writeAudioSidecar(j.cache, j.req, j.mime, now, pk) // no prior sidecar → write a fresh one
-						}
-					}
-				}
-			}
-			if backfilled {
-				// Visible (not detail) so a backfill — which makes a network call and changes
-				// what's published — is observable, unlike a plain cache hit.
-				out.bytes, out.logArgs = b, []any{"cached", path.Base(j.outPath), "waveform", "backfilled", "bytes", len(b)}
-			} else {
-				out.bytes, out.detail, out.logArgs = b, true, []any{"cached", path.Base(j.outPath), "bytes", len(b)}
-			}
+			out.bytes, out.detail, out.logArgs = b, true, []any{"cached", path.Base(j.outPath), "bytes", len(b)}
 			return out
 		}
 		if !ar.generateAI {
@@ -416,16 +373,7 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 			out.logArgs = []any{"warn", fmt.Sprintf("generate %q failed: %v", path.Base(j.outPath), err)}
 			return out
 		}
-		// Waveform peaks via a PCM render from the same provider (no audio-decoder dependency).
-		// A failure leaves the player to use its live visualiser, but is warned (not swallowed)
-		// so a provider that rejects format=pcm is visible rather than a silently missing waveform.
-		if ar.speech != nil && ar.speech.Waveform {
-			if pk, perr := computePeaks(gen, j.req); perr != nil {
-				out.warns = append(out.warns, fmt.Sprintf("waveform for %q: %v", path.Base(j.outPath), perr))
-			} else {
-				j.peaks = pk
-			}
-		}
+		// No second render for a waveform: the browser derives peaks from this audio (player.js).
 		if err := os.MkdirAll(ar.cacheDir, 0o755); err != nil {
 			out.fatal = err
 			return out
@@ -434,34 +382,17 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 			out.fatal = err
 			return out
 		}
-		_ = writeAudioSidecar(j.cache, j.req, res.MIME, now, j.peaks)
+		_ = writeAudioSidecar(j.cache, j.req, res.MIME, now)
 		j.size = int64(len(res.Bytes))
 		out.bytes, out.logArgs = res.Bytes, []any{"generated", path.Base(j.outPath), "voice", j.req.Voice, "bytes", len(res.Bytes)}
 		return out
 	}
 }
 
-// addPeaksToSidecar merges waveform peaks into an existing cache sidecar, preserving its other
-// fields (generated time, voice, model…) — used when backfilling a waveform onto already-cached
-// audio. Errors if the sidecar is absent, so the caller can fall back to writing a fresh one.
-func addPeaksToSidecar(path string, peaks []float64) error {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	var m map[string]any
-	if err := json.Unmarshal(b, &m); err != nil {
-		return err
-	}
-	m["peaks"] = peaks
-	out, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, append(out, '\n'), 0o644)
-}
-
-func writeAudioSidecar(audioPath string, req generate.SpeechRequest, mime string, now time.Time, peaks []float64) error {
+// writeAudioSidecar records cache metadata next to a generated clip (provenance + the inputs the
+// cache key is derived from). The waveform is no longer precomputed — the player derives it from
+// the audio in-browser — so no peaks are stored.
+func writeAudioSidecar(audioPath string, req generate.SpeechRequest, mime string, now time.Time) error {
 	sc := map[string]any{
 		"text_chars": len(req.Text),
 		"voice":      req.Voice,
@@ -469,9 +400,6 @@ func writeAudioSidecar(audioPath string, req generate.SpeechRequest, mime string
 		"format":     req.Format,
 		"mime":       mime,
 		"generated":  now.Format(time.RFC3339),
-	}
-	if len(peaks) > 0 {
-		sc["peaks"] = peaks // persisted so plain (cache-hit) builds can publish the waveform
 	}
 	b, err := json.MarshalIndent(sc, "", "  ")
 	if err != nil {

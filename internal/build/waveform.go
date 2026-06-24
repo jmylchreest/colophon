@@ -10,13 +10,6 @@ import (
 // across the whole clip, so bar i maps linearly to time (i/N)·duration for accurate scrubbing.
 const waveformBuckets = 120
 
-// peaksFromPCM reduces raw little-endian 16-bit mono PCM (as a TTS provider returns for
-// format=pcm) to normalised peaks (0–1). No audio decoding is involved — the provider hands
-// us the samples directly, so colophon needs no MP3 decoder dependency.
-func peaksFromPCM(pcm []byte) ([]float64, bool) {
-	return peaksFromSamples(le16(pcm))
-}
-
 // peaksFromWAV reads 16-bit PCM from a RIFF/WAVE file (for recorded .wav attachments),
 // averaging channels to mono. Other recorded formats return ok=false → live visualiser.
 func peaksFromWAV(b []byte) ([]float64, bool) {
@@ -58,14 +51,6 @@ func peaksFromSamples(samples []int16) ([]float64, bool) {
 		peaks[i] = math.Round(peaks[i]/maxPeak*1000) / 1000 // normalise + trim precision for a small sidecar
 	}
 	return peaks, true
-}
-
-func le16(b []byte) []int16 {
-	out := make([]int16, 0, len(b)/2)
-	for i := 0; i+1 < len(b); i += 2 {
-		out = append(out, int16(binary.LittleEndian.Uint16(b[i:])))
-	}
-	return out
 }
 
 // decodeWAV returns mono 16-bit samples from a RIFF/WAVE file's data chunk, or ok=false if

@@ -41,7 +41,6 @@ type SpeechSettings struct {
 	APIPath     string
 	APIKey      string
 	Concurrency int
-	Waveform    bool
 	Transcript  core.SpeechTranscript
 	Retry       RetryPolicy // rate-limit backoff; zero value = fail fast
 }
@@ -86,7 +85,6 @@ func ResolveSpeech(g core.SpeechGen) (SpeechSettings, error) {
 		APIPath:     firstNonEmpty(g.APIPath, p.apiPath),
 		APIKey:      strings.TrimSpace(g.APIKey),
 		Concurrency: g.Concurrency,
-		Waveform:    g.Waveforms(),
 		Transcript:  g.Transcript,
 	}
 	if s.Concurrency <= 0 {

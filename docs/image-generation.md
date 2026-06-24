@@ -167,13 +167,14 @@ voice: "English_Graceful_Lady"
 Themes get `has_audio` (bool) and `audio` (URL) to render a player or filter audio posts. The
 press theme shows a themed play/pause + **scrubbable waveform** player under the byline.
 
-**Waveform.** For generated audio, colophon precomputes amplitude peaks (`generation.speech.waveform`,
-on by default — it costs one extra, cached generation call) and publishes them as a `<audio>.json`
-sidecar the player uses to draw an accurate waveform. For a **recorded** file, drop a matching
-`episode.mp3.json` of the form `{"peaks":[0.1, 0.7, …]}` (values 0–1) next to it — e.g. produced
-with `ffmpeg`/`audiowaveform` — and it'll be used; a `.wav` is read directly. If there are no
-peaks, the player falls back to a live Web Audio visualiser. (When audio is routed cross-origin to
-an object store, the live visualiser and the peaks fetch need CORS on the bucket.)
+**Waveform.** The player derives the waveform from the audio itself, in the browser (Web Audio
+`decodeAudioData`), on first play — so generated readings cost a single TTS call, not a second one,
+and the computed peaks are cached in `localStorage` for instant redraws. For a **recorded** file you
+can still ship a precomputed `episode.mp3.json` of the form `{"peaks":[0.1, 0.7, …]}` (values 0–1)
+next to it — e.g. produced with `ffmpeg`/`audiowaveform` — and it renders instantly (paused,
+pre-play); a `.wav` is read directly at build. Until peaks exist, the player shows a resting shape
+or a live Web Audio visualiser (same-origin). When audio is routed cross-origin to an object store,
+the in-browser decode and any peaks fetch need CORS (a GET policy) on the bucket.
 
 ### What gets read aloud
 
