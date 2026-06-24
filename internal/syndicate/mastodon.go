@@ -38,8 +38,17 @@ func (s *mastodonSyndicator) Syndicate(ctx context.Context, p Post) (string, err
 	var status struct {
 		URL string `json:"url"`
 	}
-	if err := postJSON(ctx, s.instance+"/api/v1/statuses", s.token,
-		map[string]any{"status": mastodonText(p, s.limit)}, &status); err != nil {
+	// Mastodon honours an Idempotency-Key (keyed on the canonical post URL), so a retried create
+	// is deduped server-side — making the status POST safe to retry on any transient failure.
+	headers := map[string]string{}
+	if p.URL != "" {
+		headers["Idempotency-Key"] = p.URL
+	}
+	err := retryIdempotent(ctx, func() error {
+		return postJSON(ctx, s.instance+"/api/v1/statuses", s.token, headers,
+			map[string]any{"status": mastodonText(p, s.limit)}, &status)
+	})
+	if err != nil {
 		return "", fmt.Errorf("mastodon %q: %w", s.id, err)
 	}
 	return status.URL, nil

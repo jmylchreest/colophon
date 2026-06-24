@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+
+	"github.com/jmylchreest/colophon/internal/retry"
 )
 
 // minimaxDriver calls MiniMax's bespoke image_generation endpoint (it is not
@@ -19,7 +21,7 @@ type minimaxDriver struct {
 func minimaxStatusError(code int, msg string) error {
 	err := fmt.Errorf("minimax error %d: %s", code, msg)
 	if code == 1002 || code == 1039 {
-		return rateLimited(0, err) // MiniMax gives no Retry-After; the policy's backoff applies
+		return retry.RateLimited(0, err) // MiniMax gives no Retry-After; the policy's backoff applies
 	}
 	return err
 }

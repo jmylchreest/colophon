@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
-	"strings"
 	"time"
+
+	"github.com/jmylchreest/colophon/internal/retry"
 )
 
 // New constructs the image generator for these settings, dispatching on the
@@ -57,15 +57,12 @@ func postJSON(ctx context.Context, url string, headers map[string]string, body, 
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return err
+		return retry.FromDoErr(err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode == http.StatusTooManyRequests {
-		return rateLimited(retryAfter(resp), fmt.Errorf("%s: %s", resp.Status, truncate(data, 400)))
-	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("%s: %s", resp.Status, truncate(data, 400))
+		return retry.FromStatus(resp.StatusCode, retry.RetryAfter(resp.Header), fmt.Errorf("%s: %s", resp.Status, truncate(data, 400)))
 	}
 	if err := json.Unmarshal(data, out); err != nil {
 		return fmt.Errorf("decode response: %w (body: %s)", err, truncate(data, 200))
@@ -100,16 +97,6 @@ func withSystem(system, prompt string) string {
 		return prompt
 	}
 	return prompt + "\n\n" + system
-}
-
-// retryAfter reads a Retry-After header (delta-seconds form), returning 0 when absent/unparsable.
-func retryAfter(resp *http.Response) time.Duration {
-	if v := resp.Header.Get("Retry-After"); v != "" {
-		if secs, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && secs >= 0 {
-			return time.Duration(secs) * time.Second
-		}
-	}
-	return 0
 }
 
 func truncate(b []byte, n int) string {

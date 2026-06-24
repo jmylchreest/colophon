@@ -45,8 +45,11 @@ func (s *blueskySyndicator) Syndicate(ctx context.Context, p Post) (string, erro
 		AccessJwt string `json:"accessJwt"`
 		DID       string `json:"did"`
 	}
-	if err := postJSON(ctx, s.service+"/xrpc/com.atproto.server.createSession", "",
-		map[string]string{"identifier": s.handle, "password": s.password}, &session); err != nil {
+	// Auth is idempotent → retry any transient failure.
+	if err := retryIdempotent(ctx, func() error {
+		return postJSON(ctx, s.service+"/xrpc/com.atproto.server.createSession", "", nil,
+			map[string]string{"identifier": s.handle, "password": s.password}, &session)
+	}); err != nil {
 		return "", fmt.Errorf("bluesky %q: createSession: %w", s.id, err)
 	}
 
@@ -66,8 +69,12 @@ func (s *blueskySyndicator) Syndicate(ctx context.Context, p Post) (string, erro
 	var created struct {
 		URI string `json:"uri"`
 	}
-	if err := postJSON(ctx, s.service+"/xrpc/com.atproto.repo.createRecord", session.AccessJwt,
-		map[string]any{"repo": session.DID, "collection": "app.bsky.feed.post", "record": record}, &created); err != nil {
+	// createRecord is not idempotent (no idempotency key) → retry only when nothing could have
+	// been posted (rate limit or unsent), so a mid-flight failure never risks a duplicate skeet.
+	if err := retrySafe(ctx, func() error {
+		return postJSON(ctx, s.service+"/xrpc/com.atproto.repo.createRecord", session.AccessJwt, nil,
+			map[string]any{"repo": session.DID, "collection": "app.bsky.feed.post", "record": record}, &created)
+	}); err != nil {
 		return "", fmt.Errorf("bluesky %q: createRecord: %w", s.id, err)
 	}
 	return blueskyPostURL(s.handle, created.URI), nil

@@ -52,7 +52,9 @@ func (s *bridgySyndicator) Syndicate(ctx context.Context, p Post) (string, error
 		URL   string `json:"url"`
 		Error string `json:"error"`
 	}
-	if err := postForm(ctx, s.endpoint, form, &resp); err != nil {
+	// Bridgy publish creates the silo post → retry only when nothing could have been created
+	// (rate limit or unsent), avoiding a duplicate on an ambiguous mid-flight failure.
+	if err := retrySafe(ctx, func() error { return postForm(ctx, s.endpoint, form, &resp) }); err != nil {
 		return "", fmt.Errorf("bridgy %q: %w", s.id, err)
 	}
 	if resp.Error != "" {

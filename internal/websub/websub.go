@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/jmylchreest/colophon/internal/retry"
 )
 
 // DefaultClient is a short-timeout client; a hub ping is fire-and-forget and must never
@@ -26,19 +28,22 @@ func Ping(ctx context.Context, client *http.Client, hub, topic string) error {
 		client = DefaultClient
 	}
 	form := url.Values{"hub.mode": {"publish"}, "hub.url": {topic}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, hub, strings.NewReader(form.Encode()))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("hub %s returned %s", hub, resp.Status)
-	}
-	return nil
+	// Re-pinging a hub is harmless (idempotent) → retry transient/rate-limit failures with backoff.
+	return retry.Do(ctx, retry.Default(), func() error {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, hub, strings.NewReader(form.Encode()))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		resp, err := client.Do(req)
+		if err != nil {
+			return retry.FromDoErr(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return retry.FromStatus(resp.StatusCode, retry.RetryAfter(resp.Header), fmt.Errorf("hub %s returned %s", hub, resp.Status))
+		}
+		return nil
+	})
 }

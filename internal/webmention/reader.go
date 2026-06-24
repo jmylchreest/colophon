@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/jmylchreest/colophon/internal/retry"
 )
 
 // The reader pulls received mentions back from a hosted endpoint. JF2 (the format webmention.io
@@ -104,28 +106,34 @@ func fetchJF2Page(ctx context.Context, client *http.Client, endpoint, domain, to
 	} else {
 		u += "?" + q.Encode()
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/json")
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("read endpoint %s returned %s: %s", endpoint, resp.Status, snippet(body))
-	}
-	var feed jf2Feed
-	if err := json.Unmarshal(body, &feed); err != nil {
-		return nil, fmt.Errorf("decode JF2 from %s: %w", endpoint, err)
-	}
-	return feed.Children, nil
+	// Reading the JF2 feed is idempotent → retry transient/rate-limit failures with backoff.
+	var children []jf2Item
+	err := retry.Do(ctx, retry.Default(), func() error {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Accept", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			return retry.FromDoErr(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return retry.FromStatus(resp.StatusCode, retry.RetryAfter(resp.Header), fmt.Errorf("read endpoint %s returned %s: %s", endpoint, resp.Status, snippet(body)))
+		}
+		var feed jf2Feed
+		if err := json.Unmarshal(body, &feed); err != nil {
+			return fmt.Errorf("decode JF2 from %s: %w", endpoint, err)
+		}
+		children = feed.Children
+		return nil
+	})
+	return children, err
 }
 
 func normaliseJF2(it jf2Item) Mention {

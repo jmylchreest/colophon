@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"golang.org/x/net/html"
+
+	"github.com/jmylchreest/colophon/internal/retry"
 )
 
 // DefaultClient follows redirects (endpoint discovery relies on the final URL) and has a
@@ -91,28 +93,37 @@ func Discover(ctx context.Context, client *http.Client, target string) (string, 
 	if client == nil {
 		client = DefaultClient
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	final := resp.Request.URL // after redirects
-
-	if ep := endpointFromLinkHeader(resp.Header.Values("Link")); ep != "" {
-		return resolve(final, ep), nil
-	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
-	if err != nil {
-		return "", err
-	}
-	if ep := endpointFromHTML(body); ep != "" {
-		return resolve(final, ep), nil
-	}
-	return "", nil
+	// GET is idempotent → retry transient/rate-limit failures with backoff.
+	var endpoint string
+	err := retry.Do(ctx, retry.Default(), func() error {
+		endpoint = ""
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+		if err != nil {
+			return err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return retry.FromDoErr(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+			return retry.FromStatus(resp.StatusCode, retry.RetryAfter(resp.Header), fmt.Errorf("discover %s: %s", target, resp.Status))
+		}
+		final := resp.Request.URL // after redirects
+		if ep := endpointFromLinkHeader(resp.Header.Values("Link")); ep != "" {
+			endpoint = resolve(final, ep)
+			return nil
+		}
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+		if err != nil {
+			return err
+		}
+		if ep := endpointFromHTML(body); ep != "" {
+			endpoint = resolve(final, ep)
+		}
+		return nil
+	})
+	return endpoint, err
 }
 
 // Send POSTs source/target (form-encoded) to the endpoint. A 2xx is success; the spec also
@@ -122,21 +133,24 @@ func Send(ctx context.Context, client *http.Client, endpoint, source, target str
 		client = DefaultClient
 	}
 	form := url.Values{"source": {source}, "target": {target}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("endpoint %s returned %s", endpoint, resp.Status)
-	}
-	return nil
+	// Sending a webmention is idempotent (receivers dedupe on source+target) → safe to retry.
+	return retry.Do(ctx, retry.Default(), func() error {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		resp, err := client.Do(req)
+		if err != nil {
+			return retry.FromDoErr(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return retry.FromStatus(resp.StatusCode, retry.RetryAfter(resp.Header), fmt.Errorf("endpoint %s returned %s", endpoint, resp.Status))
+		}
+		return nil
+	})
 }
 
 // endpointFromLinkHeader scans HTTP Link header values for rel="webmention".
