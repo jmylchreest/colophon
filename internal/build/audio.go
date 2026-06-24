@@ -33,6 +33,16 @@ func resolveSpeech(cfg *config.Config, log *clog.Logger) *generate.SpeechSetting
 	return &s
 }
 
+// retryPolicyFor is the default provider rate-limit backoff with a logging hook, so each backoff
+// is visible under the given category (AUDIO/IMAGE) rather than looking like a stalled build.
+func retryPolicyFor(category string, log *clog.Logger) generate.RetryPolicy {
+	p := generate.DefaultRetryPolicy()
+	p.OnRetry = func(attempt int, wait time.Duration, err error) {
+		log.Step(category, "", "warn", fmt.Sprintf("rate limited, backing off %s (attempt %d): %v", wait.Round(time.Second), attempt, err))
+	}
+	return p
+}
+
 // audioVoiceFor builds the voice resolver: a post's audio_voice wins, else its author's
 // voice, else its persona's voice, else "" (the speech default applies).
 func audioVoiceFor(cfg *config.Config) func(postVoice, author, persona string) string {

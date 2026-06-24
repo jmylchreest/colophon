@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,19 +19,21 @@ func New(s Settings) (ImageGenerator, error) {
 	if s.APIKey == "" {
 		return nil, fmt.Errorf("provider %q: no API key (set api_key or the provider's env var)", s.Provider)
 	}
+	var g ImageGenerator
 	switch s.Driver {
 	case driverGoogle:
-		return &googleDriver{baseURL: s.BaseURL, apiKey: s.APIKey}, nil
+		g = &googleDriver{baseURL: s.BaseURL, apiKey: s.APIKey}
 	case driverOpenAI:
 		if s.BaseURL == "" || s.APIPath == "" {
 			return nil, fmt.Errorf("provider %q: base_url and api_path are required", s.Provider)
 		}
-		return &openaiDriver{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey}, nil
+		g = &openaiDriver{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey}
 	case driverMiniMax:
-		return &minimaxDriver{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey}, nil
+		g = &minimaxDriver{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey}
 	default:
 		return nil, fmt.Errorf("unknown driver %q", s.Driver)
 	}
+	return withImageRetry(g, s.Retry), nil
 }
 
 // httpClient is shared by the HTTP drivers; image generation can be slow, so the
@@ -57,6 +61,9 @@ func postJSON(ctx context.Context, url string, headers map[string]string, body, 
 	}
 	defer func() { _ = resp.Body.Close() }()
 	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusTooManyRequests {
+		return rateLimited(retryAfter(resp), fmt.Errorf("%s: %s", resp.Status, truncate(data, 400)))
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("%s: %s", resp.Status, truncate(data, 400))
 	}
@@ -93,6 +100,16 @@ func withSystem(system, prompt string) string {
 		return prompt
 	}
 	return prompt + "\n\n" + system
+}
+
+// retryAfter reads a Retry-After header (delta-seconds form), returning 0 when absent/unparsable.
+func retryAfter(resp *http.Response) time.Duration {
+	if v := resp.Header.Get("Retry-After"); v != "" {
+		if secs, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && secs >= 0 {
+			return time.Duration(secs) * time.Second
+		}
+	}
+	return 0
 }
 
 func truncate(b []byte, n int) string {

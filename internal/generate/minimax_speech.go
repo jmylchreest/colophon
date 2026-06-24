@@ -58,7 +58,7 @@ func (d *minimaxSpeech) synth(ctx context.Context, req SpeechRequest, text strin
 		return nil, err
 	}
 	if out.BaseResp.StatusCode != 0 {
-		return nil, fmt.Errorf("minimax error %d: %s", out.BaseResp.StatusCode, out.BaseResp.StatusMsg)
+		return nil, minimaxStatusError(out.BaseResp.StatusCode, out.BaseResp.StatusMsg)
 	}
 	if out.Data.Audio == "" {
 		return nil, fmt.Errorf("no audio in response")

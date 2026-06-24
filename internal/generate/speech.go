@@ -43,6 +43,7 @@ type SpeechSettings struct {
 	Concurrency int
 	Waveform    bool
 	Transcript  core.SpeechTranscript
+	Retry       RetryPolicy // rate-limit backoff; zero value = fail fast
 }
 
 type speechProfile struct {
@@ -109,7 +110,7 @@ func NewSpeech(s SpeechSettings) (SpeechGenerator, error) {
 	}
 	switch s.Driver {
 	case driverMiniMax:
-		return &minimaxSpeech{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey}, nil
+		return withSpeechRetry(&minimaxSpeech{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey}, s.Retry), nil
 	default:
 		return nil, fmt.Errorf("unknown speech driver %q", s.Driver)
 	}

@@ -25,6 +25,7 @@ type PublishCmd struct {
 	AllowPublish bool     `help:"Deploy environments that set allow_publish: false"`
 	Create       bool     `help:"Create the destination (e.g. a Pages project) if it doesn't exist"`
 	GenerateAI   bool     `name:"generate-ai" help:"Generate uncached AI media (gen: images and TTS audio) via the configured providers before deploying"`
+	NoBackoff    bool     `name:"no-backoff" help:"Don't retry rate-limited generation; fail fast and warn instead of backing off"`
 	Verbose      bool     `short:"v" help:"Log each step (sources, files, publisher actions)"`
 	Pprof        string   `help:"Capture CPU+heap profiles to a dir (or 1 for cwd)" hidden:""`
 
@@ -157,6 +158,7 @@ func (c *PublishCmd) publishEnv(ctx context.Context, root string, cfg *config.Co
 		Env:           name,
 		Telemetry:     tel,
 		GenerateAI:    c.GenerateAI,
+		NoBackoff:     c.NoBackoff,
 	}); err != nil {
 		return err
 	}

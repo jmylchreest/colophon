@@ -75,6 +75,9 @@ type Options struct {
 	// GenerateAI enables producing images for `gen:` references that aren't already cached.
 	// When false, missing generated images are warned and skipped (cached ones still ship).
 	GenerateAI bool
+	// NoBackoff disables the provider rate-limit retry/backoff (it is on by default), so a
+	// rate-limited generation fails fast and warns instead of retrying.
+	NoBackoff bool
 	// Env is the environment name, used only as a telemetry label (may be "").
 	Env string
 	// Telemetry receives build/source/persona events. Nil (e.g. from serve) sends nothing,
@@ -226,6 +229,16 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	audioDefaultOn := genActive && cfg.Generation.Speech.On() && cfg.Generation.Speech.Configured()
 	gr := newGenResolver(resolveImageGen(cfg, opts.Log), cfg.Root, resolveSystemDefault(cfg, eng.Meta()))
 	ar := newAudioResolver(resolveSpeech(cfg, opts.Log), cfg.Root, basePath, site.BaseURL, router, speechGen, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(cfg.Glossary), audioDefaultOn, opts.Log)
+	// Rate-limit backoff for provider calls: retry by default (a TPM blip self-heals), disabled
+	// by --no-backoff so a rate limit then fails fast and warns. Set before lazy construction.
+	if !opts.NoBackoff {
+		if gr.s != nil {
+			gr.s.Retry = retryPolicyFor("IMAGE", opts.Log)
+		}
+		if ar.speech != nil {
+			ar.speech.Retry = retryPolicyFor("AUDIO", opts.Log)
+		}
+	}
 	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router, gr, ar, imageGen, opts.Log)
 	if err != nil {
 		return Result{}, err

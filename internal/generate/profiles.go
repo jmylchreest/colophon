@@ -38,6 +38,7 @@ type Settings struct {
 	Defaults      map[string]string
 	Concurrency   int
 	TrimLetterbox bool
+	Retry         RetryPolicy // rate-limit backoff; zero value = fail fast
 }
 
 type profile struct {

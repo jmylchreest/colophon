@@ -14,6 +14,16 @@ type minimaxDriver struct {
 	apiKey   string
 }
 
+// minimaxStatusError turns a non-zero base_resp.status_code into an error, tagging the rate-limit
+// codes (1002 RPM/concurrency, 1039 TPM) as retryable so the shared backoff layer kicks in.
+func minimaxStatusError(code int, msg string) error {
+	err := fmt.Errorf("minimax error %d: %s", code, msg)
+	if code == 1002 || code == 1039 {
+		return rateLimited(0, err) // MiniMax gives no Retry-After; the policy's backoff applies
+	}
+	return err
+}
+
 type minimaxResponse struct {
 	Data struct {
 		ImageBase64 []string `json:"image_base64"`
@@ -41,7 +51,7 @@ func (d *minimaxDriver) Generate(ctx context.Context, req ImageRequest) (ImageRe
 		return ImageResult{}, err
 	}
 	if out.BaseResp.StatusCode != 0 {
-		return ImageResult{}, fmt.Errorf("minimax error %d: %s", out.BaseResp.StatusCode, out.BaseResp.StatusMsg)
+		return ImageResult{}, minimaxStatusError(out.BaseResp.StatusCode, out.BaseResp.StatusMsg)
 	}
 	if len(out.Data.ImageBase64) > 0 {
 		raw, err := base64.StdEncoding.DecodeString(out.Data.ImageBase64[0])
