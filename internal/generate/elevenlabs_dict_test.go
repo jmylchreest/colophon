@@ -116,6 +116,35 @@ func TestSyncElevenLabsDict_Lifecycle(t *testing.T) {
 	}
 }
 
+// An archived dictionary still appears in the list API but is hidden in the dashboard, so it is
+// treated as gone and a fresh active one is created rather than reused.
+func TestSyncElevenLabsDict_RecreatesArchived(t *testing.T) {
+	var created bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/pronunciation-dictionaries", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"pronunciation_dictionaries": []map[string]any{
+			{"id": "old", "name": "colophon:blog.example", "latest_version_id": "v1", "archived_time_unix": 123},
+		}})
+	})
+	mux.HandleFunc("/pronunciation-dictionaries/add-from-rules", func(w http.ResponseWriter, r *http.Request) {
+		created = true
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "new", "version_id": "v1"})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	dir := t.TempDir()
+	pron := []Pronunciation{{Word: "zebra", IPA: "ˈzɛbrə"}}
+	_ = writePronDictState(filepath.Join(dir, prondictStateFile), map[string]prondictState{
+		driverElevenLabs: {DictID: "old", VersionID: "v1", Hash: rulesHash(ipaRules(pron)), Words: []string{"zebra"}},
+	})
+	s := SpeechSettings{Driver: driverElevenLabs, BaseURL: srv.URL, APIKey: "k", SiteID: "blog.example"}
+	loc, err := syncElevenLabsDict(context.Background(), s, pron, dir)
+	if err != nil || !created || loc.DictID != "new" {
+		t.Fatalf("archived dict should be recreated, created=%v loc=%+v err=%v", created, loc, err)
+	}
+}
+
 // A tracked dictionary deleted out of band (absent from the account list) is recreated, not
 // reused — even when the rules are unchanged.
 func TestSyncElevenLabsDict_RecreatesDeleted(t *testing.T) {

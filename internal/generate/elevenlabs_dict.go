@@ -211,7 +211,12 @@ type foundDict struct {
 	ID              string `json:"id"`
 	Name            string `json:"name"`
 	LatestVersionID string `json:"latest_version_id"`
+	ArchivedTime    int64  `json:"archived_time_unix"` // non-zero → archived (hidden in the dashboard)
 }
+
+// live reports whether the dictionary is usable: present and not archived. Archived dictionaries
+// still appear in the list API but are hidden in the dashboard and shouldn't be reused.
+func (d foundDict) live() bool { return d.ArchivedTime == 0 }
 
 // listDicts returns the account's pronunciation dictionaries.
 func listDicts(ctx context.Context, base string, hdr map[string]string) ([]foundDict, error) {
@@ -224,20 +229,22 @@ func listDicts(ctx context.Context, base string, hdr map[string]string) ([]found
 	return resp.Dicts, nil
 }
 
-// findDict returns the dictionary with the given name, or nil.
+// findDict returns the live (non-archived) dictionary with the given name, or nil.
 func findDict(dicts []foundDict, name string) *foundDict {
 	for i := range dicts {
-		if dicts[i].Name == name {
+		if dicts[i].Name == name && dicts[i].live() {
 			return &dicts[i]
 		}
 	}
 	return nil
 }
 
-// containsDictID reports whether a dictionary with the given id exists.
+// containsDictID reports whether a live (non-archived) dictionary with the given id exists. An
+// archived dictionary is treated as gone, so the tracked id is dropped and a fresh active one is
+// created rather than reusing one that's hidden in the dashboard and may not apply.
 func containsDictID(dicts []foundDict, id string) bool {
 	for i := range dicts {
-		if dicts[i].ID == id {
+		if dicts[i].ID == id && dicts[i].live() {
 			return true
 		}
 	}
