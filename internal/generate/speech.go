@@ -45,6 +45,7 @@ type SpeechSettings struct {
 	APIKey            string
 	Concurrency       int
 	SiteID            string // stable per-site identifier (e.g. host), namespaces shared-account state
+	Reuse             string // "exact" (default) | "content" — cross-render cache reuse policy
 	Transcript        core.SpeechTranscript
 	Retry             RetryPolicy        // rate-limit backoff; zero value = fail fast
 	elevenLabsLocator *elevenLabsLocator // set by PrepareSpeech; ElevenLabs IPA dictionary version
@@ -94,6 +95,7 @@ func ResolveSpeech(g core.SpeechGen) (SpeechSettings, error) {
 		Voice:             firstNonEmpty(g.Voice, p.defaultVoice),
 		OutputDir:         firstNonEmpty(g.OutputDir, DefaultOutputDir),
 		PronunciationDict: strings.TrimSpace(g.PronunciationDict),
+		Reuse:             strings.ToLower(strings.TrimSpace(g.Reuse)),
 		BaseURL:           firstNonEmpty(g.BaseURL, p.baseURL),
 		APIPath:           firstNonEmpty(g.APIPath, p.apiPath),
 		APIKey:            strings.TrimSpace(g.APIKey),
@@ -129,16 +131,23 @@ func NewSpeech(s SpeechSettings) (SpeechGenerator, error) {
 	}
 }
 
-// SpeechStem is the deterministic, extension-less cache name for a speech request. The
-// label (e.g. the post slug) is a readable prefix; the hash covers everything affecting
-// the synthesis (provider, model, voice, text, and the applied pronunciation entries). The
-// container format is fixed (WAV) and captured by the file extension, so it is not part of
-// the key.
+// SpeechContentStem names a reading by WHAT is said — the text plus the applied pronunciation.
+// This is the published, renderer-independent identity, so the audio URL is stable when the
+// provider/model/voice change and only moves when the text itself changes.
+func SpeechContentStem(label, text string, pronunciation []Pronunciation) string {
+	var extra map[string]string
+	if len(pronunciation) > 0 {
+		extra = map[string]string{"pron": pronunciationKey(pronunciation)}
+	}
+	return promptSlug(label) + "-" + CacheKey("", "", text, "", extra)
+}
+
+// SpeechStem is the pre-split single-hash cache name (content+render in one key). Retained so a
+// build can find and adopt audio cached by an older colophon during the move to content naming.
 func SpeechStem(provider, model, voice, label, text string, pronunciation []Pronunciation) string {
 	var extra map[string]string
 	if len(pronunciation) > 0 {
 		extra = map[string]string{"pron": pronunciationKey(pronunciation)}
 	}
-	key := CacheKey(provider, model, text, voice, extra)
-	return promptSlug(label) + "-" + key
+	return promptSlug(label) + "-" + CacheKey(provider, model, text, voice, extra)
 }

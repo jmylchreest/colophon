@@ -75,6 +75,9 @@ type Options struct {
 	// GenerateAI enables producing images for `gen:` references that aren't already cached.
 	// When false, missing generated images are warned and skipped (cached ones still ship).
 	GenerateAI bool
+	// Regenerate forces a fresh render of generated media even when a cached rendition exists
+	// (re-voice audio / re-roll images); requires GenerateAI to actually produce.
+	Regenerate bool
 	// NoBackoff disables the provider rate-limit retry/backoff (it is on by default), so a
 	// rate-limited generation fails fast and warns instead of retrying.
 	NoBackoff bool
@@ -227,8 +230,8 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// audioDefaultOn is the per-post `audio:` default: a post with no explicit audio reads aloud
 	// when speech is configured and enabled, and is silent otherwise (e.g. no provider).
 	audioDefaultOn := genActive && cfg.Generation.Speech.On() && cfg.Generation.Speech.Configured()
-	gr := newGenResolver(resolveImageGen(cfg, opts.Log), cfg.Root, resolveSystemDefault(cfg, eng.Meta()))
-	ar := newAudioResolver(resolveSpeech(cfg, opts.Log), cfg.Root, basePath, site.BaseURL, router, speechGen, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(cfg.Glossary), audioDefaultOn, opts.Log)
+	gr := newGenResolver(resolveImageGen(cfg, opts.Log), cfg.Root, resolveSystemDefault(cfg, eng.Meta()), opts.Regenerate)
+	ar := newAudioResolver(resolveSpeech(cfg, opts.Log), cfg.Root, basePath, site.BaseURL, router, speechGen, opts.Regenerate, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(cfg.Glossary), audioDefaultOn, opts.Log)
 	// Rate-limit backoff for provider calls: retry by default (a TPM blip self-heals), disabled
 	// by --no-backoff so a rate limit then fails fast and warns. Set before lazy construction.
 	if !opts.NoBackoff {

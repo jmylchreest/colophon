@@ -74,7 +74,9 @@ type audioJob struct {
 	src     core.Source // file: source to read the recording from
 	srcPath string      // file: path within that source
 	req     generate.SpeechRequest
-	cache   string    // tts: absolute cache path
+	cache   string    // tts: absolute cache path, named by content identity
+	legacy  string    // tts: pre-split single-hash cache path, adopted on migration if present
+	force   bool      // tts: re-render even if cache exists (--regenerate)
 	size    int64     // filled after run()
 	peaks   []float64 // waveform amplitude peaks (0–1), when computed
 }
@@ -96,14 +98,19 @@ type audioResolver struct {
 	acronyms       *acronymReplacer         // glossary acronym → spoken expansion
 	defaultAudioOn bool                     // per-post audio: default when a post sets none
 	pronunciation  []generate.Pronunciation // loaded provider-agnostic pronunciation dict, if configured
+	reuseContent   bool                     // reuse: content — adopt any prior rendition of the same text
+	regenerate     bool                     // --regenerate: re-render even when cached
 	jobs           map[string]*audioJob
 }
 
-func newAudioResolver(speech *generate.SpeechSettings, root, basePath, baseURL string, router *core.Router, generateAI bool, voiceFor func(string, string, string) string, defaultLang string, acronyms *acronymReplacer, defaultAudioOn bool, log *clog.Logger) *audioResolver {
+func newAudioResolver(speech *generate.SpeechSettings, root, basePath, baseURL string, router *core.Router, generateAI, regenerate bool, voiceFor func(string, string, string) string, defaultLang string, acronyms *acronymReplacer, defaultAudioOn bool, log *clog.Logger) *audioResolver {
 	ar := &audioResolver{
 		speech: speech, basePath: basePath, baseURL: baseURL, router: router,
-		generateAI: generateAI, voiceFor: voiceFor, defaultLang: defaultLang,
+		generateAI: generateAI, regenerate: regenerate, voiceFor: voiceFor, defaultLang: defaultLang,
 		acronyms: acronyms, defaultAudioOn: defaultAudioOn, i18n: loadTTSTable(root), log: log, jobs: map[string]*audioJob{},
+	}
+	if speech != nil {
+		ar.reuseContent = speech.Reuse == "content"
 	}
 	if speech != nil {
 		if u, err := url.Parse(baseURL); err == nil && u.Host != "" {
@@ -202,19 +209,47 @@ func (ar *audioResolver) registerTTS(label, htmlBody, lang, postVoice, author, p
 		voice = v
 	}
 	pron := generate.FilterPronunciation(ar.pronunciation, text)
-	stem := generate.SpeechStem(s.Provider, s.Model, voice, label, text, pron)
-	filename := stem + ttsOutputExt
-	outPath = genOutDir + "/" + filename
+	// Publish and cache under the content identity (text + pronunciation) so the URL is stable
+	// across provider/model/voice changes; the renderer is recorded in the sidecar, and reuse
+	// policy decides whether a renderer change re-renders the single content-named file.
+	content := generate.SpeechContentStem(label, text, pron)
+	outPath = genOutDir + "/" + content + ttsOutputExt
 	mime = ttsOutputMIME
 	if _, seen := ar.jobs[outPath]; !seen {
 		ar.jobs[outPath] = &audioJob{
 			kind: "tts", outPath: outPath, mime: mime,
-			req:   generate.SpeechRequest{Text: text, Voice: voice, Model: s.Model, Pronunciation: pron},
-			cache: filepath.Join(ar.cacheDir, filename),
+			req:    generate.SpeechRequest{Text: text, Voice: voice, Model: s.Model, Pronunciation: pron},
+			cache:  filepath.Join(ar.cacheDir, content+ttsOutputExt),
+			legacy: filepath.Join(ar.cacheDir, generate.SpeechStem(s.Provider, s.Model, voice, label, text, pron)+ttsOutputExt),
+			force:  ar.regenerate,
 		}
 	}
 	rel, abs = ar.urlFor(outPath)
 	return rel, abs, mime, outPath, true
+}
+
+func fileExists(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && !info.IsDir()
+}
+
+// sidecarRenderMatches reports whether the clip's sidecar records the given renderer
+// (provider/model/voice). A missing or unreadable sidecar matches (true) so clips without
+// provenance — older builds, hand-placed files — are reused rather than churned.
+func sidecarRenderMatches(cachePath, provider, model, voice string) bool {
+	b, err := os.ReadFile(cachePath + ".json")
+	if err != nil {
+		return true
+	}
+	var sc struct {
+		Provider string `json:"provider"`
+		Model    string `json:"model"`
+		Voice    string `json:"voice"`
+	}
+	if json.Unmarshal(b, &sc) != nil || sc.Provider == "" {
+		return true // unreadable or pre-render-tracking sidecar → reuse, don't churn
+	}
+	return sc.Provider == provider && sc.Model == model && sc.Voice == voice
 }
 
 // size returns the published byte length for an output path (for feed enclosures), 0 if
@@ -370,15 +405,37 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 		out.bytes, out.detail, out.logArgs = b, true, []any{"file", j.outPath, "bytes", len(b)}
 		return out
 	default: // tts
-		if b, err := os.ReadFile(j.cache); err == nil {
-			j.size = int64(len(b))
-			// Read any peaks an older build persisted (read-compat); current builds derive the
-			// waveform in the browser, so a cache hit with no peaks just ships no sidecar.
-			if meta, err := os.ReadFile(j.cache + ".json"); err == nil {
-				j.peaks = parsePeaks(meta)
+		provider := ""
+		if ar.speech != nil {
+			provider = ar.speech.Provider
+		}
+		if !j.force {
+			if b, err := os.ReadFile(j.cache); err == nil {
+				// A content-named clip exists. Reuse it unless reuse:exact and the renderer
+				// recorded in the sidecar differs from the current provider/model/voice.
+				if ar.reuseContent || sidecarRenderMatches(j.cache, provider, j.req.Model, j.req.Voice) {
+					j.size = int64(len(b))
+					if meta, err := os.ReadFile(j.cache + ".json"); err == nil {
+						j.peaks = parsePeaks(meta)
+					}
+					out.bytes, out.detail, out.logArgs = b, true, []any{"cached", path.Base(j.outPath), "bytes", len(b)}
+					return out
+				}
+				// reuse:exact + renderer changed → fall through and re-render.
+			} else if b, err := os.ReadFile(j.legacy); err == nil {
+				// Migration: adopt a clip cached by a pre-content-naming build under the new
+				// content name (+ sidecar), so upgrading doesn't re-render unchanged audio.
+				if err := os.MkdirAll(ar.cacheDir, 0o755); err == nil {
+					_ = os.WriteFile(j.cache, b, 0o644)
+					_ = writeAudioSidecar(j.cache, provider, j.req, now)
+				}
+				j.size = int64(len(b))
+				if meta, err := os.ReadFile(j.legacy + ".json"); err == nil {
+					j.peaks = parsePeaks(meta)
+				}
+				out.bytes, out.detail, out.logArgs = b, true, []any{"adopted", path.Base(j.outPath), "bytes", len(b)}
+				return out
 			}
-			out.bytes, out.detail, out.logArgs = b, true, []any{"cached", path.Base(j.outPath), "bytes", len(b)}
-			return out
 		}
 		if !ar.generateAI {
 			out.logArgs = []any{"skip", path.Base(j.outPath), "hint", "build --generate-ai to create it"}
@@ -405,19 +462,21 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 			out.fatal = err
 			return out
 		}
-		_ = writeAudioSidecar(j.cache, j.req, now)
+		_ = writeAudioSidecar(j.cache, provider, j.req, now)
 		j.size = int64(len(audio))
 		out.bytes, out.logArgs = audio, []any{"generated", path.Base(j.outPath), "voice", j.req.Voice, "bytes", len(audio)}
 		return out
 	}
 }
 
-// writeAudioSidecar records cache metadata next to a generated clip (provenance + the inputs the
-// cache key is derived from). The waveform is not precomputed — the player derives it from the
-// audio in-browser — so no peaks are stored.
-func writeAudioSidecar(audioPath string, req generate.SpeechRequest, now time.Time) error {
+// writeAudioSidecar records cache metadata next to a generated clip: provenance plus the
+// renderer identity (provider/model/voice), which reuse:exact compares against the current
+// config to decide whether a renderer change re-renders. The waveform is not precomputed — the
+// player derives it from the audio in-browser — so no peaks are stored.
+func writeAudioSidecar(audioPath, provider string, req generate.SpeechRequest, now time.Time) error {
 	sc := map[string]any{
 		"text_chars": len(req.Text),
+		"provider":   provider,
 		"voice":      req.Voice,
 		"model":      req.Model,
 		"generated":  now.Format(time.RFC3339),

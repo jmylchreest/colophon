@@ -39,6 +39,7 @@ type Settings struct {
 	Defaults      map[string]string
 	Concurrency   int
 	TrimLetterbox bool
+	Reuse         string      // "exact" (default) | "content" — cross-render cache reuse policy
 	Retry         RetryPolicy // rate-limit backoff; zero value = fail fast
 }
 
@@ -89,6 +90,7 @@ func Resolve(g core.ImageGen) (Settings, error) {
 		Defaults:      g.Defaults,
 		Concurrency:   g.Concurrency,
 		TrimLetterbox: g.Postprocess.TrimsLetterbox(),
+		Reuse:         strings.ToLower(strings.TrimSpace(g.Reuse)),
 	}
 	if s.Concurrency <= 0 {
 		s.Concurrency = DefaultConcurrency
@@ -113,6 +115,14 @@ func Resolve(g core.ImageGen) (Settings, error) {
 // computes always matches what Request would generate.
 func (s Settings) ImageStem(prompt, system string, params map[string]string) string {
 	return Stem(s.Provider, s.Model, prompt, system, s.mergeParams(params))
+}
+
+// ImageContentStem names an image by WHAT it depicts — prompt, system prompt and params,
+// independent of the renderer (provider/model). It is the published, renderer-stable identity;
+// the provider/model that produced a file is recorded in its sidecar. Combined with the reuse
+// policy this keeps image URLs stable when the provider or model changes.
+func (s Settings) ImageContentStem(prompt, system string, params map[string]string) string {
+	return promptSlug(prompt) + "-" + CacheKey("", "", prompt, system, s.mergeParams(params))
 }
 
 // Request builds the generation request for a prompt (with its resolved system prompt)
