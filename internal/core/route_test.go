@@ -70,3 +70,16 @@ func TestGlobMatching(t *testing.T) {
 		t.Error("single * must not cross a slash")
 	}
 }
+
+// "**/x/**" must match x at the root, not only when nested under another directory.
+func TestGlobDoubleStarMatchesRoot(t *testing.T) {
+	r := NewRouter([]RouteRule{{Match: "**/assets/**", Publisher: "r2", BaseURL: "https://c/"}}, []string{"r2"})
+	for _, p := range []string{"assets/generated/foo.wav", "posts/assets/x.png"} {
+		if r.AssetURL(p) == "" {
+			t.Errorf("%q should match **/assets/**", p)
+		}
+	}
+	if r.AssetURL("index.html") != "" {
+		t.Error("index.html should not match **/assets/**")
+	}
+}

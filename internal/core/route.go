@@ -111,8 +111,16 @@ func globToRegex(pattern string) string {
 		switch c := pattern[i]; c {
 		case '*':
 			if i+1 < len(pattern) && pattern[i+1] == '*' {
-				b.WriteString(".*")
-				i++
+				// "**/" matches any number of leading path segments *including none*, so a
+				// pattern like "**/assets/**" matches a root-level "assets/x", not just a
+				// nested "dir/assets/x". A bare "**" (not a path segment) matches anything.
+				if i+2 < len(pattern) && pattern[i+2] == '/' {
+					b.WriteString("(?:.*/)?")
+					i += 2
+				} else {
+					b.WriteString(".*")
+					i++
+				}
 			} else {
 				b.WriteString("[^/]*")
 			}
