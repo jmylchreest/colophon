@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -90,10 +91,11 @@ type audioResolver struct {
 	generateAI     bool
 	voiceFor       func(postVoice, author, persona string) string
 	log            *clog.Logger
-	i18n           ttsTable         // injected-speech translations (block cues, hint, wrap-up, symbols)
-	defaultLang    string           // site language, used when a post sets none
-	acronyms       *acronymReplacer // glossary acronym → spoken expansion
-	defaultAudioOn bool             // per-post audio: default when a post sets none
+	i18n           ttsTable                 // injected-speech translations (block cues, hint, wrap-up, symbols)
+	defaultLang    string                   // site language, used when a post sets none
+	acronyms       *acronymReplacer         // glossary acronym → spoken expansion
+	defaultAudioOn bool                     // per-post audio: default when a post sets none
+	pronunciation  []generate.Pronunciation // loaded provider-agnostic pronunciation dict, if configured
 	jobs           map[string]*audioJob
 }
 
@@ -104,11 +106,22 @@ func newAudioResolver(speech *generate.SpeechSettings, root, basePath, baseURL s
 		acronyms: acronyms, defaultAudioOn: defaultAudioOn, i18n: loadTTSTable(root), log: log, jobs: map[string]*audioJob{},
 	}
 	if speech != nil {
+		if u, err := url.Parse(baseURL); err == nil && u.Host != "" {
+			speech.SiteID = u.Host // namespaces shared-account provider state (e.g. ElevenLabs dict name)
+		}
 		dir := speech.OutputDir
 		if !filepath.IsAbs(dir) {
 			dir = filepath.Join(root, filepath.FromSlash(dir))
 		}
 		ar.cacheDir = dir
+		if ref := speech.PronunciationDict; ref != "" {
+			if entries, err := generate.ResolvePronunciationDict(ref, root); err != nil {
+				log.Step("AUDIO", "pronunciation dict ignored", "ref", ref, "err", err.Error())
+			} else {
+				ar.pronunciation = entries
+				log.Detail("AUDIO", "pronunciation dict loaded", "ref", ref, "entries", len(entries))
+			}
+		}
 	}
 	return ar
 }
@@ -188,14 +201,15 @@ func (ar *audioResolver) registerTTS(label, htmlBody, lang, postVoice, author, p
 	if v := strings.TrimSpace(ar.voiceFor(postVoice, author, persona)); v != "" {
 		voice = v
 	}
-	stem := generate.SpeechStem(s.Provider, s.Model, voice, label, text)
+	pron := generate.FilterPronunciation(ar.pronunciation, text)
+	stem := generate.SpeechStem(s.Provider, s.Model, voice, label, text, pron)
 	filename := stem + ttsOutputExt
 	outPath = genOutDir + "/" + filename
 	mime = ttsOutputMIME
 	if _, seen := ar.jobs[outPath]; !seen {
 		ar.jobs[outPath] = &audioJob{
 			kind: "tts", outPath: outPath, mime: mime,
-			req:   generate.SpeechRequest{Text: text, Voice: voice, Model: s.Model},
+			req:   generate.SpeechRequest{Text: text, Voice: voice, Model: s.Model, Pronunciation: pron},
 			cache: filepath.Join(ar.cacheDir, filename),
 		}
 	}
@@ -233,11 +247,18 @@ func (ar *audioResolver) run(write func(string, []byte) error, now time.Time) er
 	var ttsErr error
 	ensureTTS := func() (generate.SpeechGenerator, error) {
 		ttsOnce.Do(func() {
-			if ar.speech != nil {
-				tts, ttsErr = generate.NewSpeech(*ar.speech)
-			} else {
+			if ar.speech == nil {
 				ttsErr = fmt.Errorf("speech generation not configured")
+				return
 			}
+			// One-time provider setup (e.g. sync the ElevenLabs IPA pronunciation dictionary).
+			// A failure is non-fatal: warn and generate without it (Say substitution still works).
+			s, err := generate.PrepareSpeech(context.Background(), *ar.speech, ar.pronunciation, ar.cacheDir)
+			if err != nil {
+				ar.log.Step("AUDIO", "", "warn", "pronunciation dictionary sync failed: "+err.Error())
+				s = *ar.speech
+			}
+			tts, ttsErr = generate.NewSpeech(s)
 		})
 		return tts, ttsErr
 	}

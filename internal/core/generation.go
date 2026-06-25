@@ -22,15 +22,19 @@ func (g Generation) Active() bool { return g.Enabled == nil || *g.Enabled }
 // model/key-env); the rest overrides it. Voice is the default voice id; a post or its
 // author/persona can override it.
 type SpeechGen struct {
-	Enabled     *bool  `yaml:"enabled,omitempty"`     // per-modality guard + per-post audio default; nil/true → on
-	Provider    string `yaml:"provider,omitempty"`    // minimax (more later)
-	Model       string `yaml:"model,omitempty"`       // overrides the profile default
-	Voice       string `yaml:"voice,omitempty"`       // default voice id
-	OutputDir   string `yaml:"output_dir,omitempty"`  // cache dir; default content/assets/generated
-	BaseURL     string `yaml:"base_url,omitempty"`    // overrides the profile endpoint
-	APIPath     string `yaml:"api_path,omitempty"`    // overrides the profile request path
-	APIKey      string `yaml:"api_key,omitempty"`     // inline key, usually "{env:VAR}"; else profile env var
-	Concurrency int    `yaml:"concurrency,omitempty"` // max clips generated in parallel; <=0 → default
+	Enabled   *bool  `yaml:"enabled,omitempty"`    // per-modality guard + per-post audio default; nil/true → on
+	Provider  string `yaml:"provider,omitempty"`   // minimax (more later)
+	Model     string `yaml:"model,omitempty"`      // overrides the profile default
+	Voice     string `yaml:"voice,omitempty"`      // default voice id
+	OutputDir string `yaml:"output_dir,omitempty"` // cache dir; default content/assets/generated
+	// PronunciationDict applies a pronunciation dictionary to generated readings. It is either a
+	// built-in name shipped under contrib (e.g. "en_GB") or a path (relative to site root) to a
+	// YAML dict ({pronunciations: [{word, ipa|say}]}); legacy JSON tone/map files also load.
+	PronunciationDict string `yaml:"pronunciation_dict,omitempty"`
+	BaseURL           string `yaml:"base_url,omitempty"`    // overrides the profile endpoint
+	APIPath           string `yaml:"api_path,omitempty"`    // overrides the profile request path
+	APIKey            string `yaml:"api_key,omitempty"`     // inline key, usually "{env:VAR}"; else profile env var
+	Concurrency       int    `yaml:"concurrency,omitempty"` // max clips generated in parallel; <=0 → default
 	// Transcript controls how a post's content is turned into spoken text — what to do with
 	// blocks that don't read well aloud (code, math, tables, diagrams).
 	Transcript SpeechTranscript `yaml:"transcript,omitempty"`

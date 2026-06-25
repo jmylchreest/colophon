@@ -70,6 +70,55 @@ func postJSON(ctx context.Context, url string, headers map[string]string, body, 
 	return nil
 }
 
+// postRaw sends body as JSON to url and returns the raw response bytes, for endpoints whose
+// success body is binary (e.g. audio) rather than JSON. A non-2xx status returns an error
+// carrying the (usually JSON) error body, classified for retry/backoff.
+func postRaw(ctx context.Context, url string, headers map[string]string, body any) ([]byte, error) {
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(buf))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, retry.FromDoErr(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, retry.FromStatus(resp.StatusCode, retry.RetryAfter(resp.Header), fmt.Errorf("%s: %s", resp.Status, truncate(data, 400)))
+	}
+	return data, nil
+}
+
+// getJSON GETs url with the given headers and decodes the JSON response into out.
+func getJSON(ctx context.Context, url string, headers map[string]string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return retry.FromDoErr(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return retry.FromStatus(resp.StatusCode, retry.RetryAfter(resp.Header), fmt.Errorf("%s: %s", resp.Status, truncate(data, 400)))
+	}
+	return json.Unmarshal(data, out)
+}
+
 // fetchBytes GETs url and returns its body, for providers that return image URLs
 // rather than inline base64.
 func fetchBytes(ctx context.Context, url string) ([]byte, string, error) {

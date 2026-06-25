@@ -16,6 +16,14 @@ const minimaxTextLimit = 4000
 // keeps the raw PCM small; the caller wraps it as WAV.
 const minimaxPCMRate = 16000
 
+// MiniMax speech profile defaults (used by speechProfiles in speech.go).
+const (
+	minimaxBaseURL      = "https://api.minimax.io/v1"
+	minimaxAPIPath      = "/t2a_v2"
+	minimaxDefaultModel = "speech-2.6-hd"
+	minimaxDefaultVoice = "English_Graceful_Lady"
+)
+
 type minimaxSpeech struct {
 	endpoint string
 	apiKey   string
@@ -53,6 +61,9 @@ func (d *minimaxSpeech) synth(ctx context.Context, req SpeechRequest, text strin
 		"text":          text,
 		"voice_setting": map[string]any{"voice_id": req.Voice, "speed": 1.0, "vol": 1.0, "pitch": 0},
 		"audio_setting": audioSetting,
+	}
+	if tone := minimaxTone(req.Pronunciation); len(tone) > 0 {
+		body["pronunciation_dict"] = map[string]any{"tone": tone}
 	}
 	var out minimaxSpeechResponse
 	headers := map[string]string{"Authorization": "Bearer " + d.apiKey}

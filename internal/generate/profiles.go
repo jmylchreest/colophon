@@ -14,9 +14,10 @@ import (
 const DefaultOutputDir = "content/assets/generated"
 
 const (
-	driverGoogle  = "google"
-	driverOpenAI  = "openai"
-	driverMiniMax = "minimax"
+	driverGoogle     = "google"
+	driverOpenAI     = "openai"
+	driverMiniMax    = "minimax"
+	driverElevenLabs = "elevenlabs"
 )
 
 // DefaultConcurrency is the max number of images generated in parallel when the

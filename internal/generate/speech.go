@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/jmylchreest/colophon/internal/core"
@@ -11,9 +12,10 @@ import (
 
 // SpeechRequest is a single text-to-speech request.
 type SpeechRequest struct {
-	Text  string
-	Voice string
-	Model string
+	Text          string
+	Voice         string
+	Model         string
+	Pronunciation []Pronunciation // provider-agnostic overrides; nil when none apply
 }
 
 // SpeechResult is generated audio. The bytes are raw mono 16-bit little-endian PCM at
@@ -32,17 +34,20 @@ type SpeechGenerator interface {
 
 // SpeechSettings is a fully-resolved speech configuration (profile defaults + overrides).
 type SpeechSettings struct {
-	Provider    string
-	Driver      string
-	Model       string
-	Voice       string
-	OutputDir   string
-	BaseURL     string
-	APIPath     string
-	APIKey      string
-	Concurrency int
-	Transcript  core.SpeechTranscript
-	Retry       RetryPolicy // rate-limit backoff; zero value = fail fast
+	Provider          string
+	Driver            string
+	Model             string
+	Voice             string
+	OutputDir         string
+	PronunciationDict string // path to a JSON pronunciation dictionary (relative to site root)
+	BaseURL           string
+	APIPath           string
+	APIKey            string
+	Concurrency       int
+	SiteID            string // stable per-site identifier (e.g. host), namespaces shared-account state
+	Transcript        core.SpeechTranscript
+	Retry             RetryPolicy        // rate-limit backoff; zero value = fail fast
+	elevenLabsLocator *elevenLabsLocator // set by PrepareSpeech; ElevenLabs IPA dictionary version
 }
 
 type speechProfile struct {
@@ -54,14 +59,22 @@ type speechProfile struct {
 	keyEnv       []string
 }
 
-// speechProfiles are the built-in TTS provider presets. MiniMax is implemented; others
-// can be added by writing a driver and an entry here.
+// speechProfiles are the built-in TTS provider presets. New providers are added by writing a
+// driver (see minimax_speech.go / elevenlabs_speech.go) and an entry here.
 var speechProfiles = map[string]speechProfile{
-	driverMiniMax: {driver: driverMiniMax, baseURL: "https://api.minimax.io/v1", apiPath: "/t2a_v2", defaultModel: "speech-2.6-hd", defaultVoice: "English_Graceful_Lady", keyEnv: []string{"MINIMAX_API_KEY"}},
+	driverMiniMax:    {driver: driverMiniMax, baseURL: minimaxBaseURL, apiPath: minimaxAPIPath, defaultModel: minimaxDefaultModel, defaultVoice: minimaxDefaultVoice, keyEnv: []string{"MINIMAX_API_KEY"}},
+	driverElevenLabs: {driver: driverElevenLabs, baseURL: elevenLabsBaseURL, apiPath: elevenLabsAPIPath, defaultModel: elevenLabsDefaultModel, defaultVoice: elevenLabsDefaultVoice, keyEnv: []string{"ELEVENLABS_API_KEY", "COLOPHON_ELEVENLABS_API_KEY", "ELEVEN_API_KEY"}},
 }
 
-// SpeechProviders lists the configurable speech provider names.
-func SpeechProviders() []string { return []string{driverMiniMax} }
+// SpeechProviders lists the configurable speech provider names (sorted for stable messages).
+func SpeechProviders() []string {
+	names := make([]string, 0, len(speechProfiles))
+	for n := range speechProfiles {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
+}
 
 // ResolveSpeech applies the provider profile to a speech config block, layering explicit
 // fields over the defaults and reading the API key from the environment when not inline.
@@ -75,16 +88,17 @@ func ResolveSpeech(g core.SpeechGen) (SpeechSettings, error) {
 		return SpeechSettings{}, fmt.Errorf("unknown speech provider %q (have: %s)", name, strings.Join(SpeechProviders(), ", "))
 	}
 	s := SpeechSettings{
-		Provider:    name,
-		Driver:      p.driver,
-		Model:       firstNonEmpty(g.Model, p.defaultModel),
-		Voice:       firstNonEmpty(g.Voice, p.defaultVoice),
-		OutputDir:   firstNonEmpty(g.OutputDir, DefaultOutputDir),
-		BaseURL:     firstNonEmpty(g.BaseURL, p.baseURL),
-		APIPath:     firstNonEmpty(g.APIPath, p.apiPath),
-		APIKey:      strings.TrimSpace(g.APIKey),
-		Concurrency: g.Concurrency,
-		Transcript:  g.Transcript,
+		Provider:          name,
+		Driver:            p.driver,
+		Model:             firstNonEmpty(g.Model, p.defaultModel),
+		Voice:             firstNonEmpty(g.Voice, p.defaultVoice),
+		OutputDir:         firstNonEmpty(g.OutputDir, DefaultOutputDir),
+		PronunciationDict: strings.TrimSpace(g.PronunciationDict),
+		BaseURL:           firstNonEmpty(g.BaseURL, p.baseURL),
+		APIPath:           firstNonEmpty(g.APIPath, p.apiPath),
+		APIKey:            strings.TrimSpace(g.APIKey),
+		Concurrency:       g.Concurrency,
+		Transcript:        g.Transcript,
 	}
 	if s.Concurrency <= 0 {
 		s.Concurrency = DefaultConcurrency
@@ -108,6 +122,8 @@ func NewSpeech(s SpeechSettings) (SpeechGenerator, error) {
 	switch s.Driver {
 	case driverMiniMax:
 		return withSpeechRetry(&minimaxSpeech{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey}, s.Retry), nil
+	case driverElevenLabs:
+		return withSpeechRetry(&elevenLabsSpeech{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey, locator: s.elevenLabsLocator}, s.Retry), nil
 	default:
 		return nil, fmt.Errorf("unknown speech driver %q", s.Driver)
 	}
@@ -115,9 +131,14 @@ func NewSpeech(s SpeechSettings) (SpeechGenerator, error) {
 
 // SpeechStem is the deterministic, extension-less cache name for a speech request. The
 // label (e.g. the post slug) is a readable prefix; the hash covers everything affecting
-// the synthesis (provider, model, voice, text). The container format is fixed (WAV) and
-// captured by the file extension, so it is not part of the key.
-func SpeechStem(provider, model, voice, label, text string) string {
-	key := CacheKey(provider, model, text, voice, nil)
+// the synthesis (provider, model, voice, text, and the applied pronunciation entries). The
+// container format is fixed (WAV) and captured by the file extension, so it is not part of
+// the key.
+func SpeechStem(provider, model, voice, label, text string, pronunciation []Pronunciation) string {
+	var extra map[string]string
+	if len(pronunciation) > 0 {
+		extra = map[string]string{"pron": pronunciationKey(pronunciation)}
+	}
+	key := CacheKey(provider, model, text, voice, extra)
 	return promptSlug(label) + "-" + key
 }
