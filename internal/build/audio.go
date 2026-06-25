@@ -298,10 +298,11 @@ func (ar *audioResolver) run(write func(string, []byte) error, now time.Time) er
 		return tts, ttsErr
 	}
 
-	// Sync provider-side state (e.g. the ElevenLabs IPA pronunciation dictionary) even when every
+	// Sync provider-side state (the ElevenLabs IPA pronunciation dictionary) even when every
 	// reading is already cached, so the dictionary exists and refreshes on any --generate-ai build
-	// — not only when a reading is (re)generated. No-op without a configured pronunciation dict.
-	if ar.generateAI && len(ar.pronunciation) > 0 {
+	// — not only when a reading is (re)generated. Skipped for providers that send pronunciations
+	// inline (MiniMax), and a no-op when nothing has changed remotely.
+	if ar.generateAI && ar.speech != nil && generate.NeedsDictSync(*ar.speech, ar.pronunciation) {
 		_, _ = ensureTTS()
 	}
 

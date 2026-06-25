@@ -93,6 +93,14 @@ func removedWords(old []string, rules []pronRule) []string {
 	return gone
 }
 
+// NeedsDictSync reports whether the provider stores pronunciations as a remote, versioned
+// dictionary that must be synced before generation (ElevenLabs IPA entries), as opposed to
+// sending them inline in each request (MiniMax). False when there is nothing remote to sync, so
+// callers can skip provider setup entirely on cache-only builds.
+func NeedsDictSync(s SpeechSettings, pron []Pronunciation) bool {
+	return s.Driver == driverElevenLabs && len(ipaRules(pron)) > 0
+}
+
 // PrepareSpeech performs any one-time, provider-specific setup needed before generation and
 // returns settings ready for NewSpeech. For ElevenLabs it syncs the IPA pronunciation dictionary
 // (create/update/reuse, tracked in stateDir) and pins the resulting locator. For other providers
