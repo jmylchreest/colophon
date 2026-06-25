@@ -115,6 +115,10 @@ a { color: inherit; }
 .post-flags .pf { display: inline-flex; align-items: center; justify-content: center;
   width: 1.65rem; height: 1.65rem; border-radius: 50%; color: var(--accent); background: var(--accent-soft); }
 .post-flags .pf svg { width: 0.95rem; height: 0.95rem; }
+/* reserve room at the title's right so a long title wraps before the corner media icons
+   instead of running underneath them (one icon vs. two) */
+.post-row.has-media-1 .pt { padding-right: 2.4rem; }
+.post-row.has-media-2 .pt { padding-right: 4rem; }
 .post-list { list-style: none; padding: 2rem 0 5rem; }
 .post-row { position: relative; padding: 1.6rem 0; border-top: 1px solid var(--border);
   display: grid; grid-template-columns: 7rem 1fr; gap: 1.5rem; align-items: baseline; transition: opacity 0.2s; }
