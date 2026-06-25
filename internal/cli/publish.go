@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/jmylchreest/colophon/internal/build"
@@ -352,6 +353,11 @@ func deployAll(ctx context.Context, env *config.Environment, name string, target
 	for _, r := range routes {
 		routeTargets[r.Publisher] = true
 	}
+	// Publish object-store targets (which own routed assets) before the page host, so the
+	// deployed HTML never references assets that haven't been uploaded yet.
+	sort.SliceStable(targets, func(i, j int) bool {
+		return router.Owns(targets[i].id) && !router.Owns(targets[j].id)
+	})
 	for _, t := range targets {
 		// Routing partitions the tree: each publisher sees only the files it owns (a route
 		// target gets its matched paths; a default publisher gets the unrouted remainder).
