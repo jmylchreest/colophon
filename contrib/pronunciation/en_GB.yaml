@@ -8,37 +8,39 @@
 # Scope: words where a TTS voice tends to default to American English, plus tech terms commonly
 # mispronounced. Deliberately small — overriding words the voice already says correctly tends to
 # make them worse. Audition before adding entries.
+# IPA verified against Cambridge (UK) and Wiktionary (RP); primary stress ˈ at the syllable
+# onset, non-rhotic.
 pronunciations:
   - word: router
     ipa: ˈruːtə
   - word: route
-    ipa: rˈuːt
+    ipa: ruːt
   - word: cache
-    ipa: kˈæʃ
+    ipa: kæʃ
   - word: aluminium
-    ipa: ˌæljʊmˈɪniəm
+    ipa: ˌæljʊˈmɪniəm
   - word: privacy
-    ipa: prˈɪvəsi
+    ipa: ˈprɪvəsi
   - word: data
-    ipa: dˈeɪtə
+    ipa: ˈdeɪtə
   - word: status
-    ipa: stˈeɪtəs
+    ipa: ˈsteɪtəs
   - word: process
     ipa: ˈprəʊsɛs
   - word: lieutenant
-    ipa: lɛftˈɛnənt
+    ipa: lɛfˈtɛnənt
   - word: vitamin
-    ipa: vˈɪtəmɪn
+    ipa: ˈvɪtəmɪn
   - word: either
     ipa: ˈaɪðə
   - word: neither
-    ipa: nˈaɪðə
+    ipa: ˈnaɪðə
   - word: niche
-    ipa: nˈiːʃ
+    ipa: niːʃ
   - word: schema
-    ipa: skˈiːmə
+    ipa: ˈskiːmə
   - word: query
-    ipa: kwˈɪəri
+    ipa: ˈkwɪəri
   - word: Apache
     ipa: əˈpætʃi
   - word: nginx
