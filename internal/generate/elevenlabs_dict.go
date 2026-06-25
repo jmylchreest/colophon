@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 // ElevenLabs renders IPA overrides through an uploaded, versioned pronunciation dictionary
@@ -40,18 +41,25 @@ type prondictState struct {
 }
 
 // ipaRules builds the ElevenLabs phoneme rules from a dictionary's IPA entries, sorted for a
-// stable hash. Say-only entries are excluded (the driver substitutes those as text). The
-// add-from-rules API takes the phoneme as BARE IPA (e.g. "təˈmeɪtoʊ"), not slash-delimited —
-// the dashboard editor shows/validates a /…/ form, but the API and engine use the bare value.
+// stable hash. Say-only entries are excluded (the driver substitutes those as text). The IPA is
+// slash-delimited (/təˈmeɪtoʊ/): the dashboard editor requires that form to edit a rule, and
+// ElevenLabs normalises it. (The API docs show a bare example, but bare entries can't be edited
+// in the dashboard — so we send the dashboard-canonical delimited form.)
 func ipaRules(ps []Pronunciation) []pronRule {
 	var rules []pronRule
 	for _, p := range ps {
 		if p.IPA != "" {
-			rules = append(rules, pronRule{Type: "phoneme", StringToReplace: p.Word, Phoneme: p.IPA, Alphabet: "ipa"})
+			rules = append(rules, pronRule{Type: "phoneme", StringToReplace: p.Word, Phoneme: wrapIPA(p.IPA), Alphabet: "ipa"})
 		}
 	}
 	sort.Slice(rules, func(i, j int) bool { return rules[i].StringToReplace < rules[j].StringToReplace })
 	return rules
+}
+
+// wrapIPA delimits an IPA string with exactly one pair of slashes, tolerating input that
+// already has a leading and/or trailing slash (or none).
+func wrapIPA(ipa string) string {
+	return "/" + strings.Trim(ipa, "/") + "/"
 }
 
 func rulesHash(rules []pronRule) string {

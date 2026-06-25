@@ -20,11 +20,24 @@ func TestIPARulesAndHash(t *testing.T) {
 	if rules[0].Type != "phoneme" || rules[0].Alphabet != "ipa" {
 		t.Errorf("bad rule shape: %+v", rules[0])
 	}
-	if rules[0].Phoneme != "rˈuːt" { // bare IPA, per the add-from-rules API
-		t.Errorf("phoneme must be bare IPA, got %q", rules[0].Phoneme)
+	if rules[0].Phoneme != "/rˈuːt/" { // slash-delimited, as the dashboard editor stores it
+		t.Errorf("phoneme must be slash-delimited, got %q", rules[0].Phoneme)
 	}
 	if rulesHash(rules) == rulesHash(ipaRules([]Pronunciation{{Word: "router", IPA: "X"}, {Word: "route", IPA: "rˈuːt"}})) {
 		t.Error("hash should change when a phoneme changes")
+	}
+}
+
+func TestWrapIPA(t *testing.T) {
+	for in, want := range map[string]string{
+		"rˈuːt":   "/rˈuːt/",
+		"/rˈuːt/": "/rˈuːt/",
+		"/rˈuːt":  "/rˈuːt/", // lone leading slash
+		"rˈuːt/":  "/rˈuːt/", // lone trailing slash
+	} {
+		if got := wrapIPA(in); got != want {
+			t.Errorf("wrapIPA(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 
