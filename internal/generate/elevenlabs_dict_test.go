@@ -19,6 +19,9 @@ func TestIPARulesAndHash(t *testing.T) {
 	if rules[0].Type != "phoneme" || rules[0].Alphabet != "ipa" {
 		t.Errorf("bad rule shape: %+v", rules[0])
 	}
+	if rules[0].Phoneme != "/rˈuːt/" { // ElevenLabs requires IPA wrapped in slashes
+		t.Errorf("phoneme must be slash-delimited, got %q", rules[0].Phoneme)
+	}
 	if rulesHash(rules) == rulesHash(ipaRules([]Pronunciation{{Word: "router", IPA: "X"}, {Word: "route", IPA: "rˈuːt"}})) {
 		t.Error("hash should change when a phoneme changes")
 	}
