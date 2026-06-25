@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -38,11 +39,13 @@ func TestRemovedWords(t *testing.T) {
 // unchanged, then update-in-place (add-rules + remove-rules) when the dict changes.
 func TestSyncElevenLabsDict_Lifecycle(t *testing.T) {
 	var calls []string
+	created := []map[string]any{} // dictionaries currently on the account (reflected by list)
 	version := 0
 	mux := http.NewServeMux()
 	mux.HandleFunc("/pronunciation-dictionaries/add-from-rules", func(w http.ResponseWriter, r *http.Request) {
 		calls = append(calls, "create")
 		version++
+		created = append(created, map[string]any{"id": "dict1", "name": "colophon:blog.example", "latest_version_id": "v1"})
 		_ = json.NewEncoder(w).Encode(map[string]any{"id": "dict1", "version_id": "v1"})
 	})
 	mux.HandleFunc("/pronunciation-dictionaries/dict1/add-rules", func(w http.ResponseWriter, r *http.Request) {
@@ -62,10 +65,9 @@ func TestSyncElevenLabsDict_Lifecycle(t *testing.T) {
 		version++
 		_ = json.NewEncoder(w).Encode(map[string]any{"version_id": fmt.Sprintf("v%d", version)})
 	})
-	// No pre-existing dictionaries on the account.
 	mux.HandleFunc("/pronunciation-dictionaries", func(w http.ResponseWriter, r *http.Request) {
 		calls = append(calls, "list")
-		_ = json.NewEncoder(w).Encode(map[string]any{"pronunciation_dictionaries": []any{}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"pronunciation_dictionaries": created})
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
@@ -86,18 +88,46 @@ func TestSyncElevenLabsDict_Lifecycle(t *testing.T) {
 	if _, err := syncElevenLabsDict(context.Background(), s, v1, dir); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(calls, []string{"list", "create"}) {
-		t.Fatalf("unchanged run made calls = %v", calls)
+	if !reflect.DeepEqual(calls, []string{"list", "create", "list"}) {
+		t.Fatalf("unchanged run calls = %v", calls)
 	}
 
-	// Changed (drop "route", change "router") → add-rules then remove-rules on same id (no list).
+	// Changed (drop "route", change "router") → list, then add-rules + remove-rules on same id.
 	v2 := []Pronunciation{{Word: "router", IPA: "ˈruːtər"}}
 	loc, err = syncElevenLabsDict(context.Background(), s, v2, dir)
 	if err != nil || loc.DictID != "dict1" {
 		t.Fatalf("update: loc=%+v err=%v", loc, err)
 	}
-	if !reflect.DeepEqual(calls, []string{"list", "create", "add", "remove"}) {
+	if !reflect.DeepEqual(calls, []string{"list", "create", "list", "list", "add", "remove"}) {
 		t.Fatalf("update calls = %v", calls)
+	}
+}
+
+// A tracked dictionary deleted out of band (absent from the account list) is recreated, not
+// reused — even when the rules are unchanged.
+func TestSyncElevenLabsDict_RecreatesDeleted(t *testing.T) {
+	var created bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/pronunciation-dictionaries", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"pronunciation_dictionaries": []any{}}) // account is empty
+	})
+	mux.HandleFunc("/pronunciation-dictionaries/add-from-rules", func(w http.ResponseWriter, r *http.Request) {
+		created = true
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "newdict", "version_id": "v1"})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	dir := t.TempDir()
+	pron := []Pronunciation{{Word: "zebra", IPA: "ˈzɛbrə"}}
+	// State pins a dictionary that no longer exists, with a hash matching the current rules.
+	_ = writePronDictState(filepath.Join(dir, prondictStateFile), map[string]prondictState{
+		driverElevenLabs: {DictID: "gone", VersionID: "v9", Hash: rulesHash(ipaRules(pron)), Words: []string{"zebra"}},
+	})
+	s := SpeechSettings{Driver: driverElevenLabs, BaseURL: srv.URL, APIKey: "k", SiteID: "blog.example"}
+	loc, err := syncElevenLabsDict(context.Background(), s, pron, dir)
+	if err != nil || !created || loc.DictID != "newdict" {
+		t.Fatalf("expected recreate of deleted dict, created=%v loc=%+v err=%v", created, loc, err)
 	}
 }
 

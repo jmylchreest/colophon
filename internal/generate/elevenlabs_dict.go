@@ -120,27 +120,34 @@ func syncElevenLabsDict(ctx context.Context, s SpeechSettings, pron []Pronunciat
 	all := readPronDictState(statePath)
 	cur := all[driverElevenLabs]
 
-	if cur.DictID != "" && cur.Hash == hash {
-		return &elevenLabsLocator{DictID: cur.DictID, VersionID: cur.VersionID}, nil
-	}
-
 	base := s.BaseURL + "/pronunciation-dictionaries"
 	hdr := map[string]string{"xi-api-key": s.APIKey}
 	name := dictName(s.SiteID)
-	var dictID, versionID string
 
-	// Cold path (no/stale state file, e.g. a fresh clone): a dictionary for this site may
-	// already exist on the account. Find it by its deterministic name and adopt it rather than
-	// creating an orphan duplicate. Site-id namespaces the name so multiple sites on one account
-	// don't clobber each other.
+	// List the account's dictionaries once to reconcile our state with reality: a tracked
+	// dictionary may have been deleted or archived out of band (recreate it), and on a cold start
+	// (lost state file) one may already exist under our name (adopt it instead of orphaning a
+	// duplicate). Site-id namespaces the name so multiple sites on one account don't clobber each
+	// other. The sync only runs when audio is generated, so the extra call is negligible.
+	dicts, err := listDicts(ctx, base, hdr)
+	if err != nil {
+		return nil, fmt.Errorf("list dictionaries: %w", err)
+	}
+	if cur.DictID != "" && !containsDictID(dicts, cur.DictID) {
+		cur = prondictState{} // tracked dictionary is gone → recreate
+	}
 	if cur.DictID == "" {
-		if found, err := findDictByName(ctx, base, hdr, name); err != nil {
-			return nil, fmt.Errorf("list dictionaries: %w", err)
-		} else if found != nil {
+		if found := findDict(dicts, name); found != nil {
 			cur.DictID, cur.VersionID, cur.Words = found.ID, found.LatestVersionID, nil
 		}
 	}
 
+	// Unchanged and still present → reuse with no further calls.
+	if cur.DictID != "" && cur.Hash == hash {
+		return &elevenLabsLocator{DictID: cur.DictID, VersionID: cur.VersionID}, nil
+	}
+
+	var dictID, versionID string
 	if cur.DictID == "" {
 		var resp struct {
 			ID        string `json:"id"`
@@ -199,21 +206,35 @@ type foundDict struct {
 	LatestVersionID string `json:"latest_version_id"`
 }
 
-// findDictByName lists the account's pronunciation dictionaries and returns the one whose name
-// matches, or nil if none. Used only on the cold path (missing state).
-func findDictByName(ctx context.Context, base string, hdr map[string]string, name string) (*foundDict, error) {
+// listDicts returns the account's pronunciation dictionaries.
+func listDicts(ctx context.Context, base string, hdr map[string]string) ([]foundDict, error) {
 	var resp struct {
 		Dicts []foundDict `json:"pronunciation_dictionaries"`
 	}
 	if err := getJSON(ctx, base+"?page_size=100", hdr, &resp); err != nil {
 		return nil, err
 	}
-	for i := range resp.Dicts {
-		if resp.Dicts[i].Name == name {
-			return &resp.Dicts[i], nil
+	return resp.Dicts, nil
+}
+
+// findDict returns the dictionary with the given name, or nil.
+func findDict(dicts []foundDict, name string) *foundDict {
+	for i := range dicts {
+		if dicts[i].Name == name {
+			return &dicts[i]
 		}
 	}
-	return nil, nil
+	return nil
+}
+
+// containsDictID reports whether a dictionary with the given id exists.
+func containsDictID(dicts []foundDict, id string) bool {
+	for i := range dicts {
+		if dicts[i].ID == id {
+			return true
+		}
+	}
+	return false
 }
 
 func readPronDictState(path string) map[string]prondictState {
