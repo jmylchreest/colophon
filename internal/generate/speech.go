@@ -11,16 +11,17 @@ import (
 
 // SpeechRequest is a single text-to-speech request.
 type SpeechRequest struct {
-	Text   string
-	Voice  string
-	Format string
-	Model  string
+	Text  string
+	Voice string
+	Model string
 }
 
-// SpeechResult is generated audio plus its MIME type.
+// SpeechResult is generated audio. The bytes are raw mono 16-bit little-endian PCM at
+// SampleRate Hz; the caller wraps them in a container (WAV). MIME describes the raw bytes.
 type SpeechResult struct {
-	Bytes []byte
-	MIME  string
+	Bytes      []byte
+	MIME       string // raw sample format, e.g. "audio/L16"
+	SampleRate int    // PCM sample rate in Hz
 }
 
 // SpeechGenerator turns text into spoken audio. Implementations are provider drivers
@@ -35,7 +36,6 @@ type SpeechSettings struct {
 	Driver      string
 	Model       string
 	Voice       string
-	Format      string
 	OutputDir   string
 	BaseURL     string
 	APIPath     string
@@ -79,7 +79,6 @@ func ResolveSpeech(g core.SpeechGen) (SpeechSettings, error) {
 		Driver:      p.driver,
 		Model:       firstNonEmpty(g.Model, p.defaultModel),
 		Voice:       firstNonEmpty(g.Voice, p.defaultVoice),
-		Format:      strings.ToLower(firstNonEmpty(g.Format, "mp3")),
 		OutputDir:   firstNonEmpty(g.OutputDir, DefaultOutputDir),
 		BaseURL:     firstNonEmpty(g.BaseURL, p.baseURL),
 		APIPath:     firstNonEmpty(g.APIPath, p.apiPath),
@@ -116,26 +115,9 @@ func NewSpeech(s SpeechSettings) (SpeechGenerator, error) {
 
 // SpeechStem is the deterministic, extension-less cache name for a speech request. The
 // label (e.g. the post slug) is a readable prefix; the hash covers everything affecting
-// the audio (provider, model, voice, format, text).
-func SpeechStem(provider, model, voice, format, label, text string) string {
-	key := CacheKey(provider, model, text, voice, map[string]string{"format": format})
+// the synthesis (provider, model, voice, text). The container format is fixed (WAV) and
+// captured by the file extension, so it is not part of the key.
+func SpeechStem(provider, model, voice, label, text string) string {
+	key := CacheKey(provider, model, text, voice, nil)
 	return promptSlug(label) + "-" + key
-}
-
-// AudioMIME maps an audio format to its MIME type (for enclosures and players).
-func AudioMIME(format string) string {
-	switch strings.ToLower(format) {
-	case "mp3":
-		return "audio/mpeg"
-	case "wav", "pcmu_wav":
-		return "audio/wav"
-	case "flac":
-		return "audio/flac"
-	case "opus":
-		return "audio/opus"
-	case "pcm", "pcmu_raw":
-		return "audio/L16"
-	default:
-		return "application/octet-stream"
-	}
 }

@@ -8,8 +8,13 @@ import (
 )
 
 // minimaxTextLimit is a conservative per-request character cap; longer text is split into
-// chunks whose audio is concatenated (MP3 frames concatenate cleanly for playback).
+// chunks whose audio is concatenated (raw PCM samples concatenate cleanly, unlike compressed
+// frames).
 const minimaxTextLimit = 4000
+
+// minimaxPCMRate is the sample rate we request. 16 kHz mono is wideband voice quality and
+// keeps the raw PCM small; the caller wraps it as WAV.
+const minimaxPCMRate = 16000
 
 type minimaxSpeech struct {
 	endpoint string
@@ -38,14 +43,11 @@ func (d *minimaxSpeech) Generate(ctx context.Context, req SpeechRequest) (Speech
 	if len(audio) == 0 {
 		return SpeechResult{}, fmt.Errorf("no audio returned")
 	}
-	return SpeechResult{Bytes: audio, MIME: AudioMIME(req.Format)}, nil
+	return SpeechResult{Bytes: audio, MIME: "audio/L16", SampleRate: minimaxPCMRate}, nil
 }
 
 func (d *minimaxSpeech) synth(ctx context.Context, req SpeechRequest, text string) ([]byte, error) {
-	audioSetting := map[string]any{"format": req.Format, "sample_rate": 32000, "channel": 1}
-	if req.Format == "mp3" {
-		audioSetting["bitrate"] = 128000 // bitrate is mp3-only
-	}
+	audioSetting := map[string]any{"format": "pcm", "sample_rate": minimaxPCMRate, "channel": 1}
 	body := map[string]any{
 		"model":         req.Model,
 		"text":          text,

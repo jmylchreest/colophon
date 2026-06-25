@@ -188,14 +188,14 @@ func (ar *audioResolver) registerTTS(label, htmlBody, lang, postVoice, author, p
 	if v := strings.TrimSpace(ar.voiceFor(postVoice, author, persona)); v != "" {
 		voice = v
 	}
-	stem := generate.SpeechStem(s.Provider, s.Model, voice, s.Format, label, text)
-	filename := stem + "." + s.Format
+	stem := generate.SpeechStem(s.Provider, s.Model, voice, label, text)
+	filename := stem + ttsOutputExt
 	outPath = genOutDir + "/" + filename
-	mime = generate.AudioMIME(s.Format)
+	mime = ttsOutputMIME
 	if _, seen := ar.jobs[outPath]; !seen {
 		ar.jobs[outPath] = &audioJob{
 			kind: "tts", outPath: outPath, mime: mime,
-			req:   generate.SpeechRequest{Text: text, Voice: voice, Format: s.Format, Model: s.Model},
+			req:   generate.SpeechRequest{Text: text, Voice: voice, Model: s.Model},
 			cache: filepath.Join(ar.cacheDir, filename),
 		}
 	}
@@ -373,32 +373,32 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 			out.logArgs = []any{"warn", fmt.Sprintf("generate %q failed: %v", path.Base(j.outPath), err)}
 			return out
 		}
-		// No second render for a waveform: the browser derives peaks from this audio (player.js).
+		// The provider returns raw PCM; wrap it as WAV. No second render for a waveform —
+		// the browser derives peaks from this audio (player.js).
+		audio := encodeWAV(pcmToSamples(res.Bytes), res.SampleRate)
 		if err := os.MkdirAll(ar.cacheDir, 0o755); err != nil {
 			out.fatal = err
 			return out
 		}
-		if err := os.WriteFile(j.cache, res.Bytes, 0o644); err != nil {
+		if err := os.WriteFile(j.cache, audio, 0o644); err != nil {
 			out.fatal = err
 			return out
 		}
-		_ = writeAudioSidecar(j.cache, j.req, res.MIME, now)
-		j.size = int64(len(res.Bytes))
-		out.bytes, out.logArgs = res.Bytes, []any{"generated", path.Base(j.outPath), "voice", j.req.Voice, "bytes", len(res.Bytes)}
+		_ = writeAudioSidecar(j.cache, j.req, now)
+		j.size = int64(len(audio))
+		out.bytes, out.logArgs = audio, []any{"generated", path.Base(j.outPath), "voice", j.req.Voice, "bytes", len(audio)}
 		return out
 	}
 }
 
 // writeAudioSidecar records cache metadata next to a generated clip (provenance + the inputs the
-// cache key is derived from). The waveform is no longer precomputed — the player derives it from
-// the audio in-browser — so no peaks are stored.
-func writeAudioSidecar(audioPath string, req generate.SpeechRequest, mime string, now time.Time) error {
+// cache key is derived from). The waveform is not precomputed — the player derives it from the
+// audio in-browser — so no peaks are stored.
+func writeAudioSidecar(audioPath string, req generate.SpeechRequest, now time.Time) error {
 	sc := map[string]any{
 		"text_chars": len(req.Text),
 		"voice":      req.Voice,
 		"model":      req.Model,
-		"format":     req.Format,
-		"mime":       mime,
 		"generated":  now.Format(time.RFC3339),
 	}
 	b, err := json.MarshalIndent(sc, "", "  ")

@@ -26,7 +26,6 @@ type SpeechGen struct {
 	Provider    string `yaml:"provider,omitempty"`    // minimax (more later)
 	Model       string `yaml:"model,omitempty"`       // overrides the profile default
 	Voice       string `yaml:"voice,omitempty"`       // default voice id
-	Format      string `yaml:"format,omitempty"`      // audio format; default mp3 (podcast-portable)
 	OutputDir   string `yaml:"output_dir,omitempty"`  // cache dir; default content/assets/generated
 	BaseURL     string `yaml:"base_url,omitempty"`    // overrides the profile endpoint
 	APIPath     string `yaml:"api_path,omitempty"`    // overrides the profile request path
