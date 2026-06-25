@@ -35,6 +35,9 @@ func init() {
 const (
 	maxBatchFiles = 1000
 	maxBatchBytes = 40 << 20
+	// cfMaxFileBytes is Cloudflare Pages' hard per-file limit (25 MiB). A larger file makes the
+	// assets/upload call fail (often an opaque 500), so we reject it up front with a clear hint.
+	cfMaxFileBytes = 25 << 20
 )
 
 type Publisher struct {
@@ -149,6 +152,9 @@ func (p *Publisher) Commit(ctx context.Context, tree fs.FS, plan *core.Plan) (co
 		b, err := fs.ReadFile(tree, rel)
 		if err != nil {
 			return res, err
+		}
+		if int64(len(b)) > cfMaxFileBytes {
+			return res, fmt.Errorf("%q is %.1f MiB, over Cloudflare Pages' 25 MiB per-file limit; route it to an object store (e.g. site.routing → r2) or reduce its size", rel, float64(len(b))/(1<<20))
 		}
 		if len(batch) >= maxBatchFiles || batchBytes+int64(len(b)) > maxBatchBytes {
 			if err := flush(); err != nil {

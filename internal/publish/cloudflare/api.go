@@ -84,17 +84,34 @@ func (c *apiClient) do(ctx context.Context, method, url, bearer, contentType str
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	data, _ := io.ReadAll(resp.Body)
 	var env envelope
-	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
-		return fmt.Errorf("%s %s: decode response (%s): %w", method, url, resp.Status, err)
+	if err := json.Unmarshal(data, &env); err != nil {
+		// A non-JSON body (typically a Cloudflare 5xx HTML/plaintext error) would otherwise
+		// surface as a cryptic JSON-decode error; show the status and the raw body instead.
+		return fmt.Errorf("%s %s: %s: %s", method, url, resp.Status, truncateBody(data))
 	}
 	if !env.Success {
-		return fmt.Errorf("%s %s: %s", method, url, apiErr(env))
+		return fmt.Errorf("%s %s: %s (%s)", method, url, apiErr(env), resp.Status)
 	}
 	if out != nil && len(env.Result) > 0 {
 		return json.Unmarshal(env.Result, out)
 	}
 	return nil
+}
+
+// truncateBody renders a response body for an error message, collapsing whitespace and capping
+// the length so an HTML error page or stack trace doesn't flood the log.
+func truncateBody(b []byte) string {
+	s := strings.TrimSpace(string(b))
+	if s == "" {
+		return "(empty body)"
+	}
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) > 400 {
+		s = s[:400] + "…"
+	}
+	return s
 }
 
 func apiErr(env envelope) string {
