@@ -148,7 +148,14 @@ func (c *SyndicateCmd) Run() error {
 				skipped++ // unchanged since last syndicated
 
 			default:
-				// Content changed (or --resync) → edit the silo copy in place, if the driver can.
+				// Content changed (or --resync) → edit the silo copy in place, if we can.
+				if strings.TrimSpace(prior.URL) == "" {
+					// No silo handle was ever recorded (e.g. posted via a fire-and-forget driver
+					// like Bridgy) → nothing to edit. Skip cleanly; this isn't a failure.
+					skipped++
+					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "skipped", "note", "no recorded silo URL to edit")
+					continue
+				}
 				up, ok := open[id].(syndicate.Updater)
 				if !ok {
 					skipped++
