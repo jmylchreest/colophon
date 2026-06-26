@@ -485,6 +485,14 @@ func (ar *audioResolver) produce(j *audioJob, now time.Time) (out audioOutcome) 
 					if meta, err := os.ReadFile(j.cache + ".json"); err == nil {
 						j.peaks = parsePeaks(meta)
 					}
+					// Backfill peaks for clips cached before server-side waveforms — derived from the
+					// cached bytes, no re-render — so every reading ships a sidecar.
+					if len(j.peaks) == 0 {
+						if pk, ok := peaksFromWAV(b); ok {
+							j.peaks = pk
+							_ = writeAudioSidecar(j.cache, provider, j.req, j.peaks, now)
+						}
+					}
 					out.bytes, out.detail, out.logArgs = b, true, []any{"cached", path.Base(j.outPath), "bytes", len(b)}
 					return out
 				}
@@ -492,14 +500,19 @@ func (ar *audioResolver) produce(j *audioJob, now time.Time) (out audioOutcome) 
 			} else if b, err := os.ReadFile(j.legacy); err == nil {
 				// Migration: adopt a clip cached by a pre-content-naming build under the new
 				// content name (+ sidecar), so upgrading doesn't re-render unchanged audio.
-				if err := os.MkdirAll(rs.cacheDir, 0o755); err == nil {
-					_ = os.WriteFile(j.cache, b, 0o644)
-					_ = writeAudioSidecar(j.cache, provider, j.req, now)
-				}
-				j.size = int64(len(b))
 				if meta, err := os.ReadFile(j.legacy + ".json"); err == nil {
 					j.peaks = parsePeaks(meta)
 				}
+				if len(j.peaks) == 0 {
+					if pk, ok := peaksFromWAV(b); ok {
+						j.peaks = pk
+					}
+				}
+				if err := os.MkdirAll(rs.cacheDir, 0o755); err == nil {
+					_ = os.WriteFile(j.cache, b, 0o644)
+					_ = writeAudioSidecar(j.cache, provider, j.req, j.peaks, now)
+				}
+				j.size = int64(len(b))
 				out.bytes, out.detail, out.logArgs = b, true, []any{"adopted", path.Base(j.outPath), "bytes", len(b)}
 				return out
 			}
@@ -518,9 +531,14 @@ func (ar *audioResolver) produce(j *audioJob, now time.Time) (out audioOutcome) 
 			out.logArgs = []any{"warn", fmt.Sprintf("generate %q failed: %v", path.Base(j.outPath), err)}
 			return out
 		}
-		// The provider returns raw PCM; wrap it as WAV. No second render for a waveform —
-		// the browser derives peaks from this audio (player.js).
-		audio := encodeWAV(pcmToSamples(res.Bytes), res.SampleRate)
+		// The provider returns raw PCM; wrap it as WAV. The waveform peaks are derived from those
+		// same samples — not a second render — and shipped beside the audio so the player uses
+		// them directly; the in-browser visualiser is only a fallback when the sidecar is absent.
+		samples := pcmToSamples(res.Bytes)
+		audio := encodeWAV(samples, res.SampleRate)
+		if pk, ok := peaksFromSamples(samples); ok {
+			j.peaks = pk
+		}
 		if err := os.MkdirAll(rs.cacheDir, 0o755); err != nil {
 			out.fatal = err
 			return out
@@ -529,24 +547,28 @@ func (ar *audioResolver) produce(j *audioJob, now time.Time) (out audioOutcome) 
 			out.fatal = err
 			return out
 		}
-		_ = writeAudioSidecar(j.cache, provider, j.req, now)
+		_ = writeAudioSidecar(j.cache, provider, j.req, j.peaks, now)
 		j.size = int64(len(audio))
 		out.bytes, out.logArgs = audio, []any{"generated", path.Base(j.outPath), "voice", j.req.Voice, "bytes", len(audio)}
 		return out
 	}
 }
 
-// writeAudioSidecar records cache metadata next to a generated clip: provenance plus the
-// renderer identity (provider/model/voice), which reuse:exact compares against the current
-// config to decide whether a renderer change re-renders. The waveform is not precomputed — the
-// player derives it from the audio in-browser — so no peaks are stored.
-func writeAudioSidecar(audioPath, provider string, req generate.SpeechRequest, now time.Time) error {
+// writeAudioSidecar records cache metadata next to a generated clip: provenance, the renderer
+// identity (provider/model/voice) that reuse:exact compares against, and the precomputed waveform
+// peaks (when available) so a cache hit reuses them without re-analysing the audio. The same peaks
+// are published beside the clip as <audio>.json; the player falls back to an in-browser waveform
+// only when that sidecar is absent.
+func writeAudioSidecar(audioPath, provider string, req generate.SpeechRequest, peaks []float64, now time.Time) error {
 	sc := map[string]any{
 		"text_chars": len(req.Text),
 		"provider":   provider,
 		"voice":      req.Voice,
 		"model":      req.Model,
 		"generated":  now.Format(time.RFC3339),
+	}
+	if len(peaks) > 0 {
+		sc["peaks"] = peaks
 	}
 	b, err := json.MarshalIndent(sc, "", "  ")
 	if err != nil {

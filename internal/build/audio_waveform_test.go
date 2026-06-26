@@ -44,12 +44,18 @@ func withSpeechGen(rs *resolvedSpeech, g generate.SpeechGenerator) {
 	rs.once.Do(func() {})
 }
 
-// TestGenerateSingleRender: a generated reading makes exactly one provider call (the waveform is
-// derived client-side from the audio), the published bytes are WAV-wrapped, and no peaks sidecar
-// is produced server-side.
+// TestGenerateSingleRender: a generated reading makes exactly one provider call — the waveform
+// peaks are derived from those same samples, not a second render — the published bytes are
+// WAV-wrapped, and the peaks are stored in the cache sidecar for reuse.
 func TestGenerateSingleRender(t *testing.T) {
 	ar, j := newTTSResolver(t, true)
-	fake := &fakeSpeech{audio: []byte("\x01\x02\x03\x04\x05\x06\x07\x08")} // 4 PCM samples
+	// Enough PCM (>= waveformBuckets samples) with varying amplitude that peaks can be derived.
+	pcm := make([]byte, 0, 512)
+	for i := 0; i < 256; i++ {
+		v := int16((i%32 - 16) * 200)
+		pcm = append(pcm, byte(v), byte(v>>8))
+	}
+	fake := &fakeSpeech{audio: pcm}
 	withSpeechGen(j.rs, fake)
 
 	out := ar.produce(j, time.Unix(0, 0))
@@ -59,10 +65,10 @@ func TestGenerateSingleRender(t *testing.T) {
 	if fake.calls != 1 {
 		t.Errorf("a reading must cost exactly one render, got %d", fake.calls)
 	}
-	if len(j.peaks) != 0 {
-		t.Errorf("no server-side peaks expected, got %d", len(j.peaks))
+	if len(j.peaks) == 0 {
+		t.Error("server-side peaks should be derived from the rendered samples")
 	}
-	// The cache sidecar carries metadata but no peaks.
+	// The cache sidecar stores the peaks, so a later cache hit reuses them without re-analysing.
 	b, err := os.ReadFile(j.cache + ".json")
 	if err != nil {
 		t.Fatalf("cache sidecar missing: %v", err)
@@ -71,8 +77,8 @@ func TestGenerateSingleRender(t *testing.T) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := m["peaks"]; ok {
-		t.Error("cache sidecar should no longer store peaks")
+	if pk, ok := m["peaks"].([]any); !ok || len(pk) == 0 {
+		t.Error("cache sidecar should store the precomputed peaks")
 	}
 }
 
