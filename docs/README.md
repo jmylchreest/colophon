@@ -23,4 +23,7 @@ End-user guides for authoring, theming and publishing a colophon site.
 - **[How-to guides](howto/)** — short zero-to-published recipes: federate via Bridgy Fed, show
   webmentions, syndicate to Mastodon/Bluesky. Each notes whether it's shipped or planned.
 
+- **[Changelog](changelog.md)** — user-facing changes per release, each pointing at the guide that
+  documents it in full.
+
 Design notes and the roadmap live in [PLAN.md](PLAN.md) and [design/](design/).

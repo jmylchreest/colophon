@@ -132,6 +132,7 @@ theme upgrades it with [highlight.js](https://highlightjs.org/),
 | `$E=mc^2$` (inline) | `<span class="math math-inline">E=mc^2</span>` | KaTeX |
 | `$$ … $$` (display) | `<div class="math math-display">…</div>` | KaTeX |
 | `> [!note] Title` … | `<div class="callout callout-note">…</div>` | CSS only (no JS) |
+| `> [!quote] Attribution` … | `<figure class="pullquote"><blockquote>…</blockquote><figcaption>…</figcaption></figure>` | CSS only (no JS) |
 
 Notes:
 
@@ -140,8 +141,17 @@ Notes:
 - **Callouts** use Obsidian syntax — a blockquote whose first line is `[!type] Optional
   Title`. The body is normal Markdown. Types map to colours via CSS classes
   (`note`/`info`, `tip`/`success`, `warning`, `danger`, `example`, …).
+- **Pull-quotes** are the `[!quote]` callout type — they render as a semantic `<figure>` with
+  the text after `[!quote]` as the attribution `<figcaption>` (omit it for an unattributed
+  quote). The **press** theme styles this as a large display epigraph; other themes can target
+  `.pullquote`. Plain blockquotes (`>` without `[!quote]`) are unchanged.
 - **Mermaid** uses the diagram source as the element's text, so it degrades to a readable
   description without the library.
+
+> **Tip — preview every feature in your theme.** `colophon serve --showcase` injects a built-in
+> `/showcase/` page (embedded in the binary, never written to your content) that renders every one
+> of these blocks — callouts, pull-quotes, tables, maths, diagrams, media, attachments, glossary —
+> in your active theme, with the source shown alongside. Handy when writing or styling a theme.
 
 ### Links, wikilinks and images
 
