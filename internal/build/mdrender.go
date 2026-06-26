@@ -353,15 +353,27 @@ func preprocessCallouts(body string) string {
 		if m := calloutRE.FindStringSubmatch(quoted[0]); m != nil {
 			typ := strings.ToLower(m[1])
 			title := strings.TrimSpace(m[3])
-			if title == "" {
-				title = capitalize(typ)
+			if typ == "quote" {
+				// A pull-quote / epigraph: render as a semantic <figure><blockquote> with the
+				// title (when given) as the attribution <figcaption> below it, themed large.
+				out = append(out, "", `<figure class="pullquote">`, `<blockquote>`, "")
+				out = append(out, quoted[1:]...)
+				out = append(out, "", `</blockquote>`)
+				if title != "" {
+					out = append(out, `<figcaption>`+html.EscapeString(title)+`</figcaption>`)
+				}
+				out = append(out, `</figure>`, "")
+			} else {
+				if title == "" {
+					title = capitalize(typ)
+				}
+				out = append(out, "",
+					`<div class="callout callout-`+typ+`" data-callout="`+typ+`">`,
+					`<div class="callout-title">`+html.EscapeString(title)+`</div>`,
+					`<div class="callout-body">`, "")
+				out = append(out, quoted[1:]...)
+				out = append(out, "", "</div>", "</div>", "")
 			}
-			out = append(out, "",
-				`<div class="callout callout-`+typ+`" data-callout="`+typ+`">`,
-				`<div class="callout-title">`+html.EscapeString(title)+`</div>`,
-				`<div class="callout-body">`, "")
-			out = append(out, quoted[1:]...)
-			out = append(out, "", "</div>", "</div>", "")
 		} else {
 			out = append(out, lines[i:j]...)
 		}

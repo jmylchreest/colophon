@@ -123,6 +123,32 @@ func TestCalloutDefaultTitle(t *testing.T) {
 	}
 }
 
+func TestPullQuote(t *testing.T) {
+	out := renderMD(t, "> [!quote] Rachel Zoe\n> Style is a way to say who you are **without** having to speak.")
+	if !strings.Contains(out, `<figure class="pullquote">`) || !strings.Contains(out, "<blockquote>") {
+		t.Errorf("pull-quote figure/blockquote missing: %s", out)
+	}
+	if !strings.Contains(out, "<figcaption>Rachel Zoe</figcaption>") {
+		t.Errorf("attribution figcaption missing: %s", out)
+	}
+	if !strings.Contains(out, "<strong>without</strong>") {
+		t.Errorf("pull-quote body markdown not parsed: %s", out)
+	}
+	if strings.Contains(out, "callout") {
+		t.Errorf("quote must not render as a generic callout: %s", out)
+	}
+}
+
+func TestPullQuoteNoAttribution(t *testing.T) {
+	out := renderMD(t, "> [!quote]\n> An unattributed line worth emphasising.")
+	if !strings.Contains(out, `<figure class="pullquote">`) {
+		t.Errorf("pull-quote figure missing: %s", out)
+	}
+	if strings.Contains(out, "<figcaption>") {
+		t.Errorf("no attribution given → no figcaption: %s", out)
+	}
+}
+
 func TestPlainBlockquoteUntouched(t *testing.T) {
 	out := renderMD(t, "> just a quote")
 	if strings.Contains(out, "callout") {

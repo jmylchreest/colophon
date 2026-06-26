@@ -242,6 +242,20 @@ a { color: inherit; }
 .callout-body > :last-child { margin-bottom: 0.7rem; }
 .callout-warning { border-left-color: #e3b341; background: rgba(227,179,65,0.1); }
 .callout-tip { border-left-color: #2fae72; background: rgba(47,174,114,0.1); }
+
+/* Pull-quote / epigraph: lift a quote into a large display statement with the source below.
+   Authored as an Obsidian-style callout:  > [!quote] Attribution */
+.prose .pullquote { margin: 2.75rem 0; padding: 0; border: 0; }
+.prose .pullquote::before { content: "\201C"; display: block; font-family: var(--serif);
+  font-weight: 600; font-size: 4.5rem; line-height: 0.5; color: var(--accent); margin: 0.5rem 0 0.4rem -0.1rem; }
+.prose .pullquote blockquote { margin: 0; padding: 0; border: 0; opacity: 1;
+  font-family: var(--serif); font-style: italic; font-weight: 500; font-size: clamp(1.6rem, 4.5vw, 2.4rem);
+  line-height: 1.15; letter-spacing: -0.015em; color: var(--text); }
+.prose .pullquote blockquote > :first-child { margin-top: 0; }
+.prose .pullquote blockquote > :last-child { margin-bottom: 0; }
+.prose .pullquote figcaption { margin-top: 1.2rem; font-family: var(--sans); font-style: normal;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; font-size: 0.82rem; color: var(--accent); }
+.prose .pullquote figcaption::before { content: "— "; }
 .math-display { display: block; overflow-x: auto; margin: 1.5rem 0; text-align: center; }
 pre.mermaid { background: none; border: 0; text-align: center; }
 
