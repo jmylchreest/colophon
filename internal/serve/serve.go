@@ -81,10 +81,11 @@ type Server struct {
 	addr string // set at ListenAndServe; used to derive each env's local base_url
 	log  *clog.Logger
 
-	mu      sync.RWMutex // guards cfg, site, targets across config reloads
-	cfg     *config.Config
-	site    string
-	targets []target
+	mu       sync.RWMutex // guards cfg, site, targets across config reloads
+	cfg      *config.Config
+	site     string
+	showcase bool // inject the built-in /showcase/ page into every target
+	targets  []target
 
 	buildsMu sync.Mutex             // guards the builds map
 	builds   map[string]*buildState // per-target build state, keyed by target name
@@ -102,8 +103,8 @@ type Server struct {
 
 // New builds a Server from the loaded config. log carries serve's structured progress
 // (startup URLs, rebuilds, config reloads, shutdown); a nil log is a silent no-op.
-func New(cfg *config.Config, log *clog.Logger) (*Server, error) {
-	site, targets, err := targetsFor(cfg)
+func New(cfg *config.Config, log *clog.Logger, showcase bool) (*Server, error) {
+	site, targets, err := targetsFor(cfg, showcase)
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +113,7 @@ func New(cfg *config.Config, log *clog.Logger) (*Server, error) {
 		log:      log,
 		cfg:      cfg,
 		site:     site,
+		showcase: showcase,
 		targets:  targets,
 		builds:   map[string]*buildState{},
 		clients:  map[chan struct{}]bool{},
@@ -121,7 +123,7 @@ func New(cfg *config.Config, log *clog.Logger) (*Server, error) {
 
 // targetsFor derives the serve targets from a config. With no environments configured
 // it yields a single draft-including "preview" so the command always works.
-func targetsFor(cfg *config.Config) (string, []target, error) {
+func targetsFor(cfg *config.Config, showcase bool) (string, []target, error) {
 	if len(cfg.Sites) == 0 {
 		return "", nil, fmt.Errorf("no sites configured")
 	}
@@ -145,6 +147,7 @@ func targetsFor(cfg *config.Config) (string, []target, error) {
 				Theme:         e.Theme,
 				ImageProfile:  e.ImageProfile,
 				SpeechProfile: e.SpeechProfile,
+				Showcase:      showcase,
 				BasePath:      prefix,
 			},
 		})
@@ -544,7 +547,7 @@ func (s *Server) reconfigure() {
 		s.log.Step("SERVE", "", "config_reload_failed", err.Error())
 		return
 	}
-	site, targets, err := targetsFor(cfg)
+	site, targets, err := targetsFor(cfg, s.showcase)
 	if err != nil {
 		s.log.Step("SERVE", "", "config_reload_failed", err.Error())
 		return

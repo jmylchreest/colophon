@@ -26,6 +26,7 @@ import (
 	"github.com/jmylchreest/colophon/internal/config"
 	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/render"
+	"github.com/jmylchreest/colophon/internal/showcase"
 	"github.com/jmylchreest/colophon/internal/source"
 	"github.com/jmylchreest/colophon/internal/syndicate"
 	"github.com/jmylchreest/colophon/internal/telemetry"
@@ -88,6 +89,10 @@ type Options struct {
 	// image_profile/speech_profile frontmatter overrides these per post.
 	ImageProfile  string
 	SpeechProfile string
+	// Showcase injects the built-in markdown feature reference (embedded in the binary, never on
+	// disk) as a synthetic /showcase/ document, for previewing every content feature in the
+	// active theme. Set by `colophon serve --showcase`.
+	Showcase bool
 	// Telemetry receives build/source/persona events. Nil (e.g. from serve) sends nothing,
 	// so preview rebuilds never emit telemetry.
 	Telemetry *telemetry.Client
@@ -199,6 +204,13 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	docs, err := gatherDocuments(cfg, opts.Log)
 	if err != nil {
 		return Result{}, err
+	}
+	if opts.Showcase {
+		if c, s, err := showcase.Document(); err != nil {
+			opts.Log.Step("BUILD", "", "warn", "showcase: "+err.Error())
+		} else {
+			docs = append(docs, sourceDoc{doc: c, src: s})
+		}
 	}
 	// Routes: publish supplies fully-resolved rules via opts.Routes; a plain build resolves
 	// an empty route base_url from the target publisher's configured public_url (no network).
