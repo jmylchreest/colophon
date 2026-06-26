@@ -1,6 +1,8 @@
 package build
 
 import (
+	"bytes"
+	"strings"
 	"time"
 
 	"github.com/jmylchreest/colophon/internal/config"
@@ -43,6 +45,13 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 	for _, d := range docs {
 		fm := d.doc.Frontmatter
 		slug := slugFor(d.doc.SourcePath, fm.Slug)
+		// Mirror the page's description: an explicit `description:`, else a short excerpt of the
+		// rendered body — so consumers (syndication cards, feeds, tooling) get a summary for posts
+		// that set none.
+		desc := strings.TrimSpace(fm.Description)
+		if desc == "" {
+			desc = bodyExcerpt(d.doc.Body)
+		}
 		out = append(out, Entry{
 			SourcePath:       d.doc.SourcePath,
 			Slug:             slug,
@@ -52,7 +61,7 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 			Author:           fm.Author,
 			Persona:          resolvePersona(fm),
 			Tags:             fm.Tags,
-			Description:      fm.Description,
+			Description:      desc,
 			Draft:            fm.Draft,
 			Date:             fm.Date,
 			Predecessor:      fm.Predecessor,
@@ -62,6 +71,16 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 		})
 	}
 	return out, nil
+}
+
+// bodyExcerpt renders a post body to a short plain-text excerpt, matching the page's
+// `description` fallback, so a post with no explicit `description:` still gets a summary.
+func bodyExcerpt(body string) string {
+	var buf bytes.Buffer
+	if err := sharedMarkdown.Convert([]byte(preprocessCallouts(body)), &buf); err != nil {
+		return ""
+	}
+	return excerpt(buf.String(), 200)
 }
 
 // Slugify turns arbitrary text (e.g. a post title) into a slug segment, using the same
