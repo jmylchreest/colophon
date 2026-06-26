@@ -2,7 +2,10 @@
 title: Markdown & Style Showcase
 slug: showcase
 date: 2026-01-01
-audio: false
+description: A live reference for every content feature colophon supports — rendered in your active theme.
+hero: assets/sample-image.jpg
+hero_alt: An editorial illustration of an open dictionary, a microphone and a small printing press
+audio_file: assets/reading.wav
 attachments:
   - { path: assets/sample.txt, label: "Sample download", description: "A placeholder file shipped with the showcase" }
 ---
@@ -269,9 +272,9 @@ A path or `[[embed]]`, or an AI-generated image from a `gen:` prompt
 ![a fox in snow](<gen:a fox asleep in snow, soft morning light?aspect=16:9>)
 ```
 
-Renders as (a real embedded placeholder image):
+Renders as (a real embedded, MiniMax-generated image):
 
-![A placeholder image](assets/placeholder.png)
+![An editorial illustration](assets/sample-image.jpg)
 
 ## Video
 
@@ -284,9 +287,9 @@ Video: `.mp4`, `.webm`, `.mov`, `.m4v`, `.ogv`.
 ![](https://cdn.example.com/clip.mp4)   <!-- external URLs play, untouched -->
 ```
 
-Renders as (placeholder, won't load):
+Renders as (a real embedded, MiniMax-generated clip — no audio):
 
-![A short demo](https://example.com/placeholder.mp4)
+![A generated demo clip](assets/sample-video.mp4)
 
 ## Audio (inline)
 
@@ -298,9 +301,9 @@ from `audio:`/`audio_file:`, which attach a whole-post spoken reading.
 ![](interview.mp3)
 ```
 
-Renders as (a real embedded sample plays):
+Renders as (a real embedded clip plays):
 
-![](assets/placeholder.wav)
+![](assets/reading.wav)
 
 ## Attachments (downloads)
 
@@ -319,8 +322,10 @@ attachments:
 
 ## Glossary terms and abbreviations
 
-A `glossary.yaml` term is decorated automatically on first use; you can also force
-an abbreviation inline.
+When a project ships a `glossary.yaml`, the first mention of each term gets an
+accessible pop-over. This page registers TTS, IPA, PCM and KaTeX as glossary terms
+(under `--showcase`), so each is decorated where it first appears above. You can also
+force an abbreviation inline.
 
 ```markdown
 Force one with <abbr title="Text To Speech">TTS</abbr>.

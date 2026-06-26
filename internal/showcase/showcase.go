@@ -24,6 +24,18 @@ var files embed.FS
 // Slug is the URL slug the showcase renders at (/showcase/).
 const Slug = "showcase"
 
+// Glossary returns the showcase's own glossary terms, merged into the build's glossary only
+// under --showcase, so the auto-decoration (pop-overs on first use) renders without the project
+// shipping a glossary.yaml. The showcase prose mentions each of these.
+func Glossary() map[string]string {
+	return map[string]string{
+		"TTS":   "Text To Speech — generating spoken audio from text.",
+		"IPA":   "International Phonetic Alphabet — a precise notation for pronunciation.",
+		"PCM":   "Pulse-Code Modulation — uncompressed digital audio samples.",
+		"KaTeX": "A fast math typesetting library that renders LaTeX in the browser.",
+	}
+}
+
 // Document parses the embedded showcase markdown into a content document plus a source that
 // serves the embedded assets, ready to inject into a build.
 func Document() (core.Content, core.Source, error) {

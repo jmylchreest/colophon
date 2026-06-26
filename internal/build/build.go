@@ -247,8 +247,14 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// audioDefaultOn is the per-post `audio:` default: a post with no explicit audio reads aloud
 	// when speech is configured and enabled, and is silent otherwise (e.g. no provider).
 	audioDefaultOn := genActive && cfg.Generation.Speech.On() && cfg.Generation.Speech.Configured()
+	// The showcase ships its own glossary terms, merged in only under --showcase, so its
+	// auto-decoration renders without the project shipping a glossary.yaml. cfg is left untouched.
+	glossary := cfg.Glossary
+	if opts.Showcase {
+		glossary = mergeGlossary(cfg.Glossary, showcase.Glossary())
+	}
 	gr := newGenResolver(cfg.Generation.Image, opts.ImageProfile, cfg.Root, resolveSystemDefault(cfg, eng.Meta()), opts.Regenerate, opts.Log)
-	ar := newAudioResolver(cfg.Generation.Speech, opts.SpeechProfile, cfg.Root, basePath, site.BaseURL, router, speechGen, opts.Regenerate, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(cfg.Glossary), audioDefaultOn, opts.Log)
+	ar := newAudioResolver(cfg.Generation.Speech, opts.SpeechProfile, cfg.Root, basePath, site.BaseURL, router, speechGen, opts.Regenerate, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(glossary), audioDefaultOn, opts.Log)
 	// Rate-limit backoff for provider calls: retry by default (a TPM blip self-heals), disabled
 	// by --no-backoff so a rate limit then fails fast and warns. Set before any profile resolves.
 	if !opts.NoBackoff {
@@ -363,7 +369,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 
 	// The glossary ships only where it's used: each page is scanned for terms below, and the
 	// data + decorator are emitted after the loop only if some page actually references one.
-	glossRE := glossaryMatcher(cfg.Glossary)
+	glossRE := glossaryMatcher(glossary)
 	anyGlossary := false
 
 	// Dateless pages (About, Now, …) are standing chrome, not dated posts: they surface in
@@ -578,7 +584,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// Emit the glossary data + decorator only if some page actually referenced a term, so a
 	// glossary.yaml with no matching content (or no glossary at all) ships nothing.
 	if anyGlossary {
-		if _, err := emitGlossary(write, cfg); err != nil {
+		if _, err := emitGlossary(write, glossary); err != nil {
 			return Result{}, err
 		}
 	}

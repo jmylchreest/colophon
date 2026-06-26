@@ -7,8 +7,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-
-	"github.com/jmylchreest/colophon/internal/config"
 )
 
 // glossaryMatcher compiles a case-insensitive, word-boundary regex over all glossary terms,
@@ -59,11 +57,11 @@ const (
 // project ships a glossary, and reports whether it did. The glossary itself is never rendered
 // as a page; only the term→definition JSON is published. Per-page markup is built by
 // glossaryHeadTag, so a post can carry the auto-match flag.
-func emitGlossary(write func(string, []byte) error, cfg *config.Config) (bool, error) {
-	if len(cfg.Glossary) == 0 {
+func emitGlossary(write func(string, []byte) error, glossary map[string]string) (bool, error) {
+	if len(glossary) == 0 {
 		return false, nil
 	}
-	data, err := json.Marshal(cfg.Glossary)
+	data, err := json.Marshal(glossary)
 	if err != nil {
 		return false, err
 	}
@@ -76,6 +74,19 @@ func emitGlossary(write func(string, []byte) error, cfg *config.Config) (bool, e
 		}
 	}
 	return true, nil
+}
+
+// mergeGlossary returns base with extra layered on top (base wins on key conflicts, so a
+// project's own definitions take precedence over the showcase's built-ins).
+func mergeGlossary(base, extra map[string]string) map[string]string {
+	out := make(map[string]string, len(base)+len(extra))
+	for k, v := range extra {
+		out[k] = v
+	}
+	for k, v := range base {
+		out[k] = v
+	}
+	return out
 }
 
 // glossaryHeadTag is the per-page markup that loads the glossary styles + decorator. auto is
