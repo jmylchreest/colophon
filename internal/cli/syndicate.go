@@ -19,6 +19,7 @@ type SyndicateCmd struct {
 	Env          string `help:"Environment to syndicate" default:"production"`
 	AllowPublish bool   `help:"Run for environments gated by allow_publish: false (required to post)"`
 	DryRun       bool   `name:"dry-run" help:"Show what would be syndicated; post nothing, write no ledger"`
+	Resync       bool   `help:"Re-edit every already-syndicated copy to the post's current content, ignoring fingerprints (one-shot; only drivers that can edit, e.g. mastodon/bluesky)"`
 	Verbose      bool   `short:"v" help:"Log each candidate"`
 }
 
@@ -129,10 +130,11 @@ func (c *SyndicateCmd) Run() error {
 				posted++
 				log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "silo", url, "status", "ok")
 
-			case prior.Fingerprint == "":
+			case !c.Resync && prior.Fingerprint == "":
 				// Ledger entry written before update support: record the current fingerprint
 				// without editing (there's nothing to compare against), so future edits to the
-				// post are detected from here on. This is the one-time backfill.
+				// post are detected from here on. This is the one-time backfill. (--resync skips
+				// this and forces an edit instead.)
 				if c.DryRun {
 					log.Step("SYNDICATE", "would-backfill", "post", post.URL, "to", id)
 					backfilled++
@@ -142,11 +144,11 @@ func (c *SyndicateCmd) Run() error {
 				ledger.Set(post.Key, id, prior)
 				backfilled++
 
-			case prior.Fingerprint == fp:
+			case !c.Resync && prior.Fingerprint == fp:
 				skipped++ // unchanged since last syndicated
 
 			default:
-				// Content changed → edit the silo copy in place, if the driver's silo can edit.
+				// Content changed (or --resync) → edit the silo copy in place, if the driver can.
 				up, ok := open[id].(syndicate.Updater)
 				if !ok {
 					skipped++

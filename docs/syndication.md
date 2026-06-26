@@ -37,6 +37,11 @@ existing silo copy in place** rather than skipping it — keeping its likes/repl
   after upgrading **backfills** the current fingerprint for each entry *without editing anything*
   (there's nothing to compare against), so only genuine changes *after* that trigger an edit. The
   run reports `backfilled=N`; commit the updated ledger.
+- **`--resync`:** a one-shot that re-edits **every** already-syndicated copy to the post's current
+  content, ignoring fingerprints. Use it once after adopting this feature to bring silo copies that
+  were created (or changed) before the upgrade up to date — the backfill deliberately won't, since
+  it can't tell which were stale. Only edit-capable drivers (Mastodon/Bluesky) are touched; it
+  reports `updated=N`.
 
 It performs **irreversible external actions** (posting to real accounts), so it's fenced:
 
