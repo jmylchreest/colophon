@@ -235,6 +235,18 @@ a { color: inherit; }
 .prose pre::-webkit-scrollbar-thumb, .math-display::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 38%, transparent); border-radius: 999px; }
 .prose pre:hover::-webkit-scrollbar-thumb, .math-display:hover::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 62%, transparent); }
 
+/* Tables: editorial horizontal rules, generous cell padding, header underline. goldmark emits
+   alignment as inline text-align styles, which override the left default below. */
+.prose table { width: 100%; border-collapse: collapse; margin: 1.9rem 0; font-size: 0.95rem; line-height: 1.55; }
+.prose th, .prose td { padding: 0.6rem 0.95rem; text-align: left; vertical-align: top;
+  border-bottom: 1px solid var(--border); }
+.prose thead th { font-weight: 600; color: var(--text); border-bottom: 2px solid var(--accent);
+  white-space: nowrap; }
+.prose tbody tr:last-child td { border-bottom: 0; }
+.prose tbody tr:hover { background: var(--accent-soft); }
+/* Narrow screens: let a wide table scroll rather than overflow the column. */
+@media (max-width: 640px) { .prose table { display: block; overflow-x: auto; } }
+
 /* colophon content blocks */
 .callout { margin: 1.75rem 0; padding: 0.4rem 1.3rem; border: 1px solid var(--border);
   border-left: 3px solid var(--accent); border-radius: 0 12px 12px 0; background: var(--accent-soft); }
