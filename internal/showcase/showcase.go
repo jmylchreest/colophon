@@ -27,12 +27,23 @@ const Slug = "showcase"
 // Glossary returns the showcase's own glossary terms, merged into the build's glossary only
 // under --showcase, so the auto-decoration (pop-overs on first use) renders without the project
 // shipping a glossary.yaml. The showcase prose mentions each of these.
-func Glossary() map[string]string {
-	return map[string]string{
-		"TTS":   "Text To Speech — generating spoken audio from text.",
-		"IPA":   "International Phonetic Alphabet — a precise notation for pronunciation.",
-		"PCM":   "Pulse-Code Modulation — uncompressed digital audio samples.",
-		"KaTeX": "A fast math typesetting library that renders LaTeX in the browser.",
+func Glossary() map[string]core.GlossaryEntry {
+	return map[string]core.GlossaryEntry{
+		"TTS": {Definition: "Text To Speech — generating spoken audio from text."},
+		// A multi-link entry: the decorator renders numbered superscripts (¹ ²) after the term.
+		"IPA": {
+			Definition: "International Phonetic Alphabet — a precise notation for pronunciation.",
+			Links: []core.GlossaryLink{
+				{Label: "IPA chart", URL: "https://www.internationalphoneticassociation.org/content/ipa-chart"},
+				{Label: "Wikipedia", URL: "https://en.wikipedia.org/wiki/International_Phonetic_Alphabet"},
+			},
+		},
+		"PCM": {Definition: "Pulse-Code Modulation — uncompressed digital audio samples."},
+		// A single-link entry: the decorator renders one glyph (↗) after the term.
+		"KaTeX": {
+			Definition: "A fast math typesetting library that renders LaTeX in the browser.",
+			Links:      []core.GlossaryLink{{Label: "KaTeX home", URL: "https://katex.org"}},
+		},
 	}
 }
 

@@ -48,3 +48,46 @@
   color: var(--muted, inherit);
 }
 .gloss-tip[hidden] { display: none; }
+
+/* Citation-style reference markers baked just after a term (a "↗" glyph for one link, numbers
+   for several). Real anchors, so they work even when the popover doesn't — the theme may restyle
+   .gloss-ref freely. */
+.gloss-refs {
+  font-size: 0.7em;
+  line-height: 0;
+  white-space: nowrap;
+}
+.gloss-ref {
+  text-decoration: none;
+  color: var(--accent, currentColor);
+  padding: 0 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+.gloss-ref + .gloss-ref { margin-left: 0.05em; }
+.gloss-ref:hover { text-decoration: underline; }
+.gloss-ref:focus-visible {
+  outline: 2px solid var(--accent, currentColor);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The card's legend names each reference so the bare markers above make sense. Plain text — the
+   clickable anchors live in the article, not the popover. */
+.gloss-tip .gloss-legend {
+  display: block;
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--border, rgba(127, 127, 127, 0.3));
+  font-family: var(--sans, inherit);
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--muted, inherit);
+}
+.gloss-tip .gloss-legend-item { display: flex; gap: 0.4rem; }
+.gloss-tip .gloss-legend-mark {
+  flex: none;
+  min-width: 1em;
+  text-align: right;
+  color: var(--accent, currentColor);
+  font-variant-numeric: tabular-nums;
+}

@@ -1,9 +1,12 @@
-// colophon glossary decorator. Fetches the published glossary (term -> definition), wraps the
-// first occurrence of each term in the article in <abbr class="gloss" data-gloss="…">, and
-// shows a themeable, accessible popover on hover/focus. The theme owns the look: it styles
-// .gloss (e.g. a wavy underline) and .gloss-tip (the card). Accessibility: the trigger is
-// focusable, the popover is role="tooltip" linked via aria-describedby, it shows on focus as
-// well as hover, and Escape dismisses it (WCAG 1.4.13). No dependency, no framework.
+// colophon glossary decorator. Fetches the published glossary (term -> {def, links}), wraps the
+// first occurrence of each term in the article in <abbr class="gloss" data-gloss="…">, and shows
+// a themeable, accessible popover on hover/focus. An entry may carry reference links: these are
+// baked after the term as citation-style superscript anchors (one glyph for a single link,
+// numbers for several) — real links, so they work without an interactive popover, and the card
+// lists them as a numbered legend. The theme owns the look: it styles .gloss (e.g. a wavy
+// underline), .gloss-tip (the card) and .gloss-ref (the superscripts). Accessibility: the
+// trigger is focusable, the popover is role="tooltip" linked via aria-describedby, it shows on
+// focus as well as hover, and Escape dismisses it (WCAG 1.4.13). No dependency, no framework.
 (function () {
   "use strict";
 
@@ -14,8 +17,64 @@
 
   fetch(url, { credentials: "omit" })
     .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (gloss) { if (gloss && Object.keys(gloss).length) start(gloss); })
+    .then(function (raw) { var g = normalise(raw); if (Object.keys(g).length) start(g); })
     .catch(function () { /* never let the glossary break the page */ });
+
+  // normalise accepts both the current shape ({term: {def, links}}) and the legacy flat shape
+  // ({term: "definition"}), returning entry objects {def, links} keyed by term.
+  function normalise(raw) {
+    var out = {};
+    if (!raw) return out;
+    Object.keys(raw).forEach(function (t) {
+      var v = raw[t];
+      if (typeof v === "string") out[t] = { def: v, links: [] };
+      else if (v && typeof v === "object") out[t] = { def: v.def || "", links: v.links || [] };
+    });
+    return out;
+  }
+
+  // SAFE_URL permits only navigable schemes (and scheme-relative/relative URLs), so a config
+  // typo can never bake a javascript:/data: link into the page.
+  function safeURL(u) {
+    u = String(u || "").trim();
+    if (!u) return "";
+    if (/^(https?:|mailto:|\/|#|\.)/i.test(u)) return u;
+    return "";
+  }
+
+  // validLinks keeps only entries with a navigable URL, normalising {href, label} — so the marker
+  // and the card legend share one view of what's clickable and number it identically.
+  function validLinks(links) {
+    var out = [];
+    (links || []).forEach(function (l) {
+      var href = safeURL(l && l.url);
+      if (href) out.push({ href: href, label: (l.label || href).trim() });
+    });
+    return out;
+  }
+
+  // markText is the visible marker for the nth (0-based) of count links: a "↗" glyph for a lone
+  // link, otherwise its 1-based number. Shared by the superscript and the legend so they agree.
+  function markText(count, i) { return count === 1 ? "↗" : String(i + 1); }
+
+  // refMarker builds the citation superscript for an entry's links, or null when none are
+  // navigable. Each is a real anchor; external links open in a new tab.
+  function refMarker(term, links) {
+    var valid = validLinks(links);
+    if (!valid.length) return null;
+    var sup = document.createElement("sup");
+    sup.className = "gloss-refs";
+    valid.forEach(function (l, i) {
+      var a = document.createElement("a");
+      a.className = "gloss-ref";
+      a.href = l.href;
+      a.textContent = markText(valid.length, i);
+      a.setAttribute("aria-label", term + " reference: " + l.label);
+      if (/^https?:/i.test(l.href)) { a.target = "_blank"; a.rel = "noopener noreferrer"; }
+      sup.appendChild(a);
+    });
+    return sup;
+  }
 
   // Tags whose text must not be auto-decorated: code, links, existing abbreviations, headings,
   // and <noabbr> — the author's "leave this word alone" opt-out.
@@ -26,7 +85,7 @@
     var root = document.querySelector(".prose") ||
       document.querySelector("article") || document.querySelector("main");
     if (!root) return;
-    setupPopover();
+    setupPopover(gloss);
     var lower = {};
     Object.keys(gloss).forEach(function (t) { lower[t.toLowerCase()] = t; });
     var used = {};
@@ -50,9 +109,11 @@
       var key = lower[(el.textContent || "").trim().toLowerCase()];
       if (!key) continue;
       el.classList.add("gloss");
-      el.setAttribute("data-gloss", gloss[key]);
+      el.setAttribute("data-gloss", gloss[key].def);
       el.setAttribute("data-gloss-term", key);
       el.setAttribute("tabindex", "0");
+      var sup = refMarker(key, gloss[key].links);
+      if (sup) el.insertAdjacentElement("afterend", sup);
       used[key] = true; // don't auto-match it again elsewhere
     }
   }
@@ -94,11 +155,13 @@
       if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
       var abbr = document.createElement("abbr");
       abbr.className = "gloss";
-      abbr.setAttribute("data-gloss", gloss[key]);
+      abbr.setAttribute("data-gloss", gloss[key].def);
       abbr.setAttribute("data-gloss-term", key); // canonical headword (glossary casing)
       abbr.setAttribute("tabindex", "0");
       abbr.textContent = m[1];
       frag.appendChild(abbr);
+      var sup = refMarker(key, gloss[key].links); // citation links ride just after the term
+      if (sup) frag.appendChild(sup);
       last = m.index + m[1].length;
     }
     if (frag) {
@@ -107,7 +170,7 @@
     }
   }
 
-  function setupPopover() {
+  function setupPopover(gloss) {
     var tip = document.createElement("div");
     tip.className = "gloss-tip";
     tip.id = "gloss-tip";
@@ -135,6 +198,28 @@
       body.textContent = def;
       tip.appendChild(head);
       tip.appendChild(body);
+      // Legend: name each reference link so the bare superscript markers are decipherable. The
+      // links live in the article (the markers), so the legend is plain text — the card stays a
+      // non-interactive tooltip.
+      var entry = gloss[el.getAttribute("data-gloss-term")];
+      var links = validLinks(entry && entry.links);
+      if (links.length) {
+        var legend = document.createElement("span");
+        legend.className = "gloss-legend";
+        links.forEach(function (l, i) {
+          var row = document.createElement("span");
+          row.className = "gloss-legend-item";
+          var mark = document.createElement("span");
+          mark.className = "gloss-legend-mark";
+          mark.textContent = markText(links.length, i);
+          var label = document.createElement("span");
+          label.textContent = l.label;
+          row.appendChild(mark);
+          row.appendChild(label);
+          legend.appendChild(row);
+        });
+        tip.appendChild(legend);
+      }
       tip.hidden = false;
       el.setAttribute("aria-describedby", "gloss-tip");
       current = el;

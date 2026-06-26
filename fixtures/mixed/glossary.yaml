@@ -1,11 +1,18 @@
-# Optional glossary: term -> definition. Never rendered as a page; the build publishes it as
-# glossary.json and a theme's decorator wraps the first occurrence of each term in the prose
-# with an accessible, themeable pop-over. Terms here are the ones used in "Post With Multimedia".
+# Optional glossary. Never rendered as a page; the build publishes it as glossary.json and a
+# theme's decorator wraps the first occurrence of each term in the prose with an accessible,
+# themeable pop-over. An entry is either a bare definition string or a {definition, links}
+# mapping — links render as citation-style superscripts after the term. Terms here are the ones
+# used in "Post With Multimedia".
 SSG: "Static Site Generator — a tool that renders content (e.g. Markdown) into static HTML files served as-is, with no per-request server rendering."
 Markdown: "A lightweight plain-text formatting syntax that converts to HTML."
 HTML: "HyperText Markup Language — the markup a browser renders into a page."
 CDN: "Content Delivery Network — geographically distributed servers that cache and serve a site close to its visitors."
 RSS: "Really Simple Syndication — a feed format readers subscribe to for a site's updates."
 LaTeX: "A typesetting system widely used for mathematical and scientific notation."
-KaTeX: "A fast JavaScript library that typesets LaTeX maths in the browser."
+# Extended form: a definition plus reference links (one link → ↗ glyph; several → numbers).
+KaTeX:
+  definition: "A fast JavaScript library that typesets LaTeX maths in the browser."
+  links:
+    - { label: "KaTeX home", url: "https://katex.org" }
+    - { label: "Supported functions", url: "https://katex.org/docs/supported.html" }
 Mermaid: "A JavaScript library that renders diagrams (flowcharts, sequence diagrams, …) from a plain-text description."

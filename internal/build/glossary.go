@@ -7,12 +7,14 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/jmylchreest/colophon/internal/core"
 )
 
 // glossaryMatcher compiles a case-insensitive, word-boundary regex over all glossary terms,
 // or nil when the glossary is empty. It is used to decide which pages actually reference a
 // term, so the decorator + assets ship only where they're needed.
-func glossaryMatcher(gloss map[string]string) *regexp.Regexp {
+func glossaryMatcher(gloss map[string]core.GlossaryEntry) *regexp.Regexp {
 	if len(gloss) == 0 {
 		return nil
 	}
@@ -57,7 +59,7 @@ const (
 // project ships a glossary, and reports whether it did. The glossary itself is never rendered
 // as a page; only the term→definition JSON is published. Per-page markup is built by
 // glossaryHeadTag, so a post can carry the auto-match flag.
-func emitGlossary(write func(string, []byte) error, glossary map[string]string) (bool, error) {
+func emitGlossary(write func(string, []byte) error, glossary map[string]core.GlossaryEntry) (bool, error) {
 	if len(glossary) == 0 {
 		return false, nil
 	}
@@ -78,8 +80,8 @@ func emitGlossary(write func(string, []byte) error, glossary map[string]string) 
 
 // mergeGlossary returns base with extra layered on top (base wins on key conflicts, so a
 // project's own definitions take precedence over the showcase's built-ins).
-func mergeGlossary(base, extra map[string]string) map[string]string {
-	out := make(map[string]string, len(base)+len(extra))
+func mergeGlossary(base, extra map[string]core.GlossaryEntry) map[string]core.GlossaryEntry {
+	out := make(map[string]core.GlossaryEntry, len(base)+len(extra))
 	for k, v := range extra {
 		out[k] = v
 	}

@@ -36,9 +36,9 @@ func TestIsAcronymExpansion(t *testing.T) {
 }
 
 func TestAcronymExpansionInSpeech(t *testing.T) {
-	glossary := map[string]string{
-		"SSH":  "Secure Shell",
-		"Rust": "A systems programming language",
+	glossary := map[string]core.GlossaryEntry{
+		"SSH":  {Definition: "Secure Shell"},
+		"Rust": {Definition: "A systems programming language"},
 	}
 	acr := newAcronymReplacer(glossary)
 	out := speechText(`<p>Use SSH and Rust today.</p>`, core.SpeechTranscript{}, enTTS, acr)

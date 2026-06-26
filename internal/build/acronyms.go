@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/jmylchreest/colophon/internal/core"
 )
 
 // acronymReplacer expands acronym glossary terms to their spoken form in TTS text (e.g. "SSH"
@@ -17,10 +19,10 @@ type acronymReplacer struct {
 
 // newAcronymReplacer builds a replacer from the glossary, keeping only entries that look like
 // acronym expansions (see isAcronymExpansion). Returns nil when none qualify.
-func newAcronymReplacer(glossary map[string]string) *acronymReplacer {
+func newAcronymReplacer(glossary map[string]core.GlossaryEntry) *acronymReplacer {
 	m := map[string]string{}
-	for term, def := range glossary {
-		t, d := strings.TrimSpace(term), strings.TrimSpace(def)
+	for term, entry := range glossary {
+		t, d := strings.TrimSpace(term), strings.TrimSpace(entry.Definition)
 		if isAcronymExpansion(t, d) {
 			m[t] = d
 		}

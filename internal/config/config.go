@@ -13,6 +13,7 @@ import (
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/rawbytes"
 	"github.com/knadh/koanf/v2"
+	yamlv3 "go.yaml.in/yaml/v3"
 
 	"github.com/jmylchreest/colophon/internal/core"
 )
@@ -108,9 +109,10 @@ type Config struct {
 	Personas []core.Persona `yaml:"-"`
 	Authors  []core.Author  `yaml:"-"`
 
-	// Glossary maps a term/acronym to its definition, loaded from glossary.yaml. It is never
-	// rendered as a page; the build publishes it as glossary.json for a theme's decorator.
-	Glossary map[string]string `yaml:"-"`
+	// Glossary maps a term/acronym to its definition (and optional reference links), loaded from
+	// glossary.yaml. It is never rendered as a page; the build publishes it as glossary.json for a
+	// theme's decorator.
+	Glossary map[string]core.GlossaryEntry `yaml:"-"`
 
 	// Root is the project directory the config was loaded from.
 	Root string `yaml:"-"`
@@ -267,9 +269,10 @@ func loadAuthors(dir string) ([]core.Author, error) {
 		func(a *core.Author) string { return a.ID })
 }
 
-// loadGlossary reads a flat term→definition map from glossary.yaml (with {env:VAR}
-// interpolation). A missing file yields nil, so the glossary is purely optional.
-func loadGlossary(path string) (map[string]string, error) {
+// loadGlossary reads a flat term→entry map from glossary.yaml (with {env:VAR} interpolation). An
+// entry is either a bare definition string or a {definition, links} mapping (core.GlossaryEntry
+// handles both). A missing file yields nil, so the glossary is purely optional.
+func loadGlossary(path string) (map[string]core.GlossaryEntry, error) {
 	raw, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -277,13 +280,9 @@ func loadGlossary(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read glossary %s: %w", path, err)
 	}
-	k, err := parseYAML(raw, "glossary", path)
-	if err != nil {
-		return nil, err
-	}
-	out := map[string]string{}
-	for _, key := range k.Keys() {
-		out[key] = k.String(key)
+	out := map[string]core.GlossaryEntry{}
+	if err := yamlv3.Unmarshal(interpolateEnv(raw), &out); err != nil {
+		return nil, fmt.Errorf("parse glossary %s: %w", path, err)
 	}
 	return out, nil
 }

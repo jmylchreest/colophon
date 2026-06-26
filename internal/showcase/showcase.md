@@ -327,6 +327,22 @@ accessible pop-over. This page registers TTS, IPA, PCM and KaTeX as glossary ter
 (under `--showcase`), so each is decorated where it first appears above. You can also
 force an abbreviation inline.
 
+A term may also carry **reference links**. These render as citation-style
+superscripts right after the term — a single link shows a `↗` glyph, several show
+numbers (`¹ ²`) — and the pop-over lists them as a numbered legend. The links are real
+anchors in the text, so they work without an interactive card. Here KaTeX has one
+reference link and IPA has two; an entry written as a plain string (TTS, PCM) has none.
+
+```yaml
+# glossary.yaml — an entry is a bare definition, or a mapping with links
+PCM: Pulse-Code Modulation — uncompressed digital audio samples.
+IPA:
+  definition: International Phonetic Alphabet — a precise pronunciation notation.
+  links:
+    - { label: IPA chart, url: "https://www.internationalphoneticassociation.org/content/ipa-chart" }
+    - { label: Wikipedia, url: "https://en.wikipedia.org/wiki/International_Phonetic_Alphabet" }
+```
+
 ```markdown
 Force one with <abbr title="Text To Speech">TTS</abbr>.
 ```

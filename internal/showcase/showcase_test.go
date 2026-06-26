@@ -37,7 +37,7 @@ func TestDocument(t *testing.T) {
 		}
 	}
 	// Glossary terms are provided for --showcase decoration.
-	if Glossary()["TTS"] == "" {
+	if Glossary()["TTS"].Definition == "" {
 		t.Error("showcase glossary should define TTS")
 	}
 	if _, ok := src.Resolve(context.Background(), "assets/does-not-exist"); ok {
