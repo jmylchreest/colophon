@@ -20,18 +20,21 @@ import (
 	"github.com/jmylchreest/colophon/internal/generate"
 )
 
-// resolveSpeech resolves the configured speech generator to settings, or nil when speech
-// is off or misconfigured (recorded audio still works without it).
-func resolveSpeech(cfg *config.Config, log *clog.Logger) *generate.SpeechSettings {
-	if !cfg.Generation.Speech.Configured() {
-		return nil
-	}
-	s, err := generate.ResolveSpeech(cfg.Generation.Speech)
-	if err != nil {
-		log.Step("AUDIO", "", "warn", "speech generation disabled: "+err.Error())
-		return nil
-	}
-	return &s
+// resolvedSpeech is one speech profile resolved to live state: its rendered settings, loaded
+// pronunciation entries, cache dir and reuse policy, plus a lazily-built generator (so provider
+// setup — e.g. the ElevenLabs dictionary sync — happens once per profile, only if used). The
+// resolver caches one of these per effective profile name as posts reference them.
+type resolvedSpeech struct {
+	settings      generate.SpeechSettings
+	provider      string
+	pronunciation []generate.Pronunciation
+	cacheDir      string
+	reuseContent  bool
+	resolveErr    error // ResolveProfile/ResolveSpeech failure → TTS disabled for posts using it
+
+	once sync.Once
+	gen  generate.SpeechGenerator
+	err  error // generator construction (PrepareSpeech/NewSpeech) failure
 }
 
 // retryPolicyFor is the default provider rate-limit backoff with a logging hook, so each backoff
@@ -74,63 +77,136 @@ type audioJob struct {
 	src     core.Source // file: source to read the recording from
 	srcPath string      // file: path within that source
 	req     generate.SpeechRequest
-	cache   string    // tts: absolute cache path, named by content identity
-	legacy  string    // tts: pre-split single-hash cache path, adopted on migration if present
-	force   bool      // tts: re-render even if cache exists (--regenerate)
-	size    int64     // filled after run()
-	peaks   []float64 // waveform amplitude peaks (0–1), when computed
+	cache   string          // tts: absolute cache path, named by content identity
+	legacy  string          // tts: pre-split single-hash cache path, adopted on migration if present
+	rs      *resolvedSpeech // tts: the resolved speech profile that renders this clip
+	force   bool            // tts: re-render even if cache exists (--regenerate)
+	size    int64           // filled after run()
+	peaks   []float64       // waveform amplitude peaks (0–1), when computed
 }
 
 // audioResolver maps a post's audio (recorded audio_file or generated audio:true) to a
 // stable URL, accumulates the clips to publish, and produces them. Recorded audio works
 // whenever a resolver exists; TTS additionally needs speech to be configured.
 type audioResolver struct {
-	speech         *generate.SpeechSettings
-	cacheDir       string
+	speechGen      core.SpeechGen // default block + named profiles
+	configured     bool           // a speech provider is set (TTS possible)
+	envProfile     string         // environment-selected speech profile; a post's wins over it
+	root           string
+	retry          generate.RetryPolicy // provider rate-limit backoff, applied to each resolved profile
+	siteID         string               // namespaces shared-account provider state (e.g. ElevenLabs dict name)
 	basePath       string
 	baseURL        string
 	router         *core.Router
 	generateAI     bool
 	voiceFor       func(postVoice, author, persona string) string
 	log            *clog.Logger
-	i18n           ttsTable                 // injected-speech translations (block cues, hint, wrap-up, symbols)
-	defaultLang    string                   // site language, used when a post sets none
-	acronyms       *acronymReplacer         // glossary acronym → spoken expansion
-	defaultAudioOn bool                     // per-post audio: default when a post sets none
-	pronunciation  []generate.Pronunciation // loaded provider-agnostic pronunciation dict, if configured
-	reuseContent   bool                     // reuse: content — adopt any prior rendition of the same text
-	regenerate     bool                     // --regenerate: re-render even when cached
+	i18n           ttsTable                   // injected-speech translations (block cues, hint, wrap-up, symbols)
+	defaultLang    string                     // site language, used when a post sets none
+	acronyms       *acronymReplacer           // glossary acronym → spoken expansion
+	defaultAudioOn bool                       // per-post audio: default when a post sets none
+	regenerate     bool                       // --regenerate: re-render even when cached
+	profiles       map[string]*resolvedSpeech // resolved speech profiles, keyed by effective name
+	pronCache      map[string][]generate.Pronunciation
 	jobs           map[string]*audioJob
 }
 
-func newAudioResolver(speech *generate.SpeechSettings, root, basePath, baseURL string, router *core.Router, generateAI, regenerate bool, voiceFor func(string, string, string) string, defaultLang string, acronyms *acronymReplacer, defaultAudioOn bool, log *clog.Logger) *audioResolver {
+func newAudioResolver(speech core.SpeechGen, envProfile, root, basePath, baseURL string, router *core.Router, generateAI, regenerate bool, voiceFor func(string, string, string) string, defaultLang string, acronyms *acronymReplacer, defaultAudioOn bool, log *clog.Logger) *audioResolver {
 	ar := &audioResolver{
-		speech: speech, basePath: basePath, baseURL: baseURL, router: router,
+		speechGen: speech, configured: speech.Configured(), envProfile: envProfile, root: root,
+		basePath: basePath, baseURL: baseURL, router: router,
 		generateAI: generateAI, regenerate: regenerate, voiceFor: voiceFor, defaultLang: defaultLang,
-		acronyms: acronyms, defaultAudioOn: defaultAudioOn, i18n: loadTTSTable(root), log: log, jobs: map[string]*audioJob{},
+		acronyms: acronyms, defaultAudioOn: defaultAudioOn, i18n: loadTTSTable(root), log: log,
+		profiles: map[string]*resolvedSpeech{}, pronCache: map[string][]generate.Pronunciation{},
+		jobs: map[string]*audioJob{},
 	}
-	if speech != nil {
-		ar.reuseContent = speech.Reuse == "content"
-	}
-	if speech != nil {
-		if u, err := url.Parse(baseURL); err == nil && u.Host != "" {
-			speech.SiteID = u.Host // namespaces shared-account provider state (e.g. ElevenLabs dict name)
-		}
-		dir := speech.OutputDir
-		if !filepath.IsAbs(dir) {
-			dir = filepath.Join(root, filepath.FromSlash(dir))
-		}
-		ar.cacheDir = dir
-		if ref := speech.PronunciationDict; ref != "" {
-			if entries, err := generate.ResolvePronunciationDict(ref, root); err != nil {
-				log.Step("AUDIO", "pronunciation dict ignored", "ref", ref, "err", err.Error())
-			} else {
-				ar.pronunciation = entries
-				log.Detail("AUDIO", "pronunciation dict loaded", "ref", ref, "entries", len(entries))
-			}
-		}
+	if u, err := url.Parse(baseURL); err == nil && u.Host != "" {
+		ar.siteID = u.Host
 	}
 	return ar
+}
+
+// resolved returns the live state for a speech profile, resolving and caching it on first use.
+// The post's profile name wins over the environment's; an empty name selects the default block.
+// A resolution failure is cached (and warned once) so posts that reference it skip TTS cleanly.
+func (ar *audioResolver) resolved(postProfile string) *resolvedSpeech {
+	name := strings.TrimSpace(postProfile)
+	if name == "" {
+		name = strings.TrimSpace(ar.envProfile)
+	}
+	key := name
+	if key == "" {
+		key = "default"
+	}
+	if rs, ok := ar.profiles[key]; ok {
+		return rs
+	}
+	rs := &resolvedSpeech{}
+	g, err := ar.speechGen.ResolveProfile(name)
+	if err == nil {
+		var s generate.SpeechSettings
+		if s, err = generate.ResolveSpeech(g); err == nil {
+			s.SiteID = ar.siteID
+			s.Retry = ar.retry
+			rs.settings = s
+			rs.provider = s.Provider
+			rs.reuseContent = s.Reuse == "content"
+			rs.cacheDir = ar.dirFor(s.OutputDir)
+			rs.pronunciation = ar.loadPron(s.PronunciationDict)
+		}
+	}
+	if err != nil {
+		ar.log.Step("AUDIO", "", "warn", fmt.Sprintf("speech profile %q unavailable: %v", key, err))
+	}
+	rs.resolveErr = err
+	ar.profiles[key] = rs
+	return rs
+}
+
+// dirFor resolves a possibly-relative output_dir against the site root.
+func (ar *audioResolver) dirFor(dir string) string {
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(ar.root, filepath.FromSlash(dir))
+	}
+	return dir
+}
+
+// loadPron loads a pronunciation dictionary by ref (built-in name or path), caching by ref so
+// profiles that share a dict load it once.
+func (ar *audioResolver) loadPron(ref string) []generate.Pronunciation {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return nil
+	}
+	if p, ok := ar.pronCache[ref]; ok {
+		return p
+	}
+	entries, err := generate.ResolvePronunciationDict(ref, ar.root)
+	if err != nil {
+		ar.log.Step("AUDIO", "pronunciation dict ignored", "ref", ref, "err", err.Error())
+		entries = nil
+	} else {
+		ar.log.Detail("AUDIO", "pronunciation dict loaded", "ref", ref, "entries", len(entries))
+	}
+	ar.pronCache[ref] = entries
+	return entries
+}
+
+// ensureGen builds (once) the generator for a resolved profile, running provider setup
+// (e.g. the ElevenLabs dictionary sync) and warning on failure.
+func (ar *audioResolver) ensureGen(rs *resolvedSpeech) (generate.SpeechGenerator, error) {
+	rs.once.Do(func() {
+		s, err := generate.PrepareSpeech(context.Background(), rs.settings, rs.pronunciation, rs.cacheDir)
+		if err != nil {
+			ar.log.Step("AUDIO", "", "warn", "pronunciation dictionary sync failed: "+err.Error())
+			s = rs.settings
+		}
+		rs.gen, rs.err = generate.NewSpeech(s)
+		if rs.err != nil {
+			ar.log.Step("AUDIO", rs.provider, "warn", "speech generator unavailable: "+rs.err.Error())
+		}
+	})
+	return rs.gen, rs.err
 }
 
 func (ar *audioResolver) active() bool { return ar != nil }
@@ -189,26 +265,30 @@ func (ar *audioResolver) registerFile(it included, ref string) (rel, abs, mime, 
 	return rel, abs, mime, outPath, true
 }
 
-// registerTTS resolves a generated reading to its URLs and queues it. ok is false when
-// speech generation isn't configured.
-func (ar *audioResolver) registerTTS(label, htmlBody, lang, postVoice, author, persona string) (rel, abs, mime, outPath string, ok bool) {
-	if !ar.active() || ar.speech == nil {
+// registerTTS resolves a generated reading to its URLs and queues it, rendering with the post's
+// speech profile (else the environment's, else the default block). ok is false when speech
+// generation isn't configured or the selected profile failed to resolve.
+func (ar *audioResolver) registerTTS(label, htmlBody, lang, postVoice, author, persona, speechProfile string) (rel, abs, mime, outPath string, ok bool) {
+	if !ar.active() || !ar.configured {
+		return "", "", "", "", false
+	}
+	rs := ar.resolved(speechProfile)
+	if rs.resolveErr != nil {
 		return "", "", "", "", false
 	}
 	if strings.TrimSpace(lang) == "" {
 		lang = ar.defaultLang
 	}
 	// strip/cue code, math, tables, diagrams; spell inline-code symbols — in the post's language
-	text := speechText(htmlBody, ar.speech.Transcript, ar.i18n.For(lang), ar.acronyms)
+	text := speechText(htmlBody, rs.settings.Transcript, ar.i18n.For(lang), ar.acronyms)
 	if strings.TrimSpace(text) == "" {
 		return "", "", "", "", false
 	}
-	s := ar.speech
-	voice := s.Voice
+	voice := rs.settings.Voice
 	if v := strings.TrimSpace(ar.voiceFor(postVoice, author, persona)); v != "" {
 		voice = v
 	}
-	pron := generate.FilterPronunciation(ar.pronunciation, text)
+	pron := generate.FilterPronunciation(rs.pronunciation, text)
 	// Publish and cache under the content identity (text + pronunciation) so the URL is stable
 	// across provider/model/voice changes; the renderer is recorded in the sidecar, and reuse
 	// policy decides whether a renderer change re-renders the single content-named file.
@@ -217,10 +297,10 @@ func (ar *audioResolver) registerTTS(label, htmlBody, lang, postVoice, author, p
 	mime = ttsOutputMIME
 	if _, seen := ar.jobs[outPath]; !seen {
 		ar.jobs[outPath] = &audioJob{
-			kind: "tts", outPath: outPath, mime: mime,
-			req:    generate.SpeechRequest{Text: text, Voice: voice, Model: s.Model, Pronunciation: pron},
-			cache:  filepath.Join(ar.cacheDir, content+ttsOutputExt),
-			legacy: filepath.Join(ar.cacheDir, generate.SpeechStem(s.Provider, s.Model, voice, label, text, pron)+ttsOutputExt),
+			kind: "tts", outPath: outPath, mime: mime, rs: rs,
+			req:    generate.SpeechRequest{Text: text, Voice: voice, Model: rs.settings.Model, Pronunciation: pron},
+			cache:  filepath.Join(rs.cacheDir, content+ttsOutputExt),
+			legacy: filepath.Join(rs.cacheDir, generate.SpeechStem(rs.provider, rs.settings.Model, voice, label, text, pron)+ttsOutputExt),
 			force:  ar.regenerate,
 		}
 	}
@@ -277,39 +357,24 @@ func (ar *audioResolver) run(write func(string, []byte) error, now time.Time) er
 	}
 	sort.Strings(keys)
 
-	var ttsOnce sync.Once
-	var tts generate.SpeechGenerator
-	var ttsErr error
-	ensureTTS := func() (generate.SpeechGenerator, error) {
-		ttsOnce.Do(func() {
-			if ar.speech == nil {
-				ttsErr = fmt.Errorf("speech generation not configured")
-				return
+	// Sync provider-side state (the ElevenLabs IPA pronunciation dictionary) for every speech
+	// profile in play even when its readings are all cached, so the dictionary exists and
+	// refreshes on any --generate-ai build — not only when a reading is (re)generated. Skipped
+	// for providers that send pronunciations inline (MiniMax), and a no-op when nothing changed.
+	if ar.generateAI {
+		for _, rs := range ar.profiles {
+			if rs.resolveErr == nil && generate.NeedsDictSync(rs.settings, rs.pronunciation) {
+				_, _ = ar.ensureGen(rs)
 			}
-			// One-time provider setup (e.g. sync the ElevenLabs IPA pronunciation dictionary).
-			// A failure is non-fatal: warn and generate without it (Say substitution still works).
-			s, err := generate.PrepareSpeech(context.Background(), *ar.speech, ar.pronunciation, ar.cacheDir)
-			if err != nil {
-				ar.log.Step("AUDIO", "", "warn", "pronunciation dictionary sync failed: "+err.Error())
-				s = *ar.speech
-			}
-			tts, ttsErr = generate.NewSpeech(s)
-		})
-		return tts, ttsErr
-	}
-
-	// Sync provider-side state (the ElevenLabs IPA pronunciation dictionary) even when every
-	// reading is already cached, so the dictionary exists and refreshes on any --generate-ai build
-	// — not only when a reading is (re)generated. Skipped for providers that send pronunciations
-	// inline (MiniMax), and a no-op when nothing has changed remotely.
-	if ar.generateAI && ar.speech != nil && generate.NeedsDictSync(*ar.speech, ar.pronunciation) {
-		_, _ = ensureTTS()
+		}
 	}
 
 	results := make([]audioOutcome, len(keys))
 	limit := generate.DefaultConcurrency
-	if ar.speech != nil && ar.speech.Concurrency > 0 {
-		limit = ar.speech.Concurrency
+	if ar.configured { // skip when only recorded files are queued (no TTS provider to resolve)
+		if rs := ar.resolved(""); rs.resolveErr == nil && rs.settings.Concurrency > 0 {
+			limit = rs.settings.Concurrency
+		}
 	}
 	sem := make(chan struct{}, max(1, limit))
 	var wg sync.WaitGroup
@@ -319,14 +384,10 @@ func (ar *audioResolver) run(write func(string, []byte) error, now time.Time) er
 		go func(i int, j *audioJob) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			results[i] = ar.produce(j, ensureTTS, now)
+			results[i] = ar.produce(j, now)
 		}(i, ar.jobs[k])
 	}
 	wg.Wait()
-
-	if ttsErr != nil {
-		ar.log.Step("AUDIO", "", "warn", "speech generator unavailable: "+ttsErr.Error())
-	}
 	for i, k := range keys {
 		r := results[i]
 		if r.fatal != nil {
@@ -394,7 +455,7 @@ type audioOutcome struct {
 	fatal   error
 }
 
-func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechGenerator, error), now time.Time) (out audioOutcome) {
+func (ar *audioResolver) produce(j *audioJob, now time.Time) (out audioOutcome) {
 	switch j.kind {
 	case "file":
 		rc, err := j.src.Open(context.Background(), j.srcPath)
@@ -413,15 +474,13 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 		out.bytes, out.detail, out.logArgs = b, true, []any{"file", j.outPath, "bytes", len(b)}
 		return out
 	default: // tts
-		provider := ""
-		if ar.speech != nil {
-			provider = ar.speech.Provider
-		}
+		rs := j.rs
+		provider := rs.provider
 		if !j.force {
 			if b, err := os.ReadFile(j.cache); err == nil {
 				// A content-named clip exists. Reuse it unless reuse:exact and the renderer
 				// recorded in the sidecar differs from the current provider/model/voice.
-				if ar.reuseContent || sidecarRenderMatches(j.cache, provider, j.req.Model, j.req.Voice) {
+				if rs.reuseContent || sidecarRenderMatches(j.cache, provider, j.req.Model, j.req.Voice) {
 					j.size = int64(len(b))
 					if meta, err := os.ReadFile(j.cache + ".json"); err == nil {
 						j.peaks = parsePeaks(meta)
@@ -433,7 +492,7 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 			} else if b, err := os.ReadFile(j.legacy); err == nil {
 				// Migration: adopt a clip cached by a pre-content-naming build under the new
 				// content name (+ sidecar), so upgrading doesn't re-render unchanged audio.
-				if err := os.MkdirAll(ar.cacheDir, 0o755); err == nil {
+				if err := os.MkdirAll(rs.cacheDir, 0o755); err == nil {
 					_ = os.WriteFile(j.cache, b, 0o644)
 					_ = writeAudioSidecar(j.cache, provider, j.req, now)
 				}
@@ -449,7 +508,7 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 			out.logArgs = []any{"skip", path.Base(j.outPath), "hint", "build --generate-ai to create it"}
 			return out
 		}
-		gen, err := ensureTTS()
+		gen, err := ar.ensureGen(rs)
 		if err != nil {
 			out.logArgs = []any{"skip", path.Base(j.outPath)}
 			return out
@@ -462,7 +521,7 @@ func (ar *audioResolver) produce(j *audioJob, ensureTTS func() (generate.SpeechG
 		// The provider returns raw PCM; wrap it as WAV. No second render for a waveform —
 		// the browser derives peaks from this audio (player.js).
 		audio := encodeWAV(pcmToSamples(res.Bytes), res.SampleRate)
-		if err := os.MkdirAll(ar.cacheDir, 0o755); err != nil {
+		if err := os.MkdirAll(rs.cacheDir, 0o755); err != nil {
 			out.fatal = err
 			return out
 		}

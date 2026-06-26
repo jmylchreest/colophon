@@ -1,0 +1,210 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# colophon.yaml — ANNOTATED REFERENCE
+#
+# Not a starter config (`colophon init` writes a lean one). This shows every
+# option in one place, with a few list entries set side-by-side so the shapes
+# are clear. Copy the bits you need.
+#
+# Markers used in comments below:
+#   [required]   must be set; no default
+#   [optional]   may be omitted; the shown value is the default
+#   [inherits]   only meaningful inside a profile — when omitted, the value is
+#                taken from that modality's default block (see "generation")
+#
+# Any string may interpolate the environment: {env:VAR} or {env:VAR:-fallback}.
+# Deploy secrets are read from the environment at build time and are NEVER stored
+# in this file.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ═══ sites ═══════════════════════════════════════════════════════════════════
+# One or more sites built from the shared content. Most projects have exactly one.
+sites:
+  - id: main                                   # [required] stable id, used in URLs/serve paths
+    title: "My Blog"                           # [required]
+    base_url: "{env:SITE_URL:-http://localhost:8080}"  # [required] canonical origin
+    theme: press                               # [optional] default: the bundled "default" theme
+    personas: [default]                        # [optional] writing voices available to the agent
+    federation:
+      feeds: [rss, atom, json]                 # [optional] default: none; emit at least one
+    # search accepts a bare mode string OR a block. Bare form: `search: lexical`.
+    search:
+      mode: lexical                            # [optional] lexical | semantic | off (default off)
+      fuzzy: true                              # [optional] default false; trigram+Levenshtein typo tolerance
+    # Reader analytics for THIS site. One block per provider; inert until configured.
+    analytics:
+      statsfactory:
+        server_url: "{env:STATSFACTORY_SERVER_URL:-}"
+        app_key: "{env:STATSFACTORY_APP_KEY:-}"
+      # google_analytics:                      # GA4 — sets cookies, brings its own consent duties
+      #   measurement_id: "{env:GA_MEASUREMENT_ID:-}"
+    # Routing rewrites matching output paths to a publisher's object store instead of
+    # shipping them with the page host (which has a file/size budget). Inert until that
+    # publisher resolves a public URL, so local builds keep assets co-located.
+    routing:
+      - match: "**assets/**"                   # co-located post assets + the root /assets tree
+        publisher: r2
+      - match: "_search/**"                    # keep the search index off the page-host budget
+        publisher: r2
+
+
+# ═══ sources ═════════════════════════════════════════════════════════════════
+# Where content comes from. Driver selects the implementation; the rest is
+# driver-specific. List several and their content is merged.
+sources:
+  - id: content                                # [required]
+    driver: md-dir                             # [required] a plain Markdown directory
+    path: ./content
+  - id: vault                                  # a second source, merged with the first
+    driver: obsidian
+    vault: "{env:OBSIDIAN_VAULT:-}"            # vault root; empty → contributes nothing
+    path: "{env:BLOG_PATH:-}"                  # vault-relative folder(s); empty → whole vault
+    tag: "{env:BLOG_TAGS:-}"                   # publish by tag(s); empty → use publish_required
+    publish_required: false
+
+
+# ═══ publishers ══════════════════════════════════════════════════════════════
+# Pure mechanism: HOW to deploy. WHAT/WHERE is decided by environments below.
+# Deploy credentials always come from the environment, never from these fields.
+publishers:
+  - id: local                                  # offline build target, for diffing output
+    driver: local
+    path: ./dist
+  - id: cf                                     # HTML/static host
+    driver: cloudflare-pages
+    project: "{env:CF_PAGES_PROJECT:-my-blog}"
+    account_id: "{env:CLOUDFLARE_ACCOUNT_ID}"
+  - id: r2                                     # S3-compatible object store (routing target above)
+    driver: cloudflare-r2
+    bucket: "{env:R2_BUCKET:-my-blog-assets}"
+    account_id: "{env:CLOUDFLARE_ACCOUNT_ID}"
+    public_url: "{env:R2_PUBLIC_URL:-}"        # empty → auto-discovered on publish
+
+
+# ═══ environments ════════════════════════════════════════════════════════════
+# Named build+deploy profiles. No name is privileged. An environment picks
+# publishers, toggles drafts, and may override a few site fields + select
+# generation profiles (see "generation"). Build/deploy with --env <name>.
+environments:
+  - name: production                           # [required]
+    publish: [cf, r2]                          # [required] publisher ids to deploy to
+    allow_publish: false                       # [optional] default true; false → require --allow-publish
+    base_url: "{env:BASE_URL:-}"               # [optional] override the site base_url here
+    overrides:                                 # [optional] per-publisher Settings overrides, keyed by id
+      cf: { branch: main }
+
+  - name: preview
+    publish: [cf, r2]
+    include_drafts: true                       # [optional] default false
+    title: "My Blog (preview)"                 # [optional] override the site title
+    image_profile: draft                       # [optional] use the cheap image profile in this env
+    speech_profile: minimax                    # [optional] use the minimax voice profile in this env
+    overrides:
+      cf: { branch: preview }
+
+  - name: dist                                 # local copy; ungated, no creds
+    publish: [local]
+    include_drafts: true
+
+  - name: text                                 # preview an alternate theme before promoting it
+    publish: [local]
+    include_drafts: true
+    theme: minimal                             # [optional] override the site theme
+    overrides:
+      local: { path: ./dist-text }
+
+
+# ═══ generation ══════════════════════════════════════════════════════════════
+# Optional AI media generation. Two modalities: image (satisfies `gen:` refs) and
+# speech (reads posts with `audio: true`). Empty → the feature is off.
+#
+# Each modality has a DEFAULT block plus named PROFILES (a map). A profile inherits
+# every field from the default block and overrides only what it lists. The default
+# block is the implicit profile named "default".
+#
+# Which profile renders a given asset (narrowest scope wins):
+#
+#   default block
+#     ◀ environment   speech_profile: / image_profile:
+#       ◀ post         audio_profile: / image_profile:   (frontmatter)
+#         ◀ per-ref    <gen:hero?profile=…>              (image refs only)
+#           ◀ post scalar overrides (audio_voice, …)
+#
+# Merge rule: scalars REPLACE, maps DEEP-MERGE (e.g. image `defaults`). Voice/model
+# ids are provider-specific, so a profile that changes provider should also set them.
+generation:
+  enabled: true                                # [optional] default true; master off-switch for all AI gen
+
+  # ── images ──────────────────────────────────────────────────────────────────
+  image:
+    enabled: true                              # [optional] default true; per-modality switch
+    provider: google                           # [required] google|minimax|openai|together|deepinfra|custom
+    model: gemini-3.1-flash-image              # [optional] default: the provider profile's default model
+    api_key: "{env:GEMINI_API_KEY}"            # [optional] default: the provider's env var (kept out of config)
+    base_url: ""                               # [optional] override endpoint (required for `custom`)
+    api_path: ""                               # [optional] override request path (OpenAI-compatible hosts)
+    output_dir: content/assets/generated       # [optional] default shown; cache + sidecars (committed)
+    concurrency: 5                             # [optional] default 5; max parallel generations
+    reuse: exact                               # [optional] exact (re-render on provider/model change) | content
+    system_prompt: ""                          # [optional] house style; default: the theme's
+    defaults:                                  # [optional] tuning params applied to every request
+      aspect: "16:9"
+    postprocess:
+      trim_letterbox: true                     # [optional] default true; strip baked-in letterbox bars
+    profiles:                                  # [optional] named alternates; each inherits the block above
+      draft:                                   # cheap/fast — e.g. for previews
+        provider: together                     # [inherits] all other fields from the default image block
+        model: black-forest-labs/FLUX.1-schnell
+      poster:                                  # premium — e.g. for hero art
+        provider: openai
+        model: gpt-image-1
+        defaults: { quality: high }            # deep-merged over the default `defaults` (aspect kept)
+
+  # ── speech ──────────────────────────────────────────────────────────────────
+  speech:
+    enabled: true                              # [optional] default true; also the per-post `audio:` default
+    provider: elevenlabs                       # [required] elevenlabs | minimax
+    voice: "{env:ELEVENLABS_VOICE:-Ee4WTXzxagFpoj4PUkHV}"  # [optional] default: provider profile's default voice
+    model: ""                                  # [optional] default: provider profile's default model
+    api_key: "{env:ELEVENLABS_API_KEY}"        # [optional] default: the provider's env var
+    base_url: ""                               # [optional] override endpoint
+    api_path: ""                               # [optional] override request path
+    output_dir: content/assets/generated       # [optional] default shown; clip cache + sidecars
+    concurrency: 5                             # [optional] default 5; max parallel clips
+    reuse: exact                               # [optional] exact | content (reuse a prior voice's reading)
+    pronunciation_dict: en_GB                  # [optional] built-in name (contrib/pronunciation) or a YAML path
+    transcript:                                # [optional] how post content becomes spoken text
+      wrap_up: true                            # [optional] default true; append a closing "visit the post" note
+      expand_acronyms: true                    # [optional] default true; read SSH as "Secure Shell"
+      blocks:                                  # [optional] per block-type handling: cue|drop|keep|spell
+        code: cue                              #   (defaults: code/table/diagram/math_display→cue,
+        table: cue                             #    math_inline→drop, inline_code→spell, else keep)
+    profiles:                                  # [optional] named alternates; each inherits the block above
+      minimax:                                 # a different provider needs its own voice
+        provider: minimax
+        voice: English_Trustworth_Man          # [inherits] pronunciation_dict/transcript/etc from default
+      narrator-fast:                           # same provider, faster/cheaper model + a different voice
+        model: eleven_turbo_v2_5
+        voice: "{env:ELEVENLABS_NARRATOR_VOICE:-}"
+
+
+# ═══ telemetry ═══════════════════════════════════════════════════════════════
+# The colophon APP's own anonymous usage reporting (build/source/publisher TYPES —
+# never your content), separate from the site analytics above. Governs only itself.
+telemetry:
+  enabled: true                                # [optional] default true; false (or COLOPHON_TELEMETRY=off) disables
+
+
+# ═══ per-post selection (frontmatter — NOT this file) ════════════════════════
+# Posts pick a profile in their own frontmatter. The selector keys are identical
+# at every scope (config block, environment, frontmatter): speech_profile /
+# image_profile.
+#
+#   ---
+#   audio: true
+#   speech_profile: minimax          # → generation.speech.profiles.minimax
+#   audio_voice: SomeOtherVoiceId    # still wins over the profile's voice
+#   image_profile: poster            # → generation.image.profiles.poster (hero + inline images)
+#   ---
+#
+#   ![cover](<gen:hero?profile=poster>)   # per-image override, beats image_profile

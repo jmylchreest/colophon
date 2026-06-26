@@ -70,6 +70,12 @@ type Frontmatter struct {
 	Audio      *bool  `yaml:"audio,omitempty"` // tri-state: unset → site default; true/false → explicit
 	AudioFile  string `yaml:"audio_file,omitempty"`
 	AudioVoice string `yaml:"audio_voice,omitempty"`
+	// SpeechProfile / ImageProfile select a named generation profile for this post
+	// (generation.<speech|image>.profiles.<name>), overriding the environment's selection.
+	// Empty → the environment's profile, else the default block. AudioVoice still wins over
+	// the resolved profile's voice. For a single image, <gen:…?profile=name> beats ImageProfile.
+	SpeechProfile string `yaml:"speech_profile,omitempty"`
+	ImageProfile  string `yaml:"image_profile,omitempty"`
 
 	// Attachments are downloadable files published with the post — scripts, archives,
 	// datasets, PDFs, etc. Each entry is either a bare source-relative path (or [[embed]])

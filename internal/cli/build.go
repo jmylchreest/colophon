@@ -45,6 +45,8 @@ func (c *BuildCmd) Run() error {
 		opts.BaseURL = env.BaseURL
 		opts.Theme = env.Theme
 		opts.Publishers = env.Publish
+		opts.ImageProfile = env.ImageProfile
+		opts.SpeechProfile = env.SpeechProfile
 	}
 
 	res, err := build.Run(cfg, opts)

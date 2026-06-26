@@ -26,13 +26,22 @@ func (f *fakeSpeech) Generate(_ context.Context, _ generate.SpeechRequest) (gene
 func newTTSResolver(t *testing.T, generateAI bool) (*audioResolver, *audioJob) {
 	t.Helper()
 	dir := t.TempDir()
-	ar := &audioResolver{speech: &generate.SpeechSettings{}, generateAI: generateAI, cacheDir: dir}
+	rs := &resolvedSpeech{settings: generate.SpeechSettings{Model: "m1"}, cacheDir: dir}
+	ar := &audioResolver{generateAI: generateAI, profiles: map[string]*resolvedSpeech{"default": rs}}
 	j := &audioJob{
 		kind: "tts", outPath: genOutDir + "/clip" + ttsOutputExt, mime: ttsOutputMIME,
 		req:   generate.SpeechRequest{Text: "hello world", Voice: "v1", Model: "m1"},
 		cache: filepath.Join(dir, "clip"+ttsOutputExt),
+		rs:    rs,
 	}
 	return ar, j
+}
+
+// withSpeechGen pre-injects a generator into a resolved profile, consuming its once-cell so
+// produce() uses the fake instead of building a real generator.
+func withSpeechGen(rs *resolvedSpeech, g generate.SpeechGenerator) {
+	rs.gen = g
+	rs.once.Do(func() {})
 }
 
 // TestGenerateSingleRender: a generated reading makes exactly one provider call (the waveform is
@@ -41,9 +50,9 @@ func newTTSResolver(t *testing.T, generateAI bool) (*audioResolver, *audioJob) {
 func TestGenerateSingleRender(t *testing.T) {
 	ar, j := newTTSResolver(t, true)
 	fake := &fakeSpeech{audio: []byte("\x01\x02\x03\x04\x05\x06\x07\x08")} // 4 PCM samples
-	ensure := func() (generate.SpeechGenerator, error) { return fake, nil }
+	withSpeechGen(j.rs, fake)
 
-	out := ar.produce(j, ensure, time.Unix(0, 0))
+	out := ar.produce(j, time.Unix(0, 0))
 	if len(out.bytes) < 44 || string(out.bytes[:4]) != "RIFF" {
 		t.Fatalf("audio should publish as WAV; got %d bytes %q", len(out.bytes), out.bytes[:min(4, len(out.bytes))])
 	}
@@ -78,9 +87,9 @@ func TestCacheHitReadsLegacyPeaks(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := &fakeSpeech{audio: []byte("x")}
-	ensure := func() (generate.SpeechGenerator, error) { return fake, nil }
+	withSpeechGen(j.rs, fake)
 
-	out := ar.produce(j, ensure, time.Unix(0, 0))
+	out := ar.produce(j, time.Unix(0, 0))
 	if string(out.bytes) != "CACHEDWAV" {
 		t.Fatalf("must reuse cached audio; got %q", out.bytes)
 	}

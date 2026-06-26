@@ -1,6 +1,14 @@
 package core
 
-import "strings"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
+
+// defaultProfile is the implicit name of the unnamed (default) generation block, so
+// `speech_profile: default` / `image_profile: default` explicitly select it.
+const defaultProfile = "default"
 
 // Generation configures colophon's optional AI media generation, one block per modality
 // (image, speech). Each block names a provider profile; credentials are shared across
@@ -42,6 +50,27 @@ type SpeechGen struct {
 	// Transcript controls how a post's content is turned into spoken text — what to do with
 	// blocks that don't read well aloud (code, math, tables, diagrams).
 	Transcript SpeechTranscript `yaml:"transcript,omitempty"`
+	// Profiles are named alternate speech configurations, selectable per environment or per
+	// post via `speech_profile:`. Each inherits this (default) block and overrides only the
+	// fields it sets; voice/model ids are provider-specific, so a profile that switches provider
+	// should set its own. The unnamed block above is the implicit profile "default".
+	Profiles map[string]SpeechGen `yaml:"profiles,omitempty"`
+}
+
+// ResolveProfile returns the speech config for a named profile: the default block with the
+// named profile's overrides layered on (scalars replace, maps deep-merge). An empty name (or
+// "default") returns the default block. An unknown name is an error listing what's configured.
+func (g SpeechGen) ResolveProfile(name string) (SpeechGen, error) {
+	if name = strings.TrimSpace(name); name == "" || name == defaultProfile {
+		out := g
+		out.Profiles = nil
+		return out, nil
+	}
+	p, ok := g.Profiles[name]
+	if !ok {
+		return SpeechGen{}, fmt.Errorf("unknown speech profile %q (have: %s)", name, profileNames(g.Profiles))
+	}
+	return mergeSpeechGen(g, p), nil
 }
 
 // SpeechTranscript configures the prose extraction that feeds text-to-speech. Blocks maps a
@@ -120,6 +149,26 @@ type ImageGen struct {
 	// re-generates when the provider/model differs from the cached image's sidecar; "content"
 	// reuses any existing image for the same prompt/style/params instead of regenerating.
 	Reuse string `yaml:"reuse,omitempty"`
+	// Profiles are named alternate image configurations, selectable per environment or per post
+	// via `image_profile:` (or per `gen:` ref via ?profile=). Each inherits this (default) block
+	// and overrides only what it sets. The unnamed block above is the implicit profile "default".
+	Profiles map[string]ImageGen `yaml:"profiles,omitempty"`
+}
+
+// ResolveProfile returns the image config for a named profile: the default block with the named
+// profile's overrides layered on (scalars replace, maps deep-merge). An empty name (or "default")
+// returns the default block. An unknown name is an error listing what's configured.
+func (g ImageGen) ResolveProfile(name string) (ImageGen, error) {
+	if name = strings.TrimSpace(name); name == "" || name == defaultProfile {
+		out := g
+		out.Profiles = nil
+		return out, nil
+	}
+	p, ok := g.Profiles[name]
+	if !ok {
+		return ImageGen{}, fmt.Errorf("unknown image profile %q (have: %s)", name, profileNames(g.Profiles))
+	}
+	return mergeImageGen(g, p), nil
 }
 
 // ImagePostprocess configures deterministic fixes applied to a freshly generated image
@@ -138,3 +187,102 @@ func (g ImageGen) Configured() bool { return strings.TrimSpace(g.Provider) != ""
 
 // On reports whether image generation is switched on (default true).
 func (g ImageGen) On() bool { return g.Enabled == nil || *g.Enabled }
+
+// pick returns a when it is non-blank, else b — so a profile's blank field inherits the default.
+func pick(a, b string) string {
+	if strings.TrimSpace(a) != "" {
+		return a
+	}
+	return b
+}
+
+// mergeStrMap layers ov over base (ov wins per key); nil only when both are empty.
+func mergeStrMap(base, ov map[string]string) map[string]string {
+	if base == nil && ov == nil {
+		return nil
+	}
+	out := make(map[string]string, len(base)+len(ov))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range ov {
+		out[k] = v
+	}
+	return out
+}
+
+// profileNames lists a profiles map's keys (sorted) for diagnostics.
+func profileNames[T any](m map[string]T) string {
+	if len(m) == 0 {
+		return "(none)"
+	}
+	names := make([]string, 0, len(m))
+	for n := range m {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
+}
+
+// mergeSpeechGen layers a profile (ov) over the default speech block (base): scalars replace when
+// set, maps deep-merge, *bool/int override when present. The result carries no sub-profiles.
+func mergeSpeechGen(base, ov SpeechGen) SpeechGen {
+	out := base
+	if ov.Enabled != nil {
+		out.Enabled = ov.Enabled
+	}
+	out.Provider = pick(ov.Provider, base.Provider)
+	out.Model = pick(ov.Model, base.Model)
+	out.Voice = pick(ov.Voice, base.Voice)
+	out.OutputDir = pick(ov.OutputDir, base.OutputDir)
+	out.PronunciationDict = pick(ov.PronunciationDict, base.PronunciationDict)
+	out.Reuse = pick(ov.Reuse, base.Reuse)
+	out.BaseURL = pick(ov.BaseURL, base.BaseURL)
+	out.APIPath = pick(ov.APIPath, base.APIPath)
+	out.APIKey = pick(ov.APIKey, base.APIKey)
+	if ov.Concurrency > 0 {
+		out.Concurrency = ov.Concurrency
+	}
+	out.Transcript = mergeTranscript(base.Transcript, ov.Transcript)
+	out.Profiles = nil
+	return out
+}
+
+// mergeTranscript deep-merges block handlings and lets a profile flip the boolean toggles.
+func mergeTranscript(base, ov SpeechTranscript) SpeechTranscript {
+	out := base
+	out.Blocks = mergeStrMap(base.Blocks, ov.Blocks)
+	if ov.WrapUp != nil {
+		out.WrapUp = ov.WrapUp
+	}
+	if ov.ExpandAcronyms != nil {
+		out.ExpandAcronyms = ov.ExpandAcronyms
+	}
+	return out
+}
+
+// mergeImageGen layers a profile (ov) over the default image block (base), mirroring
+// mergeSpeechGen. The result carries no sub-profiles.
+func mergeImageGen(base, ov ImageGen) ImageGen {
+	out := base
+	if ov.Enabled != nil {
+		out.Enabled = ov.Enabled
+	}
+	out.Provider = pick(ov.Provider, base.Provider)
+	out.Model = pick(ov.Model, base.Model)
+	out.OutputDir = pick(ov.OutputDir, base.OutputDir)
+	out.BaseURL = pick(ov.BaseURL, base.BaseURL)
+	out.APIPath = pick(ov.APIPath, base.APIPath)
+	out.APIKey = pick(ov.APIKey, base.APIKey)
+	out.SystemPrompt = pick(ov.SystemPrompt, base.SystemPrompt)
+	out.Reuse = pick(ov.Reuse, base.Reuse)
+	out.Defaults = mergeStrMap(base.Defaults, ov.Defaults)
+	if ov.Concurrency > 0 {
+		out.Concurrency = ov.Concurrency
+	}
+	if ov.Postprocess.TrimLetterbox != nil {
+		out.Postprocess.TrimLetterbox = ov.Postprocess.TrimLetterbox
+	}
+	out.Profiles = nil
+	return out
+}

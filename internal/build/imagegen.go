@@ -75,19 +75,18 @@ func parseGenRef(ref string) (genRef, bool) {
 	return genRef{Prompt: prompt, Params: params}, true
 }
 
-// resolveImageGen resolves the configured image generator to ready-to-use settings,
-// or nil when generation is off or misconfigured (a config error degrades to off
-// with a warning rather than failing the build).
-func resolveImageGen(cfg *config.Config, log *clog.Logger) *generate.Settings {
-	if !cfg.Generation.Image.Configured() {
-		return nil
-	}
-	s, err := generate.Resolve(cfg.Generation.Image)
-	if err != nil {
-		log.Step("IMAGE", "", "warn", "image generation disabled: "+err.Error())
-		return nil
-	}
-	return &s
+// resolvedImage is one image profile resolved to live state: its rendered settings, cache dir
+// and reuse policy, plus a lazily-built generator (constructed once, only on a cache miss). The
+// resolver caches one per effective profile name as `gen:` refs reference them.
+type resolvedImage struct {
+	settings     generate.Settings
+	cacheDir     string
+	reuseContent bool
+	resolveErr   error // ResolveProfile/Resolve failure → refs using this profile don't resolve
+
+	once sync.Once
+	gen  generate.ImageGenerator
+	err  error
 }
 
 // genJob is one distinct image to produce, keyed by its extension-less stem. The
@@ -95,8 +94,9 @@ func resolveImageGen(cfg *config.Config, log *clog.Logger) *generate.Settings {
 // image is found in cache or generated, and is what URLs and the output emission use.
 type genJob struct {
 	req        generate.ImageRequest
-	stem       string // content identity (prompt/system/params); names the published file
-	legacyStem string // pre-content-naming single hash, adopted on migration if present
+	stem       string         // content identity (prompt/system/params); names the published file
+	legacyStem string         // pre-content-naming single hash, adopted on migration if present
+	ri         *resolvedImage // the resolved image profile that renders this image
 	filename   string
 }
 
@@ -105,43 +105,124 @@ type genJob struct {
 // across posts is generated once). It is inert when s is nil (generation off),
 // leaving gen: refs to fall through unresolved.
 type genResolver struct {
-	s        *generate.Settings
-	cacheDir string
+	imageGen   core.ImageGen // default block + named profiles
+	configured bool          // an image provider is set (generation possible)
+	envProfile string        // environment-selected image profile; a post's (or ?profile=) wins
+	root       string
+	retry      generate.RetryPolicy // provider rate-limit backoff, applied to each resolved profile
 	// systemDefault is the house-style system prompt applied to every image unless a
 	// post overrides or suppresses it (site config > theme system_prompt > theme description).
 	systemDefault string
-	reuseContent  bool // reuse: content — reuse any existing image for the same prompt/style
 	regenerate    bool // --regenerate: re-generate even when cached
+	log           *clog.Logger
+	profiles      map[string]*resolvedImage // resolved image profiles, keyed by effective name
 	jobs          map[string]*genJob
 }
 
-func newGenResolver(s *generate.Settings, root, systemDefault string, regenerate bool) *genResolver {
-	gr := &genResolver{s: s, systemDefault: strings.TrimSpace(systemDefault), regenerate: regenerate, jobs: map[string]*genJob{}}
-	if s != nil {
-		gr.reuseContent = s.Reuse == "content"
-		dir := s.OutputDir
-		if !filepath.IsAbs(dir) {
-			dir = filepath.Join(root, filepath.FromSlash(dir))
-		}
-		gr.cacheDir = dir
+func newGenResolver(image core.ImageGen, envProfile, root, systemDefault string, regenerate bool, log *clog.Logger) *genResolver {
+	return &genResolver{
+		imageGen: image, configured: image.Configured(), envProfile: envProfile, root: root,
+		systemDefault: strings.TrimSpace(systemDefault), regenerate: regenerate, log: log,
+		profiles: map[string]*resolvedImage{}, jobs: map[string]*genJob{},
 	}
-	return gr
 }
 
-func (gr *genResolver) active() bool { return gr != nil && gr.s != nil }
+func (gr *genResolver) active() bool { return gr != nil && gr.configured }
 
-// register returns the job for a gen ref, creating it on first sight. The per-ref
-// `systemprompt` param is resolved into the request's system prompt and dropped from the
-// provider params, so it shapes the cache identity without being sent as a tuning param.
-func (gr *genResolver) register(g genRef) *genJob {
-	system, params := effectiveSystem(g.Params, gr.systemDefault)
-	stem := gr.s.ImageContentStem(g.Prompt, system, params)
+// resolve returns the live settings for an image profile, resolving and caching on first use.
+// The ref's ?profile= wins over the post's image_profile, which wins over the environment's; an
+// empty name selects the default block. A resolution failure is cached (and warned once).
+func (gr *genResolver) resolve(profileName string) *resolvedImage {
+	name := strings.TrimSpace(profileName)
+	if name == "" {
+		name = strings.TrimSpace(gr.envProfile)
+	}
+	key := name
+	if key == "" {
+		key = "default"
+	}
+	if ri, ok := gr.profiles[key]; ok {
+		return ri
+	}
+	ri := &resolvedImage{}
+	g, err := gr.imageGen.ResolveProfile(name)
+	if err == nil {
+		var s generate.Settings
+		if s, err = generate.Resolve(g); err == nil {
+			s.Retry = gr.retry
+			ri.settings = s
+			ri.reuseContent = s.Reuse == "content"
+			ri.cacheDir = gr.dirFor(s.OutputDir)
+		}
+	}
+	if err != nil {
+		gr.log.Step("IMAGE", "", "warn", fmt.Sprintf("image profile %q unavailable: %v", key, err))
+	}
+	ri.resolveErr = err
+	gr.profiles[key] = ri
+	return ri
+}
+
+// dirFor resolves a possibly-relative output_dir against the site root.
+func (gr *genResolver) dirFor(dir string) string {
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(gr.root, filepath.FromSlash(dir))
+	}
+	return dir
+}
+
+// ensureGen builds (once) the generator for a resolved profile, warning on failure.
+func (gr *genResolver) ensureGen(ri *resolvedImage) (generate.ImageGenerator, error) {
+	ri.once.Do(func() {
+		ri.gen, ri.err = generate.New(ri.settings)
+		if ri.err != nil {
+			gr.log.Step("IMAGE", ri.settings.Provider, "warn", "generator unavailable: "+ri.err.Error())
+		}
+	})
+	return ri.gen, ri.err
+}
+
+// profileParam is the reserved query key that overrides the image profile for a single gen: ref
+// (![…](<gen:…?profile=poster>)), beating the post's image_profile and the environment's.
+const profileParam = "profile"
+
+// register returns the job for a gen ref, creating it on first sight. The ref's reserved
+// `profile` param (else the post's image_profile) selects which image profile renders it; the
+// `systemprompt` param is resolved into the request's system prompt. Both reserved keys are
+// dropped from the provider params. Returns nil when the selected profile failed to resolve.
+func (gr *genResolver) register(g genRef, postProfile string) *genJob {
+	profName, params := takeParam(g.Params, profileParam)
+	if profName == "" {
+		profName = postProfile
+	}
+	ri := gr.resolve(profName)
+	if ri.resolveErr != nil {
+		return nil
+	}
+	system, params := effectiveSystem(params, gr.systemDefault)
+	stem := ri.settings.ImageContentStem(g.Prompt, system, params)
 	j := gr.jobs[stem]
 	if j == nil {
-		j = &genJob{req: gr.s.Request(g.Prompt, system, params), stem: stem, legacyStem: gr.s.ImageStem(g.Prompt, system, params)}
+		j = &genJob{req: ri.settings.Request(g.Prompt, system, params), stem: stem, legacyStem: ri.settings.ImageStem(g.Prompt, system, params), ri: ri}
 		gr.jobs[stem] = j
 	}
 	return j
+}
+
+// takeParam returns params[key] (trimmed) and a copy of params with that key removed; the
+// original map is returned unchanged when the key is absent.
+func takeParam(params map[string]string, key string) (string, map[string]string) {
+	v, ok := params[key]
+	if !ok {
+		return "", params
+	}
+	clean := make(map[string]string, len(params))
+	for k, val := range params {
+		if k != key {
+			clean[k] = val
+		}
+	}
+	return strings.TrimSpace(v), clean
 }
 
 // systemPromptParam is the reserved query key authors use to override or suppress the
@@ -171,14 +252,14 @@ func effectiveSystem(params map[string]string, def string) (string, map[string]s
 	}
 }
 
-// note registers a gen: reference for generation, ignoring everything else. Called in
-// the collection pass so every image is known before ensure runs.
-func (gr *genResolver) note(ref string) {
+// note registers a gen: reference for generation under the post's image profile, ignoring
+// everything else. Called in the collection pass so every image is known before ensure runs.
+func (gr *genResolver) note(ref, postProfile string) {
 	if !gr.active() {
 		return
 	}
 	if g, ok := parseGenRef(ref); ok {
-		gr.register(g)
+		gr.register(g, postProfile)
 	}
 }
 
@@ -186,7 +267,7 @@ func (gr *genResolver) note(ref string) {
 // for non-gen refs or when generation is unconfigured, so callers fall back to normal
 // asset handling. An image not (yet) produced keeps a stable .png ref, behaving like
 // any other missing asset.
-func (gr *genResolver) resolveURL(ref, basePath, baseURL string, router *core.Router) (rel, abs string, ok bool) {
+func (gr *genResolver) resolveURL(ref, postProfile, basePath, baseURL string, router *core.Router) (rel, abs string, ok bool) {
 	if !gr.active() {
 		return "", "", false
 	}
@@ -194,8 +275,8 @@ func (gr *genResolver) resolveURL(ref, basePath, baseURL string, router *core.Ro
 	if !isGen {
 		return "", "", false
 	}
-	j := gr.register(g)
-	if j.filename == "" {
+	j := gr.register(g, postProfile)
+	if j == nil || j.filename == "" {
 		// Not produced — uncached and not generated this run, or generation failed/errored
 		// (bad key, expired plan, refusal). Resolve to nothing so we never emit a broken ref.
 		return "", "", false
@@ -216,7 +297,7 @@ var genImageRE = regexp.MustCompile(`!\[([^\]]*)\]\(\s*(?:<([^>]+)>|([^)\s]+))\s
 // gen prompt with spaces must use the <…> destination form. An embed whose image wasn't
 // produced (uncached/failed) is dropped to its alt text, so the body never carries a broken
 // <img>. Non-gen images are left untouched for the asset pass.
-func rewriteGenRefs(body, basePath, baseURL string, router *core.Router, gr *genResolver) string {
+func rewriteGenRefs(body, postProfile, basePath, baseURL string, router *core.Router, gr *genResolver) string {
 	if !gr.active() {
 		return body
 	}
@@ -229,7 +310,7 @@ func rewriteGenRefs(body, basePath, baseURL string, router *core.Router, gr *gen
 		if _, isGen := parseGenRef(dest); !isGen {
 			return m // not a gen ref — leave it for rewriteAssetURLs
 		}
-		if rel, _, ok := gr.resolveURL(dest, basePath, baseURL, router); ok {
+		if rel, _, ok := gr.resolveURL(dest, postProfile, basePath, baseURL, router); ok {
 			return "![" + sub[1] + "](" + rel + ")"
 		}
 		return sub[1] // not produced → drop the embed, keep the caption text
@@ -240,9 +321,10 @@ func rewriteGenRefs(body, basePath, baseURL string, router *core.Router, gr *gen
 // fatal filesystem error. Generation runs concurrently; the log lines replay serially
 // in deterministic order from these.
 type genResult struct {
-	detail  bool  // true → Detail (a quiet cache hit), false → Step
-	logArgs []any // key/values after ("IMAGE", provider)
-	fatal   error
+	detail   bool   // true → Detail (a quiet cache hit), false → Step
+	provider string // the job's image provider, for the log line ("IMAGE", provider)
+	logArgs  []any  // key/values after ("IMAGE", provider)
+	fatal    error
 }
 
 // ensure produces every registered image into the cache, recording each job's resolved
@@ -258,21 +340,14 @@ func (gr *genResolver) ensure(generateAI bool, log *clog.Logger, now time.Time) 
 	if !gr.active() || len(gr.jobs) == 0 {
 		return nil
 	}
-	s := gr.s
 	stems := gr.sortedStems()
 
-	// Built at most once, lazily (only a cache miss needs it), shared across workers
-	// (the drivers are stateless over a concurrency-safe http.Client).
-	var genOnce sync.Once
-	var gen generate.ImageGenerator
-	var genErr error
-	ensureGen := func() (generate.ImageGenerator, error) {
-		genOnce.Do(func() { gen, genErr = generate.New(*s) })
-		return gen, genErr
-	}
-
 	results := make([]genResult, len(stems))
-	sem := make(chan struct{}, max(1, s.Concurrency))
+	limit := generate.DefaultConcurrency
+	if ri := gr.resolve(""); ri.resolveErr == nil && ri.settings.Concurrency > 0 {
+		limit = ri.settings.Concurrency
+	}
+	sem := make(chan struct{}, max(1, limit))
 	var wg sync.WaitGroup
 	for i, st := range stems {
 		wg.Add(1)
@@ -280,23 +355,19 @@ func (gr *genResolver) ensure(generateAI bool, log *clog.Logger, now time.Time) 
 		go func(i int, j *genJob) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			results[i] = gr.produce(j, generateAI, ensureGen, now)
+			results[i] = gr.produce(j, generateAI, now)
 		}(i, gr.jobs[st])
 	}
 	wg.Wait()
 
-	// A single "generator unavailable" line stands in for the per-job skips below.
-	if genErr != nil {
-		log.Step("IMAGE", s.Provider, "warn", "generator unavailable: "+genErr.Error())
-	}
 	for _, r := range results {
 		if r.fatal != nil {
 			return r.fatal
 		}
 		if r.detail {
-			log.Detail("IMAGE", s.Provider, r.logArgs...)
+			log.Detail("IMAGE", r.provider, r.logArgs...)
 		} else {
-			log.Step("IMAGE", s.Provider, r.logArgs...)
+			log.Step("IMAGE", r.provider, r.logArgs...)
 		}
 	}
 	return nil
@@ -305,19 +376,21 @@ func (gr *genResolver) ensure(generateAI bool, log *clog.Logger, now time.Time) 
 // produce resolves one job to a cached file: a hit reuses the existing file; a miss
 // with generateAI generates and writes the image (extension chosen from its bytes)
 // plus a sidecar. It sets j.filename on success and does no output emission.
-func (gr *genResolver) produce(j *genJob, generateAI bool, ensureGen func() (generate.ImageGenerator, error), now time.Time) genResult {
+func (gr *genResolver) produce(j *genJob, generateAI bool, now time.Time) (out genResult) {
+	ri := j.ri
+	defer func() { out.provider = ri.settings.Provider }()
 	if !gr.regenerate {
-		if fn, n, ok := findCached(gr.cacheDir, j.stem); ok {
+		if fn, n, ok := findCached(ri.cacheDir, j.stem); ok {
 			// A content-named image exists. Reuse it unless reuse:exact and the renderer
 			// recorded in its sidecar differs from the current provider/model.
-			if gr.reuseContent || gr.sidecarRenderMatches(fn) {
+			if ri.reuseContent || gr.sidecarRenderMatches(j, fn) {
 				j.filename = fn
 				return genResult{detail: true, logArgs: []any{"cached", fn, "bytes", n}}
 			}
-		} else if legacy, _, ok := findCached(gr.cacheDir, j.legacyStem); ok {
+		} else if legacy, _, ok := findCached(ri.cacheDir, j.legacyStem); ok {
 			// Migration: adopt an image cached by a pre-content-naming build under the new
 			// content name (+ its sidecar), so upgrading doesn't re-roll unchanged images.
-			if fn, err := gr.adoptLegacy(legacy, j.stem); err == nil {
+			if fn, err := gr.adoptLegacy(j, legacy); err == nil {
 				j.filename = fn
 				return genResult{detail: true, logArgs: []any{"adopted", fn}}
 			}
@@ -326,24 +399,24 @@ func (gr *genResolver) produce(j *genJob, generateAI bool, ensureGen func() (gen
 	if !generateAI {
 		return genResult{logArgs: []any{"skip", j.stem, "hint", "build --generate-ai to create it"}}
 	}
-	gen, err := ensureGen()
+	gen, err := gr.ensureGen(ri)
 	if err != nil {
-		return genResult{logArgs: []any{"skip", j.stem}} // the single unavailable warn is logged by ensure
+		return genResult{logArgs: []any{"skip", j.stem}} // the unavailable warn is logged by ensureGen
 	}
 	res, err := gen.Generate(context.Background(), j.req)
 	if err != nil {
 		return genResult{logArgs: []any{"warn", fmt.Sprintf("generate %q failed: %v", j.stem, err)}}
 	}
 	data := res.Bytes
-	if gr.s.TrimLetterbox {
+	if ri.settings.TrimLetterbox {
 		if trimmed, ok := trimLetterbox(data, aspectValue(j.req.Params)); ok {
 			data = trimmed
 		}
 	}
 	ext, mime := imageExt(data, res.MIME)
 	filename := j.stem + ext
-	imagePath := filepath.Join(gr.cacheDir, filename)
-	if err := os.MkdirAll(gr.cacheDir, 0o755); err != nil {
+	imagePath := filepath.Join(ri.cacheDir, filename)
+	if err := os.MkdirAll(ri.cacheDir, 0o755); err != nil {
 		return genResult{fatal: err}
 	}
 	if err := os.WriteFile(imagePath, data, 0o644); err != nil {
@@ -352,7 +425,7 @@ func (gr *genResolver) produce(j *genJob, generateAI bool, ensureGen func() (gen
 	if err := generate.WriteSidecar(imagePath, generate.Sidecar{
 		Prompt:        j.req.Prompt,
 		System:        j.req.System,
-		Provider:      gr.s.Provider,
+		Provider:      ri.settings.Provider,
 		Model:         j.req.Model,
 		Params:        j.req.Params,
 		MIME:          mime,
@@ -377,15 +450,15 @@ func publishGeneratedImages(write func(string, []byte) error, gr *genResolver, l
 		if j.filename == "" {
 			continue // never produced (skipped/failed) — nothing to publish
 		}
-		b, err := os.ReadFile(filepath.Join(gr.cacheDir, j.filename))
+		b, err := os.ReadFile(filepath.Join(j.ri.cacheDir, j.filename))
 		if err != nil {
-			log.Step("IMAGE", gr.s.Provider, "warn", "cached image vanished: "+j.filename)
+			log.Step("IMAGE", j.ri.settings.Provider, "warn", "cached image vanished: "+j.filename)
 			continue
 		}
 		if err := write(genOutDir+"/"+j.filename, b); err != nil {
 			return err
 		}
-		log.Detail("IMAGE", gr.s.Provider, "publish", j.filename, "bytes", len(b))
+		log.Detail("IMAGE", j.ri.settings.Provider, "publish", j.filename, "bytes", len(b))
 	}
 	return nil
 }
@@ -417,8 +490,8 @@ func findCached(cacheDir, stem string) (string, int64, bool) {
 // sidecarRenderMatches reports whether the cached image was produced by the current
 // provider/model. A missing/unreadable sidecar, or one without a provider, matches (reuse) so
 // images without provenance aren't churned.
-func (gr *genResolver) sidecarRenderMatches(filename string) bool {
-	b, err := os.ReadFile(generate.SidecarPath(filepath.Join(gr.cacheDir, filename)))
+func (gr *genResolver) sidecarRenderMatches(j *genJob, filename string) bool {
+	b, err := os.ReadFile(generate.SidecarPath(filepath.Join(j.ri.cacheDir, filename)))
 	if err != nil {
 		return true
 	}
@@ -426,23 +499,23 @@ func (gr *genResolver) sidecarRenderMatches(filename string) bool {
 	if json.Unmarshal(b, &sc) != nil || sc.Provider == "" {
 		return true
 	}
-	return sc.Provider == gr.s.Provider && sc.Model == gr.s.Model
+	return sc.Provider == j.ri.settings.Provider && sc.Model == j.ri.settings.Model
 }
 
 // adoptLegacy copies a legacy single-hash image (and its sidecar) to the content-named file,
 // returning the new filename, so the move to content naming doesn't re-roll unchanged images.
-func (gr *genResolver) adoptLegacy(legacyFile, contentStem string) (string, error) {
-	src := filepath.Join(gr.cacheDir, legacyFile)
+func (gr *genResolver) adoptLegacy(j *genJob, legacyFile string) (string, error) {
+	src := filepath.Join(j.ri.cacheDir, legacyFile)
 	b, err := os.ReadFile(src)
 	if err != nil {
 		return "", err
 	}
-	dst := contentStem + filepath.Ext(legacyFile)
-	if err := os.WriteFile(filepath.Join(gr.cacheDir, dst), b, 0o644); err != nil {
+	dst := j.stem + filepath.Ext(legacyFile)
+	if err := os.WriteFile(filepath.Join(j.ri.cacheDir, dst), b, 0o644); err != nil {
 		return "", err
 	}
 	if sc, err := os.ReadFile(generate.SidecarPath(src)); err == nil {
-		_ = os.WriteFile(generate.SidecarPath(filepath.Join(gr.cacheDir, dst)), sc, 0o644)
+		_ = os.WriteFile(generate.SidecarPath(filepath.Join(j.ri.cacheDir, dst)), sc, 0o644)
 	}
 	return dst, nil
 }

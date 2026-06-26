@@ -76,6 +76,11 @@ type Environment struct {
 	Title   string `yaml:"title,omitempty"`
 	BaseURL string `yaml:"base_url,omitempty"`
 	Theme   string `yaml:"theme,omitempty"`
+	// ImageProfile and SpeechProfile select a named generation profile for this environment
+	// (generation.<image|speech>.profiles.<name>) — e.g. a cheap image model for previews. A
+	// post's own image_profile/speech_profile overrides these; empty → the default block.
+	ImageProfile  string `yaml:"image_profile,omitempty"`
+	SpeechProfile string `yaml:"speech_profile,omitempty"`
 	// Overrides layers per-publisher Settings, keyed by publisher id.
 	Overrides map[string]map[string]any `yaml:"overrides,omitempty"`
 }

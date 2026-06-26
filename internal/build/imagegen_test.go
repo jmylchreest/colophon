@@ -65,10 +65,10 @@ func TestGenResolverInertWhenNil(t *testing.T) {
 	if gr.active() {
 		t.Error("nil resolver must be inert")
 	}
-	if _, _, ok := gr.resolveURL("gen:a fox", "/", "", nil); ok {
+	if _, _, ok := gr.resolveURL("gen:a fox", "", "/", "", nil); ok {
 		t.Error("nil resolver must not resolve gen refs")
 	}
-	if got := rewriteGenRefs("![x](<gen:a fox>)", "/", "", nil, gr); got != "![x](<gen:a fox>)" {
+	if got := rewriteGenRefs("![x](<gen:a fox>)", "", "/", "", nil, gr); got != "![x](<gen:a fox>)" {
 		t.Errorf("nil resolver must leave body unchanged, got %q", got)
 	}
 }

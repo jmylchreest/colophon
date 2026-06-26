@@ -83,6 +83,11 @@ type Options struct {
 	NoBackoff bool
 	// Env is the environment name, used only as a telemetry label (may be "").
 	Env string
+	// ImageProfile and SpeechProfile name the environment's selected generation profiles
+	// (generation.<image|speech>.profiles.<name>). Empty → the default block. A post's own
+	// image_profile/speech_profile frontmatter overrides these per post.
+	ImageProfile  string
+	SpeechProfile string
 	// Telemetry receives build/source/persona events. Nil (e.g. from serve) sends nothing,
 	// so preview rebuilds never emit telemetry.
 	Telemetry *telemetry.Client
@@ -230,17 +235,13 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// audioDefaultOn is the per-post `audio:` default: a post with no explicit audio reads aloud
 	// when speech is configured and enabled, and is silent otherwise (e.g. no provider).
 	audioDefaultOn := genActive && cfg.Generation.Speech.On() && cfg.Generation.Speech.Configured()
-	gr := newGenResolver(resolveImageGen(cfg, opts.Log), cfg.Root, resolveSystemDefault(cfg, eng.Meta()), opts.Regenerate)
-	ar := newAudioResolver(resolveSpeech(cfg, opts.Log), cfg.Root, basePath, site.BaseURL, router, speechGen, opts.Regenerate, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(cfg.Glossary), audioDefaultOn, opts.Log)
+	gr := newGenResolver(cfg.Generation.Image, opts.ImageProfile, cfg.Root, resolveSystemDefault(cfg, eng.Meta()), opts.Regenerate, opts.Log)
+	ar := newAudioResolver(cfg.Generation.Speech, opts.SpeechProfile, cfg.Root, basePath, site.BaseURL, router, speechGen, opts.Regenerate, audioVoiceFor(cfg), defaultLang(site.Lang), newAcronymReplacer(cfg.Glossary), audioDefaultOn, opts.Log)
 	// Rate-limit backoff for provider calls: retry by default (a TPM blip self-heals), disabled
-	// by --no-backoff so a rate limit then fails fast and warns. Set before lazy construction.
+	// by --no-backoff so a rate limit then fails fast and warns. Set before any profile resolves.
 	if !opts.NoBackoff {
-		if gr.s != nil {
-			gr.s.Retry = retryPolicyFor("IMAGE", opts.Log)
-		}
-		if ar.speech != nil {
-			ar.speech.Retry = retryPolicyFor("AUDIO", opts.Log)
-		}
+		gr.retry = retryPolicyFor("IMAGE", opts.Log)
+		ar.retry = retryPolicyFor("AUDIO", opts.Log)
 	}
 	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router, gr, ar, imageGen, opts.Log)
 	if err != nil {
@@ -797,7 +798,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 	for _, it := range items {
 		for _, r := range docRefs(it.c) {
 			addAsset(it, r.Ref)
-			gr.note(r.Ref) // register gen: refs (frontmatter hero/image + body embeds)
+			gr.note(r.Ref, it.c.Frontmatter.ImageProfile) // register gen: refs (frontmatter hero/image + body embeds)
 		}
 	}
 	// Produce generated images before rendering, so refs resolve to the real cached
@@ -812,7 +813,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 	for _, it := range items {
 		fm := it.c.Frontmatter
 		var buf bytes.Buffer
-		body := preprocessCallouts(resolveWikilinks(rewriteAssetURLs(rewriteGenRefs(it.c.Body, basePath, baseURL, router, gr), it.slug, router), links))
+		body := preprocessCallouts(resolveWikilinks(rewriteAssetURLs(rewriteGenRefs(it.c.Body, fm.ImageProfile, basePath, baseURL, router, gr), it.slug, router), links))
 		if err := md.Convert([]byte(body), &buf); err != nil {
 			return nil, nil, nil, fmt.Errorf("%s: %w", it.c.SourcePath, err)
 		}
@@ -845,7 +846,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		if it.embargoed {
 			p.EmbargoUntil = fm.PublishAfter.Format("2006-01-02 15:04 MST")
 		}
-		if rel, abs, ok := gr.resolveURL(fm.Hero, basePath, baseURL, router); ok {
+		if rel, abs, ok := gr.resolveURL(fm.Hero, fm.ImageProfile, basePath, baseURL, router); ok {
 			p.Hero, p.HeroAbs = rel, abs // generated image, published site-root-relative
 		} else if localRef(fm.Hero) {
 			out := path.Clean(path.Join(it.slug, fm.Hero))
@@ -856,7 +857,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 				p.HeroAbs = absURL(baseURL, out)
 			}
 		}
-		if rel, abs, ok := gr.resolveURL(fm.Image, basePath, baseURL, router); ok {
+		if rel, abs, ok := gr.resolveURL(fm.Image, fm.ImageProfile, basePath, baseURL, router); ok {
 			p.Image, p.ImageAbs = rel, abs
 		} else if localRef(fm.Image) {
 			out := path.Clean(path.Join(it.slug, fm.Image))
@@ -872,7 +873,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 					p.Audio, p.AudioAbs, p.AudioType, p.AudioOut, p.HasAudio = rel, abs, mime, out, true
 				}
 			} else if ar.wantsAudio(fm.Audio) {
-				if rel, abs, mime, out, ok := ar.registerTTS(it.slug, html, fm.Lang, fm.AudioVoice, fm.Author, resolvePersona(fm)); ok {
+				if rel, abs, mime, out, ok := ar.registerTTS(it.slug, html, fm.Lang, fm.AudioVoice, fm.Author, resolvePersona(fm), fm.SpeechProfile); ok {
 					p.Audio, p.AudioAbs, p.AudioType, p.AudioOut, p.HasAudio = rel, abs, mime, out, true
 				}
 			}

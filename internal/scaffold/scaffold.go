@@ -84,6 +84,17 @@ environments:
   #   overrides:
   #     cf: { branch: preview }  # Cloudflare: non-production branch → Preview env
 
+# Generation is optional AI media: images for gen: references and spoken readings for posts
+# with audio: true. Off until you add a block. Each modality takes a default provider plus
+# named profiles selectable per environment or per post (image_profile:/speech_profile:).
+# See docs/colophon.reference.yaml for the full, annotated set of options.
+# generation:
+#   image:
+#     provider: google            # google|minimax|openai|together|deepinfra|custom
+#   speech:
+#     provider: elevenlabs        # elevenlabs|minimax
+#     pronunciation_dict: en_GB   # built-in (contrib/pronunciation) or a path to your own
+
 # Telemetry is the colophon APP's own anonymous usage reporting (builds, source types,
 # publisher types — never your content), sent to the colophon maintainer. It is separate from
 # the site analytics above and governs only itself: "enabled: false" stops the app from

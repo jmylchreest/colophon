@@ -43,11 +43,12 @@ func TestSidecarRenderMatches(t *testing.T) {
 func TestProduceReusePolicy(t *testing.T) {
 	// reuse:exact (default) — a recorded renderer change re-renders the content file.
 	ar, j := newTTSResolver(t, true)
-	ar.speech.Provider = "minimax"
+	j.rs.provider = "minimax"
 	mustWrite(t, j.cache, "OLD")
 	mustWrite(t, j.cache+".json", `{"provider":"minimax","model":"m1","voice":"OTHER"}`)
 	fake := &fakeSpeech{audio: []byte("\x01\x02\x03\x04")}
-	out := ar.produce(j, func() (generate.SpeechGenerator, error) { return fake, nil }, time.Unix(0, 0))
+	withSpeechGen(j.rs, fake)
+	out := ar.produce(j, time.Unix(0, 0))
 	if fake.calls != 1 {
 		t.Errorf("exact + renderer change: want re-render, calls=%d", fake.calls)
 	}
@@ -57,11 +58,12 @@ func TestProduceReusePolicy(t *testing.T) {
 
 	// reuse:content — reuse regardless of the recorded renderer.
 	ar2, j2 := newTTSResolver(t, true)
-	ar2.reuseContent = true
+	j2.rs.reuseContent = true
 	mustWrite(t, j2.cache, "CACHEDWAV")
 	mustWrite(t, j2.cache+".json", `{"provider":"x","model":"y","voice":"z"}`)
 	fake2 := &fakeSpeech{audio: []byte("x")}
-	out2 := ar2.produce(j2, func() (generate.SpeechGenerator, error) { return fake2, nil }, time.Unix(0, 0))
+	withSpeechGen(j2.rs, fake2)
+	out2 := ar2.produce(j2, time.Unix(0, 0))
 	if fake2.calls != 0 {
 		t.Errorf("content: want reuse, calls=%d", fake2.calls)
 	}
@@ -72,11 +74,12 @@ func TestProduceReusePolicy(t *testing.T) {
 
 func TestProduceMigration(t *testing.T) {
 	ar, j := newTTSResolver(t, true)
-	ar.speech.Provider = "minimax"
-	j.legacy = filepath.Join(ar.cacheDir, "legacy.wav") // pre-content-naming clip
+	j.rs.provider = "minimax"
+	j.legacy = filepath.Join(j.rs.cacheDir, "legacy.wav") // pre-content-naming clip
 	mustWrite(t, j.legacy, "LEGACYWAV")
 	fake := &fakeSpeech{audio: []byte("x")}
-	out := ar.produce(j, func() (generate.SpeechGenerator, error) { return fake, nil }, time.Unix(0, 0))
+	withSpeechGen(j.rs, fake)
+	out := ar.produce(j, time.Unix(0, 0))
 	if fake.calls != 0 {
 		t.Errorf("migration: want adopt without re-render, calls=%d", fake.calls)
 	}

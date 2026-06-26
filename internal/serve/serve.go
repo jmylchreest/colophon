@@ -143,6 +143,8 @@ func targetsFor(cfg *config.Config) (string, []target, error) {
 				Title:         e.Title,
 				BaseURL:       e.BaseURL,
 				Theme:         e.Theme,
+				ImageProfile:  e.ImageProfile,
+				SpeechProfile: e.SpeechProfile,
 				BasePath:      prefix,
 			},
 		})
