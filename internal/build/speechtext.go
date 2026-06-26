@@ -20,6 +20,11 @@ var reLangClass = regexp.MustCompile(`(?i)class="language-([a-z0-9+#.-]+)"`)
 // the block pass, so only inline spans remain by the time this runs.
 var reInlineCode = regexp.MustCompile(`(?is)<code[^>]*>(.*?)</code>`)
 
+// reHeading matches a whole heading element (h1–h6). Headings carry no trailing punctuation, so
+// once tags are flattened to spaces they run straight into the next paragraph with no pause;
+// we end each heading on a sentence boundary so the voice pauses before continuing.
+var reHeading = regexp.MustCompile(`(?is)<h[1-6][^>]*>(.*?)</h[1-6]>`)
+
 // Author overrides for speech: <notts>…</notts> is shown but never spoken; <tts>…</tts> is
 // always read verbatim (its inner text), overriding the block cue/drop rules.
 var (
@@ -93,6 +98,20 @@ func speechText(htmlStr string, t core.SpeechTranscript, str ttsStrings, acr *ac
 		})
 	}
 
+	// End every heading on a sentence boundary so the reading pauses between a heading and the
+	// text that follows (otherwise the flattened tags leave them touching). Runs after the inline
+	// passes so any inline code/markup inside a heading is already handled.
+	s = reHeading.ReplaceAllStringFunc(s, func(m string) string {
+		text := strings.Join(strings.Fields(reTag.ReplaceAllString(reHeading.FindStringSubmatch(m)[1], " ")), " ")
+		if text == "" {
+			return " "
+		}
+		if !endsWithSentencePunct(html.UnescapeString(text)) {
+			text += "."
+		}
+		return " " + text + " "
+	})
+
 	s = reTag.ReplaceAllString(s, " ")
 	s = html.UnescapeString(s)
 	out := strings.Join(strings.Fields(s), " ")
@@ -103,6 +122,20 @@ func speechText(htmlStr string, t core.SpeechTranscript, str ttsStrings, acr *ac
 		out = strings.TrimSpace(out + " " + str.WrapUp)
 	}
 	return out
+}
+
+// endsWithSentencePunct reports whether text already ends with punctuation that produces a
+// spoken pause, so a heading like "Why WAV?" or "The plan:" isn't given a redundant full stop.
+func endsWithSentencePunct(text string) bool {
+	r := []rune(strings.TrimSpace(text))
+	if len(r) == 0 {
+		return false
+	}
+	switch r[len(r)-1] {
+	case '.', '!', '?', ':', ';', '…':
+		return true
+	}
+	return false
 }
 
 // spellCode reads inline-code text aloud-friendly: HTML entities are decoded, then each

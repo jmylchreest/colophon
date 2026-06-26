@@ -44,6 +44,20 @@ func TestSpeechTextCuesAndKeeps(t *testing.T) {
 	}
 }
 
+func TestSpeechTextHeadingPause(t *testing.T) {
+	// A heading with no trailing punctuation gains a full stop so it reads as its own sentence,
+	// pausing before the paragraph instead of running into it.
+	out := speechText(`<h2>Pronunciation dictionaries</h2><p>The honest problem.</p>`, core.SpeechTranscript{}, enTTS, nil)
+	if !strings.Contains(out, "Pronunciation dictionaries. The honest problem.") {
+		t.Errorf("heading should end on a sentence boundary: %q", out)
+	}
+	// A heading already ending in terminal punctuation is left alone (no doubled stop).
+	out2 := speechText(`<h3>Why WAV?</h3><p>Because.</p>`, core.SpeechTranscript{}, enTTS, nil)
+	if strings.Contains(out2, "WAV?.") || !strings.Contains(out2, "Why WAV? Because.") {
+		t.Errorf("heading with existing punctuation must not gain a full stop: %q", out2)
+	}
+}
+
 func TestSpeechTextDropAndKeepOverrides(t *testing.T) {
 	htmlStr := `<p>A.</p><pre><code class="language-go">code</code></pre><p>B.</p>`
 
