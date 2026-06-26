@@ -53,19 +53,7 @@ func (s *blueskySyndicator) Syndicate(ctx context.Context, p Post) (string, erro
 		return "", fmt.Errorf("bluesky %q: createSession: %w", s.id, err)
 	}
 
-	record := map[string]any{
-		"$type":     "app.bsky.feed.post",
-		"text":      blueskyText(p),
-		"createdAt": time.Now().UTC().Format(time.RFC3339),
-		"embed": map[string]any{
-			"$type": "app.bsky.embed.external",
-			"external": map[string]any{
-				"uri":         p.URL,
-				"title":       limitRunes(p.Title, 300),
-				"description": limitRunes(p.Summary, 1000),
-			},
-		},
-	}
+	record := blueskyRecord(p)
 	var created struct {
 		URI string `json:"uri"`
 	}
@@ -78,6 +66,51 @@ func (s *blueskySyndicator) Syndicate(ctx context.Context, p Post) (string, erro
 		return "", fmt.Errorf("bluesky %q: createRecord: %w", s.id, err)
 	}
 	return blueskyPostURL(s.handle, created.URI), nil
+}
+
+// Update replaces the existing record in place via putRecord (same rkey), so the permalink — and
+// any likes/reposts/replies attached to it — are kept. The rkey is the last segment of the
+// recorded URL; the repo DID comes from a fresh session.
+func (s *blueskySyndicator) Update(ctx context.Context, p Post, prior Record) (string, error) {
+	rkey := lastPathSegment(prior.URL)
+	if rkey == "" {
+		return "", fmt.Errorf("bluesky %q: no rkey in %q", s.id, prior.URL)
+	}
+	var session struct {
+		AccessJwt string `json:"accessJwt"`
+		DID       string `json:"did"`
+	}
+	if err := retryIdempotent(ctx, func() error {
+		return postJSON(ctx, s.service+"/xrpc/com.atproto.server.createSession", "", nil,
+			map[string]string{"identifier": s.handle, "password": s.password}, &session)
+	}); err != nil {
+		return "", fmt.Errorf("bluesky %q: createSession: %w", s.id, err)
+	}
+	// putRecord targets a fixed rkey, so it's idempotent (replaces in place) → retry any failure.
+	if err := retryIdempotent(ctx, func() error {
+		return postJSON(ctx, s.service+"/xrpc/com.atproto.repo.putRecord", session.AccessJwt, nil,
+			map[string]any{"repo": session.DID, "collection": "app.bsky.feed.post", "rkey": rkey, "record": blueskyRecord(p)}, nil)
+	}); err != nil {
+		return "", fmt.Errorf("bluesky %q: putRecord: %w", s.id, err)
+	}
+	return prior.URL, nil // the permalink is unchanged (same rkey)
+}
+
+// blueskyRecord builds the app.bsky.feed.post record (text + external embed card linking back).
+func blueskyRecord(p Post) map[string]any {
+	return map[string]any{
+		"$type":     "app.bsky.feed.post",
+		"text":      blueskyText(p),
+		"createdAt": time.Now().UTC().Format(time.RFC3339),
+		"embed": map[string]any{
+			"$type": "app.bsky.embed.external",
+			"external": map[string]any{
+				"uri":         p.URL,
+				"title":       limitRunes(p.Title, 300),
+				"description": limitRunes(p.Summary, 1000),
+			},
+		},
+	}
 }
 
 // blueskyText is the post body: the custom blurb, else the title, trimmed to the limit. The

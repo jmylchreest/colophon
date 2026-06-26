@@ -5,10 +5,13 @@ package syndicate
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/jmylchreest/colophon/internal/core"
 )
@@ -32,6 +35,24 @@ type Syndicator interface {
 	ID() string
 	Driver() string
 	Syndicate(ctx context.Context, p Post) (siloURL string, err error)
+}
+
+// Updater is an optional Syndicator capability: edit an already-syndicated copy in place when the
+// post's content changes (title/summary/text/link). A driver implements it only if its silo can
+// edit a published copy — Mastodon (PUT status) and Bluesky (putRecord) do; Bridgy can't, so the
+// run loop leaves its copy untouched and warns. prior is the existing ledger record (its URL is
+// the handle the edit derives from).
+type Updater interface {
+	Update(ctx context.Context, p Post, prior Record) (siloURL string, err error)
+}
+
+// Fingerprint hashes the fields that feed a silo copy, so the ledger can tell when a syndicated
+// post has changed and needs re-editing. Any edit to title, summary, custom text, link or tags
+// yields a new value.
+func Fingerprint(p Post) string {
+	h := sha256.New()
+	fmt.Fprintf(h, "%s\x00%s\x00%s\x00%s\x00%s", p.Title, p.Summary, p.Text, p.URL, strings.Join(p.Tags, ","))
+	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
 // Open constructs a syndicator from its config. The driver picks the mechanic.
@@ -61,10 +82,14 @@ type Ledger struct {
 	Entries map[string]map[string]Record `json:"entries"`
 }
 
-// Record is one syndication result.
+// Record is one syndication result. Fingerprint is the content hash at the time the copy was
+// posted/edited; a later run compares it to decide whether the silo copy is stale. It is absent on
+// ledgers written before update support — the first run after upgrade backfills it (without
+// editing, since there's nothing to compare against).
 type Record struct {
 	URL          string `json:"url,omitempty"`
 	SyndicatedAt string `json:"syndicated_at,omitempty"`
+	Fingerprint  string `json:"fingerprint,omitempty"`
 }
 
 // LedgerPath is the committed ledger location under a project root.
@@ -99,12 +124,18 @@ func (l *Ledger) Has(key, driver string) bool {
 	return ok
 }
 
-// Set stores a syndication result (post key → driver → {url, time}).
-func (l *Ledger) Set(key, driver, url, at string) {
+// Get returns the recorded result for a (post, driver), and whether one exists.
+func (l *Ledger) Get(key, driver string) (Record, bool) {
+	r, ok := l.Entries[key][driver]
+	return r, ok
+}
+
+// Set stores a syndication result (post key → driver → record).
+func (l *Ledger) Set(key, driver string, rec Record) {
 	if l.Entries[key] == nil {
 		l.Entries[key] = map[string]Record{}
 	}
-	l.Entries[key][driver] = Record{URL: url, SyndicatedAt: at}
+	l.Entries[key][driver] = rec
 }
 
 // URLs returns the recorded silo URLs for a post (for u-syndication), order unspecified.

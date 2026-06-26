@@ -54,6 +54,27 @@ func (s *mastodonSyndicator) Syndicate(ctx context.Context, p Post) (string, err
 	return status.URL, nil
 }
 
+// Update edits the existing status in place (Mastodon supports editing). The status id is the
+// last path segment of the recorded URL (https://instance/@user/<id>).
+func (s *mastodonSyndicator) Update(ctx context.Context, p Post, prior Record) (string, error) {
+	id := lastPathSegment(prior.URL)
+	if id == "" {
+		return "", fmt.Errorf("mastodon %q: no status id in %q", s.id, prior.URL)
+	}
+	var status struct {
+		URL string `json:"url"`
+	}
+	// Editing is idempotent (same id, replaces content) → retry any transient failure.
+	err := retryIdempotent(ctx, func() error {
+		return putJSON(ctx, s.instance+"/api/v1/statuses/"+id, s.token, nil,
+			map[string]any{"status": mastodonText(p, s.limit)}, &status)
+	})
+	if err != nil {
+		return "", fmt.Errorf("mastodon %q: edit: %w", s.id, err)
+	}
+	return firstURL(status.URL, prior.URL), nil
+}
+
 // mastodonText composes the status: the blurb (custom text, else the title) and the link, kept
 // under the limit by trimming the blurb (the URL is preserved so the link-back always survives).
 func mastodonText(p Post, limit int) string {

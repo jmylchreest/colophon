@@ -21,11 +21,23 @@ var httpClient = &http.Client{Timeout: 30 * time.Second}
 // JSON response into out (nil to ignore). A non-2xx returns an error with a truncated body for
 // diagnosis; transport/5xx/429 failures are classified for the retry layer.
 func postJSON(ctx context.Context, url, bearer string, headers map[string]string, body, out any) error {
+	return sendJSON(ctx, http.MethodPost, url, bearer, headers, body, out)
+}
+
+// putJSON is postJSON with PUT — for edits (Mastodon's PUT /api/v1/statuses/:id).
+func putJSON(ctx context.Context, url, bearer string, headers map[string]string, body, out any) error {
+	return sendJSON(ctx, http.MethodPut, url, bearer, headers, body, out)
+}
+
+// sendJSON sends body as JSON via method to url (optional Bearer + extra headers) and decodes a
+// 2xx JSON response into out (nil to ignore). A non-2xx returns an error with a truncated body;
+// transport/5xx/429 failures are classified for the retry layer.
+func sendJSON(ctx context.Context, method, url, bearer string, headers map[string]string, body, out any) error {
 	b, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -99,6 +111,26 @@ func postForm(ctx context.Context, endpoint string, form url.Values, out any) er
 func confStr(settings map[string]any, key string) string {
 	if v, ok := settings[key].(string); ok {
 		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
+// lastPathSegment returns the final path segment of a URL — the Mastodon status id / Bluesky
+// rkey embedded in a recorded permalink.
+func lastPathSegment(u string) string {
+	u = strings.TrimRight(strings.TrimSpace(u), "/")
+	if i := strings.LastIndex(u, "/"); i >= 0 {
+		return u[i+1:]
+	}
+	return u
+}
+
+// firstURL returns the first non-empty URL — the edited permalink, falling back to the prior one.
+func firstURL(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
 	}
 	return ""
 }

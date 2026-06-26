@@ -23,6 +23,21 @@ colophon syndicate --env production --allow-publish    # 2. push copies to the s
 3. Each driver returns the **silo URL**, which is written to `.colophon/syndication.json` and, on the
    next build, rendered as a `u-syndication` link.
 
+### Editing a syndicated copy when the post changes
+
+The ledger stores a **content fingerprint** (title, summary, custom syndication text, link, tags)
+alongside each silo URL. On a later run, if a post's content has changed, colophon **edits the
+existing silo copy in place** rather than skipping it — keeping its likes/replies/permalink:
+
+- **Mastodon** edits the status; **Bluesky** replaces the record (same rkey). **Bridgy** can't edit
+  a published copy, so its copy is left as-is and a `note=driver can't edit a published copy` line
+  is logged. The `command` driver doesn't edit.
+- A post with an **unchanged** fingerprint is skipped as before — edits only fire on a real change.
+- **Upgrade/backfill:** a ledger written by an older colophon has no fingerprints. The first run
+  after upgrading **backfills** the current fingerprint for each entry *without editing anything*
+  (there's nothing to compare against), so only genuine changes *after* that trigger an edit. The
+  run reports `backfilled=N`; commit the updated ledger.
+
 It performs **irreversible external actions** (posting to real accounts), so it's fenced:
 
 - Only an environment's `syndicate:` targets ever fire — a `preview`/`draft` env that omits the key

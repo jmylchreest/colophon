@@ -16,7 +16,7 @@ func TestLedgerRoundTrip(t *testing.T) {
 	if l.Has("posts/x", "mastodon") {
 		t.Error("empty ledger should not Has")
 	}
-	l.Set("posts/x", "mastodon", "https://m.example/1", "2026-06-22T00:00:00Z")
+	l.Set("posts/x", "mastodon", Record{URL: "https://m.example/1", SyndicatedAt: "2026-06-22T00:00:00Z", Fingerprint: "abc123"})
 	if err := l.Save(); err != nil {
 		t.Fatal(err)
 	}

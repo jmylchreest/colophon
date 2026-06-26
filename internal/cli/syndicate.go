@@ -90,7 +90,7 @@ func (c *SyndicateCmd) Run() error {
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	posted, skipped, failed := 0, 0, 0
+	posted, updated, backfilled, skipped, failed := 0, 0, 0, 0, 0
 	for _, e := range entries {
 		if e.Type != "post" || e.Draft || e.SyndicateOff {
 			continue
@@ -108,36 +108,81 @@ func (c *SyndicateCmd) Run() error {
 			Tags:      e.Tags,
 			Published: stampDate(e.Date),
 		}
+		fp := syndicate.Fingerprint(post)
 		for _, id := range targets {
-			if ledger.Has(post.Key, id) {
-				skipped++
-				continue
-			}
-			if c.DryRun {
-				log.Step("SYNDICATE", "would-post", "post", post.URL, "to", id)
+			prior, exists := ledger.Get(post.Key, id)
+			switch {
+			case !exists:
+				// New (post, driver) → post a fresh copy.
+				if c.DryRun {
+					log.Step("SYNDICATE", "would-post", "post", post.URL, "to", id)
+					posted++
+					continue
+				}
+				url, err := open[id].Syndicate(context.Background(), post)
+				if err != nil {
+					failed++
+					log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "status", "failed", "error", err.Error())
+					continue
+				}
+				ledger.Set(post.Key, id, syndicate.Record{URL: url, SyndicatedAt: now, Fingerprint: fp})
 				posted++
-				continue
+				log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "silo", url, "status", "ok")
+
+			case prior.Fingerprint == "":
+				// Ledger entry written before update support: record the current fingerprint
+				// without editing (there's nothing to compare against), so future edits to the
+				// post are detected from here on. This is the one-time backfill.
+				if c.DryRun {
+					log.Step("SYNDICATE", "would-backfill", "post", post.URL, "to", id)
+					backfilled++
+					continue
+				}
+				prior.Fingerprint = fp
+				ledger.Set(post.Key, id, prior)
+				backfilled++
+
+			case prior.Fingerprint == fp:
+				skipped++ // unchanged since last syndicated
+
+			default:
+				// Content changed → edit the silo copy in place, if the driver's silo can edit.
+				up, ok := open[id].(syndicate.Updater)
+				if !ok {
+					skipped++
+					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "unsupported", "note", "driver can't edit a published copy")
+					continue
+				}
+				if c.DryRun {
+					log.Step("SYNDICATE", "would-update", "post", post.URL, "to", id)
+					updated++
+					continue
+				}
+				url, err := up.Update(context.Background(), post, prior)
+				if err != nil {
+					failed++
+					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "failed", "error", err.Error())
+					continue
+				}
+				if strings.TrimSpace(url) != "" {
+					prior.URL = url
+				}
+				prior.Fingerprint, prior.SyndicatedAt = fp, now
+				ledger.Set(post.Key, id, prior)
+				updated++
+				log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "silo", prior.URL, "status", "ok")
 			}
-			url, err := open[id].Syndicate(context.Background(), post)
-			if err != nil {
-				failed++
-				log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "status", "failed", "error", err.Error())
-				continue
-			}
-			ledger.Set(post.Key, id, url, now)
-			posted++
-			log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "silo", url, "status", "ok")
 		}
 	}
 
 	if c.DryRun {
-		log.Step("SYNDICATE", c.Env, "dry_run", true, "would_post", posted, "already", skipped)
+		log.Step("SYNDICATE", c.Env, "dry_run", true, "would_post", posted, "would_update", updated, "would_backfill", backfilled, "already", skipped)
 		return nil
 	}
 	if err := ledger.Save(); err != nil {
 		return fmt.Errorf("save ledger: %w", err)
 	}
-	log.Step("SYNDICATE", c.Env, "posted", posted, "already", skipped, "failed", failed)
+	log.Step("SYNDICATE", c.Env, "posted", posted, "updated", updated, "backfilled", backfilled, "already", skipped, "failed", failed)
 	if failed > 0 {
 		return fmt.Errorf("%d syndication(s) failed", failed)
 	}
