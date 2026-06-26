@@ -3,6 +3,17 @@
 User-facing changes by release. Each entry points at the guide where the feature is documented
 in full (or where it should be, when end-user docs catch up).
 
+## v0.0.30
+
+- **Syndication card descriptions fall back to a body excerpt.** A post with no `description:`
+  frontmatter previously syndicated with an empty summary (a bare Bluesky/Mastodon card);
+  `build.Entries` now mirrors the page — explicit `description:`, else a short excerpt of the
+  rendered body. Also fixes empty descriptions in feeds for such posts. Re-run
+  `colophon syndicate --resync` once to push the new descriptions onto existing cards.
+- **`syndicate` skips, doesn't fail, an entry with no recorded silo URL.** Ledger entries posted
+  via a fire-and-forget driver (Bridgy) have no editable handle; `--resync` now reports them as
+  `skipped` with a note instead of erroring the whole run non-zero.
+
 ## v0.0.29
 
 ### Content & themes
