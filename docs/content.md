@@ -267,6 +267,8 @@ slides: true                 # or the block form below
   headings into bullets.
 - The post's `slides:` **overwrites** the site default by key (it does not deep-merge): a key you set
   replaces that value, keys you omit inherit.
+- A site-wide `slides.enabled: true` applies to **listed content** (posts and custom types); standing
+  **pages** (About, etc.) don't get a deck from the default — they opt in with their own `slides: true`.
 - Three inline markers mirror the `<tts>` family: `<splitslide>` forces a break, `<slide>…</slide>`
   makes one verbatim slide, and `<noslide>…</noslide>` stays in the post but is kept out of the deck.
 

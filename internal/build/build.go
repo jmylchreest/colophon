@@ -857,6 +857,11 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		// it still carries the <slide>/<splitslide>/<noslide> markers, then strip those markers so the
 		// published post never shows them as text.
 		slidesEnabled, slidesSplit := resolveSlides(siteSlides, fm.Slides)
+		// A site-wide default deck applies to listed content (posts/custom), not standing pages
+		// (About, etc.) — those opt in explicitly with `slides: true`.
+		if slidesEnabled && standingType(resolvePageType(fm)) && (fm.Slides == nil || fm.Slides.Enabled == nil) {
+			slidesEnabled = false
+		}
 		deckHTML := ""
 		if slidesEnabled {
 			deckHTML = buildDeckHTML(html, title, slidesSplit)
