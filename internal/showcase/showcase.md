@@ -269,12 +269,12 @@ A path or `[[embed]]`, or an AI-generated image from a `gen:` prompt
 ```markdown
 ![alt text](assets/diagram.png)
 ![[screenshot.png|alt text]]
-![a fox in snow](<gen:a fox asleep in snow, soft morning light?aspect=16:9>)
+![an open dictionary beside a vintage microphone](<gen:an open dictionary beside a vintage microphone and a small printing press, dark muted palette?aspect=16:9>)
 ```
 
-Renders as (a real embedded, MiniMax-generated image):
+The third form rendered — the actual `gen:` image colophon produced from that prompt:
 
-![An editorial illustration](assets/sample-image.jpg)
+![An open dictionary beside a vintage microphone and a small printing press](assets/sample-image.jpg)
 
 ## Video
 
