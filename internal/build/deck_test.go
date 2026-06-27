@@ -40,14 +40,14 @@ func TestBuildDeckSplit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(out, `<section class="slide">`); n != 3 { // intro slide + A + B
-		t.Fatalf("want 3 slides, got %d", n)
+	if n := strings.Count(out, `<section class="slide">`); n != 3 { // intro slide + A + B (cover is extra)
+		t.Fatalf("want 3 content slides, got %d", n)
+	}
+	if !strings.Contains(out, `<section class="slide slide-cover">`) || !strings.Contains(out, `<h1 class="cover-title">Talk</h1>`) {
+		t.Errorf("deck should lead with a cover slide carrying the title: %s", out)
 	}
 	if !strings.Contains(out, `<h2 class="slide-title">A</h2>`) {
 		t.Errorf("heading should be the slide title: %s", out)
-	}
-	if !strings.Contains(out, `<aside class="notes">`) {
-		t.Error("prose should move to speaker notes")
 	}
 	// Self-contained: CSS + reader JS inlined, so it works offline.
 	if !strings.Contains(out, "<style>") || !strings.Contains(out, "<script>") {

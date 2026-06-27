@@ -154,10 +154,11 @@ type page struct {
 	Attachments    []pageAttachment // downloadable files shipped with the post (Downloads block + feeds)
 	HasAttachments bool             // post ships at least one attachment (theme marker + filtering)
 
-	Slides     string // URL of the derived slide deck (…/<slug>/slides/), or "" when disabled
-	SlidesOut  string // output path for the deck HTML (relative to OutDir)
-	SlidesHTML string // the rendered deck document, written at SlidesOut
-	HasSlides  bool   // post has a published slide deck (downloads entry + post-list marker)
+	Slides       string   // URL of the derived slide deck (…/<slug>/slides/), or "" when disabled
+	SlidesOut    string   // output path for the deck HTML (relative to OutDir)
+	SlidesSource string   // the post's rendered body (markers intact) the deck is built from
+	SlidesSplit  []string // resolved slide-boundary list for this post
+	HasSlides    bool     // post has a published slide deck (downloads entry + post-list marker)
 
 	Syndication    []string // URLs this post also lives at (manual POSSE / ledger) — u-syndication links
 	WebmentionsOff bool     // post opted out of the responses display (frontmatter webmentions: false)
@@ -437,6 +438,20 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			slugSeen[p.URL] = p.SourcePath
 		}
 		author := resolveAuthor(cfg, p.Author)
+		// Build the slide deck now that the byline author (for the cover) is resolved, write it, and
+		// add it to this page's Downloads box (a local copy of the attachments — it must not count
+		// toward HasAttachments, which drives the separate post-list paperclip marker).
+		atts := p.Attachments
+		if p.HasSlides {
+			deckHTML := buildDeckHTML(p.SlidesSource, p.SlidesSplit, deckMeta{
+				Title: p.Title, Description: p.Description, Author: author.Name,
+				Avatar: author.Avatar, Date: p.Date, PostURL: basePath + p.URL, BasePath: basePath,
+			})
+			if err := write(p.SlidesOut, []byte(deckHTML)); err != nil {
+				return Result{}, err
+			}
+			atts = append(append([]pageAttachment{}, p.Attachments...), slidesAttachment(p.Slides, len(deckHTML)))
+		}
 		pageLang := p.Lang
 		if pageLang == "" {
 			pageLang = siteLang
@@ -481,8 +496,8 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"has_audio":        p.HasAudio,
 			"slides":           p.Slides,
 			"has_slides":       p.HasSlides,
-			"attachments":      attachmentVars(p.Attachments),
-			"attachments_html": attachmentsHTML(p.Attachments),
+			"attachments":      attachmentVars(atts),
+			"attachments_html": attachmentsHTML(atts),
 			"has_attachments":  p.HasAttachments,
 			"syndication":      pageSyndication(p, synLedger),
 			"syndication_html": syndicationHTML(pageSyndication(p, synLedger)),
@@ -562,11 +577,6 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		}
 		if err := write(p.Out, []byte(html)); err != nil {
 			return Result{}, err
-		}
-		if p.HasSlides {
-			if err := write(p.SlidesOut, []byte(p.SlidesHTML)); err != nil {
-				return Result{}, err
-			}
 		}
 	}
 
@@ -853,18 +863,19 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 			title = it.slug
 		}
 		html := buf.String()
-		// Derive the slide deck from the rendered body (gen: images/glossary already resolved) while
-		// it still carries the <slide>/<splitslide>/<noslide> markers, then strip those markers so the
-		// published post never shows them as text.
+		// Keep the rendered body (with <slide>/<splitslide>/<noslide> markers and resolved gen:
+		// images/glossary) as the deck source; the deck itself is built later, in the render loop,
+		// where the byline author is resolved for the cover. Strip the markers from the post HTML so
+		// they never show as text.
 		slidesEnabled, slidesSplit := resolveSlides(siteSlides, fm.Slides)
 		// A site-wide default deck applies to listed content (posts/custom), not standing pages
 		// (About, etc.) — those opt in explicitly with `slides: true`.
 		if slidesEnabled && standingType(resolvePageType(fm)) && (fm.Slides == nil || fm.Slides.Enabled == nil) {
 			slidesEnabled = false
 		}
-		deckHTML := ""
+		deckSource := ""
 		if slidesEnabled {
-			deckHTML = buildDeckHTML(html, title, slidesSplit)
+			deckSource = html
 		}
 		html = StripDeckMarkers(html)
 		desc := fm.Description
@@ -922,19 +933,15 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 				}
 			}
 		}
-		if deckHTML != "" {
-			p.SlidesHTML = deckHTML
+		if deckSource != "" {
+			p.SlidesSource = deckSource
+			p.SlidesSplit = slidesSplit
 			p.SlidesOut = filepath.Join(filepath.FromSlash(it.slug), "slides", "index.html")
 			p.Slides = basePath + it.slug + "/slides/"
 			p.HasSlides = true
 		}
 		p.Attachments = resolveAttachments(context.Background(), it, basePath, baseURL, router)
 		p.HasAttachments = len(p.Attachments) > 0 // real files only → post-list paperclip marker
-		if p.HasSlides {
-			// The deck rides in the Downloads box (so the minimal/no-JS themes surface it too), but
-			// it doesn't count toward HasAttachments — the post-list shows a distinct slides marker.
-			p.Attachments = append(p.Attachments, slidesAttachment(p.Slides, len(deckHTML)))
-		}
 		p.Aliases = normalizeAliases(fm.Aliases)
 		p.Lang = fm.Lang
 		p.GlossaryOff = fm.Glossary != nil && !*fm.Glossary

@@ -88,16 +88,27 @@ Walk the rendered body; start a new slide at any boundary in `slides.split` (def
 `<hr>`, `<splitslide>`). When the boundary is a heading it becomes the slide **title**; the block
 kinds / `hr` / `splitslide` start an untitled slide.
 
-For each slide:
+For each section:
 
 - the **boundary heading** is the slide **title**;
-- any **heading still inside the slide** (i.e. below the split level — `h3` under an `h2`-split)
-  folds into the slide's **bullets** (`<ul class="slide-bullets"><li>`);
-- **block content** in the section — tables, images, code, display math, Mermaid, callouts,
-  pull-quotes, blockquotes — is rendered **inline on the slide as-is** (the theme/reader handles
-  layout and fit; no build-time sizing logic for now);
-- **prose paragraphs** go to the slide's **notes**, *not* the slide — unless inside an explicit
-  `<slide>…</slide>` (see overrides).
+- any **heading still inside the section** (below the split level) folds into a leading **bullet
+  list** (`<ul class="slide-bullets">`);
+- everything else — prose, tables, images, code, display math, Mermaid, callouts, pull-quotes — is a
+  **block on the slide**. There is **no automatic prose→notes**: what you wrote is what you see.
+- A **cover slide** (title, description, author avatar/initials + date) is prepended.
+
+**Pagination (content-aware).** Blocks are packed onto a slide up to a line budget; when the next
+block won't fit, it spills to a **continuation slide** (title marked "(cont.)"). A block heavier than
+the budget gets its **own slide**; an oversized **code** block is **truncated** with a link back to
+the post; **images/video** scale to fit (`max-height`). A JS fit safety-net scales a slide down if an
+estimate still overflows.
+
+**Hydration.** KaTeX, Mermaid and highlight.js load from the same published `/vendor` assets the
+theme uses (no CDN), only for what the deck contains — so math, diagrams and code render, not raw
+source. (Full offline bundling of these is still deferred.)
+
+**Keys.** ←/→/Space/PageUp-Down navigate, Home/End jump, **Enter** plays/pauses the slide's audio or
+video, **P** toggles presenter, **F** fullscreen, **Esc** returns to the post.
 
 Class-styled blocks (`.callout`, `.pullquote`, tables, …) are emitted unchanged and **styled by
 the deck theme**, which **bases off the active theme** (existing base-inheritance), so they look
