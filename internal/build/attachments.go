@@ -108,7 +108,9 @@ func attachmentsHTML(as []pageAttachment) string {
 		b.WriteString(`<li class="dl-item"><a class="dl" href="`)
 		b.WriteString(html.EscapeString(a.URL))
 		if a.View {
-			b.WriteString(`">`) // a viewable artifact (the deck) opens in the browser, not download
+			// A viewable artifact (the deck) opens in a new tab — a full-viewport presentation,
+			// separate from the post, that Esc/close returns from cleanly.
+			b.WriteString(`" target="_blank" rel="noopener">`)
 		} else {
 			b.WriteString(`" download>`)
 		}

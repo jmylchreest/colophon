@@ -554,7 +554,7 @@ if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){show(i+1);e.preventDef
 else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);}
 else if(e.key==='Home'){show(0);}else if(e.key==='End'){show(slides.length-1);}
 else if(e.key==='Enter'){var m=slides[i].querySelector('audio,video');if(m){if(m.paused){m.play();}else{m.pause();}e.preventDefault();}}
-else if(e.key==='Escape'){if(post){location.href=post;}}
+else if(e.key==='Escape'){window.close();if(post){location.href=post;}}
 else if(e.key==='p'||e.key==='P'){deck.classList.toggle('presenter');}
 else if(e.key==='f'||e.key==='F'){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}else{document.exitFullscreen();}}
 });
