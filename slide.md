@@ -31,13 +31,35 @@ no Chromium dependency); an authored-deck mode.
   published at `…/<slug>/slides/`, linked from the post. Same source, two artifacts.
 - **Standalone:** `type: deck` → rendered as a deck at its own slug.
 
+## Frontmatter config (`slides:`)
+
+A post overrides deck defaults with a `slides:` block. **It overwrites by key, it does NOT deep-merge**
+(unlike generation profiles): setting `slides.split` replaces the default split list wholesale.
+
+```yaml
+slides:                 # also: `slides: true` to enable with all defaults
+  split: [h2]           # the slide boundaries (a LIST) — see targets below
+```
+
+### Split targets (`slides.split`, a list)
+
+| target | splits before… |
+|--------|----------------|
+| `h1` … `h6` | a heading of that level (the heading becomes the slide title) |
+| `hr` | a thematic break (`---` / `<hr>`) — no title |
+| `newslide` | an explicit `<newslide>` marker — no title |
+| `text:<string>` | *(planned)* any block whose text matches `<string>` — for splitting on a recurring marker rather than structure |
+
+**Default:** `[h2, hr, newslide]` — `h2` is the usual section level for a post (the body before the
+first `h2` becomes the title slide), and an `h1` in the body is just rendered, not a boundary. This
+avoids the "stray `h1`" misfire the spike surfaced. Override per post, e.g. `split: [h1, hr]` for
+`h1`-sectioned decks, or `split: [h2, h3]` to make every `h2` *and* `h3` its own slide.
+
 ## Split algorithm (derived)
 
-Walk the rendered body; start a new slide at a **boundary**:
-
-1. the **shallowest heading level present** in the body (H1 if any H1 exists, else H2); or
-2. a thematic break (`---` / `<hr>`); or
-3. an explicit `<newslide>` marker (see below).
+Walk the rendered body; start a new slide at any boundary in `slides.split` (default `[h2, hr,
+newslide]`). When the boundary is a heading it becomes the slide **title**; `hr`/`newslide` start an
+untitled slide.
 
 For each slide:
 

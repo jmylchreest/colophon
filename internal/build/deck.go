@@ -9,7 +9,6 @@ package build
 
 import (
 	"bytes"
-	"fmt"
 	"html"
 	"regexp"
 	"strings"
@@ -20,10 +19,40 @@ var (
 	deckDividerRE  = regexp.MustCompile(`(?is)^\s*(?:<hr\s*/?>|<newslide\s*/?>(?:\s*</newslide>)?)`)
 	deckNoSlideRE  = regexp.MustCompile(`(?is)<noslide>.*?</noslide>`)
 	deckSlideTagRE = regexp.MustCompile(`(?is)</?slide>`)
+	deckTitleRE    = regexp.MustCompile(`(?is)^\s*<h[1-6][^>]*>(.*?)</h[1-6]>`)
 )
 
-// BuildDeck renders markdown to a single self-contained HTML slide deck (CSS + reader JS inlined).
-func BuildDeck(md, title string) (string, error) {
+// DefaultDeckSplit is the slide-boundary list when a post sets no `slides.split`: split before each
+// h2 (the body before the first h2 is the title slide), an <hr>, or an explicit <newslide>. An h1
+// in the body is just rendered, not a boundary — avoiding the "stray h1" misfire.
+var DefaultDeckSplit = []string{"h2", "hr", "newslide"}
+
+// deckBoundaryRE compiles the split targets (h1–h6, hr, newslide; text:… is planned) into one
+// boundary regex. Unknown/unimplemented targets are ignored; an empty result falls back to h2.
+func deckBoundaryRE(split []string) *regexp.Regexp {
+	if len(split) == 0 {
+		split = DefaultDeckSplit
+	}
+	var parts []string
+	for _, t := range split {
+		switch t = strings.ToLower(strings.TrimSpace(t)); {
+		case len(t) == 2 && t[0] == 'h' && t[1] >= '1' && t[1] <= '6':
+			parts = append(parts, `<`+t+`[\s>]`)
+		case t == "hr":
+			parts = append(parts, `<hr\b`)
+		case t == "newslide":
+			parts = append(parts, `<newslide\b`)
+		}
+	}
+	if len(parts) == 0 {
+		parts = []string{`<h2[\s>]`}
+	}
+	return regexp.MustCompile(`(?is)(` + strings.Join(parts, "|") + `)`)
+}
+
+// BuildDeck renders markdown to a single self-contained HTML slide deck (CSS + reader JS inlined),
+// splitting into slides at the given boundary targets (DefaultDeckSplit when empty).
+func BuildDeck(md, title string, split []string) (string, error) {
 	// <noslide>…</noslide> is dropped from the deck entirely; <slide>…</slide> is force-kept on the
 	// slide — for the spike we just unwrap it (so its prose isn't pulled into notes). TODO: proper
 	// force-include of arbitrary prose onto a slide.
@@ -35,15 +64,11 @@ func BuildDeck(md, title string) (string, error) {
 	body := deckNoSlideRE.ReplaceAllString(buf.String(), "")
 	body = deckSlideTagRE.ReplaceAllString(body, "")
 
-	level := 2
-	if strings.Contains(strings.ToLower(body), "<h1") {
-		level = 1
-	}
 	const sep = "\x00SLIDE\x00"
-	bound := regexp.MustCompile(fmt.Sprintf(`(?is)(<h%d[\s>]|<hr\b|<newslide\b)`, level))
+	bound := deckBoundaryRE(split)
 	var slides []string
 	for _, chunk := range strings.Split(bound.ReplaceAllString(body, sep+"$1"), sep) {
-		if s := renderSlide(strings.TrimSpace(chunk), level); s != "" {
+		if s := renderSlide(strings.TrimSpace(chunk)); s != "" {
 			slides = append(slides, s)
 		}
 	}
@@ -53,15 +78,14 @@ func BuildDeck(md, title string) (string, error) {
 	return deckDoc(title, slides), nil
 }
 
-func renderSlide(chunk string, level int) string {
+func renderSlide(chunk string) string {
 	if chunk == "" {
 		return ""
 	}
 	chunk = deckDividerRE.ReplaceAllString(chunk, "") // drop a leading <hr>/<newslide> divider
-	titleRE := regexp.MustCompile(fmt.Sprintf(`(?is)^\s*<h%d[^>]*>(.*?)</h%d>`, level, level))
 	title := ""
-	if m := titleRE.FindStringSubmatch(chunk); m != nil {
-		title, chunk = m[1], titleRE.ReplaceAllString(chunk, "")
+	if m := deckTitleRE.FindStringSubmatch(chunk); m != nil {
+		title, chunk = m[1], deckTitleRE.ReplaceAllString(chunk, "")
 	}
 	var notes strings.Builder // prose paragraphs become speaker notes
 	slideBody := deckParaRE.ReplaceAllStringFunc(chunk, func(p string) string {
