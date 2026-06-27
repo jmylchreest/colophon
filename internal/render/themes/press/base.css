@@ -91,6 +91,12 @@ a { color: inherit; }
   transition: transform 0.5s cubic-bezier(0.65,0,0.35,1), background 0.4s; }
 .tt[aria-checked="true"] .tt-knob { transform: translateX(22px); background: #cdd2ff; box-shadow: 0 0 8px rgba(165,148,255,0.5); }
 .tt[aria-checked="true"] .tt-knob::after { transform: scale(1); }
+/* Keyboard focus: a clearly visible indicator on every interactive element, not just the browser
+   default (which is often weak on these backgrounds or suppressed). WCAG 2.4.7 / 2.4.11 (AAA). */
+a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px;
+}
 .tt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- home hero (base layout; themes may add reveal flourishes) ---------- */
