@@ -1,11 +1,12 @@
 package build
 
 // SPIKE (experimental) — derive a self-contained slide deck from a post's markdown. See slide.md.
-// Derived-only: slides split at the shallowest heading present (else <hr>/<newslide>); the boundary
-// heading is the slide title; prose paragraphs become speaker notes; every other block (lists,
-// code, tables, figures, math, callouts) renders on the slide. The whole deck is one HTML file with
-// CSS + the reader JS inlined, so it works offline. Rough edges remain (see TODOs); this is to
-// react to, not to ship.
+// Derived: the body is split into slides at the configured boundaries (default h1–h6/<hr>/
+// <splitslide>); a boundary heading is the slide title; deeper headings become bullets; prose
+// paragraphs become speaker notes; every other block (code, tables, figures, math, callouts) renders
+// on the slide. Author escape hatches: <slide>…</slide> is one verbatim slide, <splitslide> forces a
+// break, <noslide>…</noslide> is dropped. The whole deck is one HTML file with CSS + the reader JS
+// inlined, so it works offline. Rough edges remain (see TODOs); this is to react to, not to ship.
 
 import (
 	"bytes"
@@ -15,33 +16,54 @@ import (
 )
 
 var (
-	deckParaRE     = regexp.MustCompile(`(?is)<p>.*?</p>`)
-	deckDividerRE  = regexp.MustCompile(`(?is)^\s*(?:<hr\s*/?>|<newslide\s*/?>(?:\s*</newslide>)?)`)
-	deckNoSlideRE  = regexp.MustCompile(`(?is)<noslide>.*?</noslide>`)
-	deckSlideTagRE = regexp.MustCompile(`(?is)</?slide>`)
-	deckTitleRE    = regexp.MustCompile(`(?is)^\s*<h[1-6][^>]*>(.*?)</h[1-6]>`)
+	deckParaRE      = regexp.MustCompile(`(?is)<p>.*?</p>`)
+	deckHeadingRE   = regexp.MustCompile(`(?is)<h[1-6][^>]*>(.*?)</h[1-6]>`)
+	deckDividerRE   = regexp.MustCompile(`(?is)^\s*(?:<hr\s*/?>|<splitslide\s*/?>(?:\s*</splitslide>)?)`)
+	deckNoSlideRE   = regexp.MustCompile(`(?is)<noslide>.*?</noslide>`)
+	deckSlideWrapRE = regexp.MustCompile(`(?is)<slide>(.*?)</slide>`)
+	deckTitleRE     = regexp.MustCompile(`(?is)^\s*<h[1-6][^>]*>(.*?)</h[1-6]>`)
 )
 
-// DefaultDeckSplit is the slide-boundary list when a post sets no `slides.split`: split before each
-// h2 (the body before the first h2 is the title slide), an <hr>, or an explicit <newslide>. An h1
-// in the body is just rendered, not a boundary — avoiding the "stray h1" misfire.
-var DefaultDeckSplit = []string{"h2", "hr", "newslide"}
+// DefaultDeckSplit is the slide-boundary list when a post sets no `slides.split`: a new slide before
+// each heading (any level), each <hr>, and each explicit <splitslide>. Narrow it (e.g. [h2]) to make
+// deeper headings render as bullets instead of their own slide.
+var DefaultDeckSplit = []string{"h1", "h2", "h3", "h4", "h5", "h6", "hr", "splitslide"}
 
-// deckBoundaryRE compiles the split targets (h1–h6, hr, newslide; text:… is planned) into one
-// boundary regex. Unknown/unimplemented targets are ignored; an empty result falls back to h2.
+// deckBoundaryRE compiles the split targets into one boundary regex. Targets: h1–h6, hr, splitslide;
+// the block kinds image, table, code, math, diagram (mermaid), audio, video; and text:<match> (split
+// before a block whose text begins with <match>). Unknown targets are ignored; empty falls back to h2.
 func deckBoundaryRE(split []string) *regexp.Regexp {
 	if len(split) == 0 {
 		split = DefaultDeckSplit
 	}
 	var parts []string
-	for _, t := range split {
-		switch t = strings.ToLower(strings.TrimSpace(t)); {
+	for _, raw := range split {
+		t := strings.ToLower(strings.TrimSpace(raw))
+		switch {
 		case len(t) == 2 && t[0] == 'h' && t[1] >= '1' && t[1] <= '6':
 			parts = append(parts, `<`+t+`[\s>]`)
 		case t == "hr":
 			parts = append(parts, `<hr\b`)
-		case t == "newslide":
-			parts = append(parts, `<newslide\b`)
+		case t == "splitslide":
+			parts = append(parts, `<splitslide\b`)
+		case t == "image":
+			parts = append(parts, `<figure\b|<img\b`)
+		case t == "table":
+			parts = append(parts, `<div[^>]*class="table-scroll"`)
+		case t == "code":
+			parts = append(parts, `<pre[^>]*><code`)
+		case t == "math":
+			parts = append(parts, `<div[^>]*math-display`)
+		case t == "diagram" || t == "mermaid":
+			parts = append(parts, `<pre[^>]*mermaid`)
+		case t == "audio":
+			parts = append(parts, `<audio\b`)
+		case t == "video":
+			parts = append(parts, `<video\b`)
+		case strings.HasPrefix(t, "text:"):
+			if m := strings.TrimSpace(strings.TrimSpace(raw)[5:]); m != "" {
+				parts = append(parts, `<[a-z][a-z0-9]*[^>]*>\s*`+regexp.QuoteMeta(m))
+			}
 		}
 	}
 	if len(parts) == 0 {
@@ -51,38 +73,74 @@ func deckBoundaryRE(split []string) *regexp.Regexp {
 }
 
 // BuildDeck renders markdown to a single self-contained HTML slide deck (CSS + reader JS inlined),
-// splitting into slides at the given boundary targets (DefaultDeckSplit when empty).
+// splitting into slides at the given boundary targets (DefaultDeckSplit when empty). <slide>…</slide>
+// blocks are lifted out as verbatim slides; the runs between them are auto-split.
 func BuildDeck(md, title string, split []string) (string, error) {
-	// <noslide>…</noslide> is dropped from the deck entirely; <slide>…</slide> is force-kept on the
-	// slide — for the spike we just unwrap it (so its prose isn't pulled into notes). TODO: proper
-	// force-include of arbitrary prose onto a slide.
-	md = strings.NewReplacer("<noslide>", "<!--noslide-->", "</noslide>", "<!--/noslide-->").Replace(md)
 	var buf bytes.Buffer
 	if err := sharedMarkdown.Convert([]byte(preprocessCallouts(md)), &buf); err != nil {
 		return "", err
 	}
-	body := deckNoSlideRE.ReplaceAllString(buf.String(), "")
-	body = deckSlideTagRE.ReplaceAllString(body, "")
-
-	const sep = "\x00SLIDE\x00"
+	body := deckNoSlideRE.ReplaceAllString(buf.String(), "") // <noslide>…</noslide> never reaches the deck
 	bound := deckBoundaryRE(split)
+
+	// Walk the body, lifting <slide>…</slide> out as explicit slides and auto-splitting the runs
+	// between them, so document order is preserved.
 	var slides []string
-	for _, chunk := range strings.Split(bound.ReplaceAllString(body, sep+"$1"), sep) {
-		if s := renderSlide(strings.TrimSpace(chunk)); s != "" {
-			slides = append(slides, s)
+	last := 0
+	for _, m := range deckSlideWrapRE.FindAllStringSubmatchIndex(body, -1) {
+		slides = append(slides, autoSlides(body[last:m[0]], bound)...)
+		slides = append(slides, explicitSlide(body[m[2]:m[3]]))
+		last = m[1]
+	}
+	slides = append(slides, autoSlides(body[last:], bound)...)
+
+	out := slides[:0]
+	for _, s := range slides {
+		if s != "" {
+			out = append(out, s)
 		}
 	}
-	if len(slides) == 0 {
-		slides = []string{`<section class="slide"><div class="slide-body"></div></section>`}
+	if len(out) == 0 {
+		out = []string{`<section class="slide"><div class="slide-body"></div></section>`}
 	}
-	return deckDoc(title, slides), nil
+	return deckDoc(title, out), nil
+}
+
+// autoSlides splits a run of body HTML at the boundary regex and renders each chunk as a derived slide.
+func autoSlides(body string, bound *regexp.Regexp) []string {
+	const sep = "\x00SLIDE\x00"
+	var slides []string
+	for _, chunk := range strings.Split(bound.ReplaceAllString(body, sep+"$1"), sep) {
+		slides = append(slides, renderSlide(strings.TrimSpace(chunk)))
+	}
+	return slides
+}
+
+// explicitSlide renders a <slide>…</slide> block verbatim: a leading heading is its title, everything
+// else stays ON the slide (prose included — no notes extraction).
+func explicitSlide(inner string) string {
+	inner = strings.TrimSpace(inner)
+	if inner == "" {
+		return ""
+	}
+	title := ""
+	if m := deckTitleRE.FindStringSubmatch(inner); m != nil {
+		title, inner = m[1], strings.TrimSpace(deckTitleRE.ReplaceAllString(inner, ""))
+	}
+	var b strings.Builder
+	b.WriteString(`<section class="slide">`)
+	if title != "" {
+		b.WriteString(`<h2 class="slide-title">` + title + `</h2>`)
+	}
+	b.WriteString(`<div class="slide-body">` + inner + `</div></section>`)
+	return b.String()
 }
 
 func renderSlide(chunk string) string {
 	if chunk == "" {
 		return ""
 	}
-	chunk = deckDividerRE.ReplaceAllString(chunk, "") // drop a leading <hr>/<newslide> divider
+	chunk = deckDividerRE.ReplaceAllString(chunk, "") // drop a leading <hr>/<splitslide> divider
 	title := ""
 	if m := deckTitleRE.FindStringSubmatch(chunk); m != nil {
 		title, chunk = m[1], deckTitleRE.ReplaceAllString(chunk, "")
@@ -92,6 +150,17 @@ func renderSlide(chunk string) string {
 		notes.WriteString(p)
 		return ""
 	})
+	// Any heading still in the body is below the split level → fold into a bullet list.
+	var bullets strings.Builder
+	if hs := deckHeadingRE.FindAllStringSubmatch(slideBody, -1); len(hs) > 0 {
+		bullets.WriteString(`<ul class="slide-bullets">`)
+		for _, h := range hs {
+			bullets.WriteString(`<li>` + strings.TrimSpace(h[1]) + `</li>`)
+		}
+		bullets.WriteString(`</ul>`)
+		slideBody = deckHeadingRE.ReplaceAllString(slideBody, "")
+	}
+	slideBody = bullets.String() + strings.TrimSpace(slideBody)
 	if strings.TrimSpace(title) == "" && strings.TrimSpace(slideBody) == "" && notes.Len() == 0 {
 		return ""
 	}
@@ -100,7 +169,7 @@ func renderSlide(chunk string) string {
 	if title != "" {
 		b.WriteString(`<h2 class="slide-title">` + title + `</h2>`)
 	}
-	b.WriteString(`<div class="slide-body">` + strings.TrimSpace(slideBody) + `</div>`)
+	b.WriteString(`<div class="slide-body">` + slideBody + `</div>`)
 	if n := strings.TrimSpace(notes.String()); n != "" {
 		b.WriteString(`<aside class="notes">` + n + `</aside>`)
 	}
@@ -129,6 +198,9 @@ body{font-family:Georgia,'Times New Roman',serif;background:#0e0e13;color:#ededf
 .slide-body h3{font-size:1.3em;margin:.4em 0}
 .slide-body ul,.slide-body ol{margin-left:1.4rem}
 .slide-body li{margin:.45rem 0}
+.slide-bullets{list-style:none;margin:0!important;display:flex;flex-direction:column;gap:.8rem}
+.slide-bullets>li{margin:0;padding-left:1.6rem;position:relative;font-size:1.05em}
+.slide-bullets>li::before{content:"";position:absolute;left:0;top:.55em;width:.55rem;height:.55rem;background:currentColor;opacity:.55;border-radius:2px}
 .slide-body pre{background:#14141a;border:1px solid #2a2a34;border-radius:10px;padding:1rem 1.2rem;overflow:auto;font:.7em ui-monospace,monospace}
 .slide-body code{font-family:ui-monospace,monospace;font-size:.9em}
 .slide-body table{border-collapse:collapse}

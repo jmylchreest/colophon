@@ -8,6 +8,8 @@ hero_alt: An editorial illustration of an open dictionary, a microphone and a sm
 audio_file: assets/reading.wav
 attachments:
   - { path: assets/sample.txt, label: "Sample download", description: "A placeholder file shipped with the showcase" }
+slides:
+  split: [h2]   # this page is itself a deck — one slide per top-level topic
 ---
 
 A built-in reference, rendered from markdown embedded in colophon itself — it is
@@ -49,6 +51,9 @@ audio_voice: "<voice id>"          # override the voice for this post
 speech_profile: minimax            # pick a named speech profile
 image_profile: poster              # pick a named image profile
 
+slides:                            # publish a slide deck of this post (see Slides below)
+  split: [h2]                      # boundaries (a list); overwrites the default, never merges
+
 predecessor: part-one              # the previous post in a series (slug/filename)
 series: "My Series"                # series title (latest-wins across the chain)
 
@@ -58,6 +63,23 @@ glossary: false                    # turn off automatic glossary decoration here
 attachments:                       # downloadable files (see Attachments below)
   - { path: data.zip, label: "Dataset", feed: true }
 ---
+```
+
+This very page's frontmatter — the exact config rendering *this* showcase, so you can see a real
+working example, not just the field list above:
+
+```yaml
+title: Markdown & Style Showcase
+slug: showcase
+date: 2026-01-01
+description: A live reference for every content feature colophon supports — rendered in your active theme.
+hero: assets/sample-image.jpg
+hero_alt: An editorial illustration of an open dictionary, a microphone and a small printing press
+audio_file: assets/reading.wav
+attachments:
+  - { path: assets/sample.txt, label: "Sample download", description: "A placeholder file shipped with the showcase" }
+slides:
+  split: [h2]   # this page is itself a deck — one slide per top-level topic
 ```
 
 ## Headings
@@ -361,6 +383,28 @@ Two inline tags steer text-to-speech without changing what readers see:
 Frontmatter switches per post: `audio: false` silences a post, `audio_file:`
 attaches a recording, `audio_voice:` overrides the voice, and `speech_profile:`
 picks a provider profile.
+
+## Slides (decks)
+
+*(Spike — see `slide.md`.)* A post can also be projected into a **themed slide deck**, derived from
+its own structure: headings become slides/bullets, prose becomes speaker notes, and every block
+(code, tables, figures, math, diagrams, callouts) renders on the slide. The `slides:` frontmatter
+configures it — and **overwrites** the default by key (it does not merge):
+
+```yaml
+slides:
+  split: [h2]   # slide boundaries (a LIST). targets: h1..h6, hr, splitslide,
+                # image, table, code, math, diagram, audio, video, text:<match>
+                # default: every heading. This page uses [h2] → one slide per topic.
+```
+
+Three inline markers steer the split where structure isn't enough:
+
+```markdown
+<splitslide>                 <!-- force a new slide here -->
+<slide>…one verbatim slide…</slide>   <!-- author an exact slide; prose stays ON it -->
+<noslide>…dropped from the deck…</noslide>
+```
 
 ## Horizontal rule
 

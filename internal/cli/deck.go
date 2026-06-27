@@ -18,7 +18,7 @@ import (
 type DeckCmd struct {
 	File  string `arg:"" help:"Markdown file to turn into a slide deck"`
 	Out   string `short:"o" help:"Write the deck HTML here (default: <file>.deck.html; '-' for stdout)"`
-	Split string `help:"Override slide boundaries, comma-separated (h1..h6, hr, newslide). Default: the post's slides.split, else h2,hr,newslide"`
+	Split string `help:"Override slide boundaries, comma-separated (h1..h6, hr, splitslide, image, table, code, math, diagram, audio, video, text:<match>). Default: the post's slides.split, else every heading"`
 }
 
 func (c *DeckCmd) Run() error {

@@ -47,30 +47,36 @@ slides:                 # also: `slides: true` to enable with all defaults
 |--------|----------------|
 | `h1` … `h6` | a heading of that level (the heading becomes the slide title) |
 | `hr` | a thematic break (`---` / `<hr>`) — no title |
-| `newslide` | an explicit `<newslide>` marker — no title |
-| `text:<string>` | *(planned)* any block whose text matches `<string>` — for splitting on a recurring marker rather than structure |
+| `splitslide` | an explicit `<splitslide>` marker — no title |
+| `image` | a figure / image |
+| `table` | a table |
+| `code` | a fenced code block |
+| `math` | a display-math block |
+| `diagram` (`mermaid`) | a Mermaid diagram |
+| `audio` / `video` | an embedded media player |
+| `text:<match>` | a block whose text **begins with** `<match>` — split on a recurring marker rather than structure |
 
-**Default:** `[h2, hr, newslide]` — `h2` is the usual section level for a post (the body before the
-first `h2` becomes the title slide), and an `h1` in the body is just rendered, not a boundary. This
-avoids the "stray `h1`" misfire the spike surfaced. Override per post, e.g. `split: [h1, hr]` for
-`h1`-sectioned decks, or `split: [h2, h3]` to make every `h2` *and* `h3` its own slide.
+**Default:** `[h1, h2, h3, h4, h5, h6, hr, splitslide]` — every heading (any level) starts a new
+slide. Narrow it to make deeper headings fold into **bullets** instead: `split: [h2]` puts each `h2`
+on its own slide and turns the `h3`s under it into the slide's bullet list. The showcase uses
+`split: [h2]` so it lands one slide per topic.
 
 ## Split algorithm (derived)
 
-Walk the rendered body; start a new slide at any boundary in `slides.split` (default `[h2, hr,
-newslide]`). When the boundary is a heading it becomes the slide **title**; `hr`/`newslide` start an
-untitled slide.
+Walk the rendered body; start a new slide at any boundary in `slides.split` (default: every heading,
+`<hr>`, `<splitslide>`). When the boundary is a heading it becomes the slide **title**; the block
+kinds / `hr` / `splitslide` start an untitled slide.
 
 For each slide:
 
-- the **split-level heading** is the slide **title**;
-- the **next heading level down** (H2 or H3) becomes the slide's **bullets** (`<ul><li>`); deeper
-  headings nest as sub-bullets;
+- the **boundary heading** is the slide **title**;
+- any **heading still inside the slide** (i.e. below the split level — `h3` under an `h2`-split)
+  folds into the slide's **bullets** (`<ul class="slide-bullets"><li>`);
 - **block content** in the section — tables, images, code, display math, Mermaid, callouts,
   pull-quotes, blockquotes — is rendered **inline on the slide as-is** (the theme/reader handles
   layout and fit; no build-time sizing logic for now);
-- **prose paragraphs** go to the slide's **notes**, *not* the slide — unless wrapped in `<slide>`
-  (see overrides).
+- **prose paragraphs** go to the slide's **notes**, *not* the slide — unless inside an explicit
+  `<slide>…</slide>` (see overrides).
 
 Class-styled blocks (`.callout`, `.pullquote`, tables, …) are emitted unchanged and **styled by
 the deck theme**, which **bases off the active theme** (existing base-inheritance), so they look
@@ -90,16 +96,17 @@ long-form document with no JS** (the talk reads as an article — SEO + a11y for
 </section>
 ```
 
-The `<newslide>` marker is the **one unifying break mechanism**: heading/`---` splits emit the same
-section boundary the author would with a manual `<newslide>`.
+The `<splitslide>` marker is the **one unifying break mechanism**: heading/`---` splits emit the same
+section boundary the author would with a manual `<splitslide>`.
 
-## Author overrides (inline markup, family of `<tts>`/`<noslide>` style)
+## Author overrides (inline markup, `<slide>` family)
 
-- `<newslide>` — force a slide break anywhere (also the engine's internal break marker).
-- `<slide>…</slide>` — force content **onto** the slide that wouldn't be there by default (e.g.
-  pull a specific paragraph/sentence onto the slide for context).
-- `<noslide>…</noslide>` — force content **off** the slide (stays in the post and the notes, but
-  not on the slide).
+- `<splitslide>` — force a slide break anywhere (a void marker; also the engine's internal break).
+- `<slide>…</slide>` — everything inside becomes **one verbatim slide**: an authored escape hatch
+  from the derived split. A leading heading is its title; all other content (prose included) stays
+  **on** the slide and is *not* pulled into notes.
+- `<noslide>…</noslide>` — content dropped from the deck entirely (stays in the post, off both the
+  slide and the notes).
 
 ## Engine assets & the reader
 
