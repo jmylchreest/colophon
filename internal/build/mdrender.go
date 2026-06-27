@@ -36,7 +36,7 @@ func newMarkdown() goldmark.Markdown {
 		goldmark.WithParserOptions(parser.WithAutoHeadingID()),
 		goldmark.WithRendererOptions(
 			ghtml.WithUnsafe(),
-			renderer.WithNodeRenderers(util.Prioritized(codeRenderer{}, 10), util.Prioritized(tableRenderer{}, 10)),
+			renderer.WithNodeRenderers(util.Prioritized(codeRenderer{}, 10), util.Prioritized(tableRenderer{}, 10), util.Prioritized(taskCheckBoxRenderer{}, 10)),
 		),
 	)
 }
@@ -253,6 +253,30 @@ func renderTableWrapped(w util.BufWriter, _ []byte, _ ast.Node, entering bool) (
 		_, _ = w.WriteString(`<div class="table-scroll" tabindex="0">` + "\n<table>\n")
 	} else {
 		_, _ = w.WriteString("</table>\n</div>\n")
+	}
+	return ast.WalkContinue, nil
+}
+
+// --- task-list checkboxes ---
+
+// taskCheckBoxRenderer labels the GFM task-list checkbox. The default renders an unlabelled,
+// disabled <input type="checkbox">, which fails "form elements must have labels" — add an
+// aria-label reflecting the done/not-done state so the meaning reaches assistive tech (the
+// checkbox is non-interactive; its value is the state). WCAG 4.1.2 / 1.3.1.
+type taskCheckBoxRenderer struct{}
+
+func (taskCheckBoxRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+	reg.Register(extast.KindTaskCheckBox, renderTaskCheckBox)
+}
+
+func renderTaskCheckBox(w util.BufWriter, _ []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		return ast.WalkContinue, nil
+	}
+	if node.(*extast.TaskCheckBox).IsChecked {
+		_, _ = w.WriteString(`<input checked="" disabled="" type="checkbox" aria-label="Completed"> `)
+	} else {
+		_, _ = w.WriteString(`<input disabled="" type="checkbox" aria-label="Not completed"> `)
 	}
 	return ast.WalkContinue, nil
 }

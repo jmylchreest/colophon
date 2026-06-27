@@ -123,6 +123,17 @@ func TestCalloutDefaultTitle(t *testing.T) {
 	}
 }
 
+func TestTaskListCheckboxLabelled(t *testing.T) {
+	out := renderMD(t, "- [x] done\n- [ ] todo")
+	// Each disabled checkbox carries an aria-label reflecting its state (form elements need labels).
+	if !strings.Contains(out, `type="checkbox" aria-label="Completed">`) {
+		t.Errorf("checked task checkbox missing aria-label: %s", out)
+	}
+	if !strings.Contains(out, `type="checkbox" aria-label="Not completed">`) {
+		t.Errorf("unchecked task checkbox missing aria-label: %s", out)
+	}
+}
+
 func TestTableWrappedAndKeyboardFocusable(t *testing.T) {
 	out := renderMD(t, "| A | B |\n|:-:|--:|\n| 1 | 2 |")
 	// Wrapped in a focusable, scrollable container (WCAG 2.1.1) — keyboard users can scroll it.
