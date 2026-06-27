@@ -61,7 +61,7 @@ type Replacer interface {
 // yields a new value.
 func Fingerprint(p Post) string {
 	h := sha256.New()
-	fmt.Fprintf(h, "%s\x00%s\x00%s\x00%s\x00%s", p.Title, p.Summary, p.Text, p.URL, strings.Join(p.Tags, ","))
+	_, _ = fmt.Fprintf(h, "%s\x00%s\x00%s\x00%s\x00%s", p.Title, p.Summary, p.Text, p.URL, strings.Join(p.Tags, ","))
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 

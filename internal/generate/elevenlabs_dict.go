@@ -65,7 +65,7 @@ func wrapIPA(ipa string) string {
 func rulesHash(rules []pronRule) string {
 	h := sha256.New()
 	for _, r := range rules {
-		fmt.Fprintf(h, "%s\x00%s\x00%s\n", r.StringToReplace, r.Phoneme, r.Alphabet)
+		_, _ = fmt.Fprintf(h, "%s\x00%s\x00%s\n", r.StringToReplace, r.Phoneme, r.Alphabet)
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }

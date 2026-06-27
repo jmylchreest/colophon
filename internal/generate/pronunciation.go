@@ -8,8 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	dicts "github.com/jmylchreest/colophon/contrib/pronunciation"
 	yaml "go.yaml.in/yaml/v3"
+
+	dicts "github.com/jmylchreest/colophon/contrib/pronunciation"
 )
 
 // ResolvePronunciationDict loads the dictionary referenced by ref. A bare token — one that does

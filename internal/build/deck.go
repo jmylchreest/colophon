@@ -114,7 +114,8 @@ func buildDeckHTML(body string, split []string, meta deckMeta) string {
 	body = deckNoSlideRE.ReplaceAllString(body, "") // <noslide>…</noslide> never reaches the deck
 	bound := deckBoundaryRE(split)
 
-	slides := []string{coverSlide(meta)}
+	slides := make([]string, 0, 16)
+	slides = append(slides, coverSlide(meta))
 	// Walk the body, lifting <slide>…</slide> out as verbatim slides and paginating the runs between.
 	last := 0
 	for _, m := range deckSlideWrapRE.FindAllStringSubmatchIndex(body, -1) {
@@ -183,8 +184,9 @@ func explicitSlide(inner string) string {
 // sectionSlides splits a run of body HTML at the boundaries and paginates each chunk.
 func sectionSlides(run string, bound *regexp.Regexp, meta deckMeta) []string {
 	const sep = "\x00SLIDE\x00"
-	var out []string
-	for _, chunk := range strings.Split(bound.ReplaceAllString(run, sep+"$1"), sep) {
+	chunks := strings.Split(bound.ReplaceAllString(run, sep+"$1"), sep)
+	out := make([]string, 0, len(chunks))
+	for _, chunk := range chunks {
 		out = append(out, paginateChunk(chunk, meta)...)
 	}
 	return out
@@ -223,8 +225,9 @@ func paginateChunk(chunk string, meta deckMeta) []string {
 		return []string{slideHTML(title, false, "", "")}
 	}
 
-	var out []string
-	for i, page := range packBlocks(blocks, meta) {
+	packed := packBlocks(blocks, meta)
+	out := make([]string, 0, len(packed))
+	for i, page := range packed {
 		var body strings.Builder
 		for _, bl := range page.body {
 			body.WriteString(bl.html)
