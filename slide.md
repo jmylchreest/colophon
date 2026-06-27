@@ -27,19 +27,37 @@ no Chromium dependency); an authored-deck mode.
 
 ## Activation & addressing
 
-- **Attached to a post:** `slides: true` (or a `slides:` block) in frontmatter → the deck is
-  published at `…/<slug>/slides/`, linked from the post. Same source, two artifacts.
+- **Attached to a post:** when slides are enabled for it, the deck is published at `…/<slug>/slides/`,
+  linked from the post. Same source, two artifacts.
 - **Standalone:** `type: deck` → rendered as a deck at its own slug.
 
-## Frontmatter config (`slides:`)
+## Config & scope (`slides:`)
 
-A post overrides deck defaults with a `slides:` block. **It overwrites by key, it does NOT deep-merge**
-(unlike generation profiles): setting `slides.split` replaces the default split list wholesale.
+`slides:` is configured at two scopes, narrowest wins:
+
+- **Project / site** (`colophon.yaml` → `slides:`): the defaults for every post — `enabled`
+  (whether posts get a deck at all), `split`, and any future keys.
+- **Per post** (frontmatter `slides:`): overrides those defaults for one post, including
+  `enabled: true/false` to force a deck on or off regardless of the site default.
 
 ```yaml
-slides:                 # also: `slides: true` to enable with all defaults
-  split: [h2]           # the slide boundaries (a LIST) — see targets below
+# colophon.yaml — site defaults
+slides:
+  enabled: false        # default off; a post opts in with `slides.enabled: true`
+  split: [h2]
+
+# a post's frontmatter
+slides:
+  enabled: true         # this post gets a deck even though the site default is off
 ```
+
+`slides: true` / `slides: false` are shorthand for `slides.enabled: true/false` (with the other
+keys inherited).
+
+**Override is shallow / by key** — *not* a deep-merge (unlike generation profiles). A key present in
+frontmatter **replaces** the site value wholesale (a `split` list is swapped, never element-merged);
+keys the post omits **inherit** the site default. So a post can set `slides.split` without restating
+`enabled`, and vice versa.
 
 ### Split targets (`slides.split`, a list)
 
@@ -99,14 +117,28 @@ long-form document with no JS** (the talk reads as an article — SEO + a11y for
 The `<splitslide>` marker is the **one unifying break mechanism**: heading/`---` splits emit the same
 section boundary the author would with a manual `<splitslide>`.
 
-## Author overrides (inline markup, `<slide>` family)
+## Author overrides (inline markup, mirrors the `<tts>` family)
 
-- `<splitslide>` — force a slide break anywhere (a void marker; also the engine's internal break).
+By default the engine **auto-derives** the slides. These inline tags are deck-only directives — like
+`<tts>`/`<notts>` for speech, they're inert in the post itself (the content renders normally there);
+only the deck builder acts on them. The symmetry is exact:
+
+| speech | slide | effect |
+|--------|-------|--------|
+| `<notts>…</notts>` | `<noslide>…</noslide>` | visible in the post, **excluded** from the spoken / slide output |
+| `<tts>…</tts>` | `<slide>…</slide>` | **forced in** — read verbatim / made one explicit slide |
+| — | `<splitslide>` | a structural slide break (no speech equivalent) |
+
+- `<noslide>…</noslide>` — stripped from the deck only; stays in the post (the `<notts>` mirror).
 - `<slide>…</slide>` — everything inside becomes **one verbatim slide**: an authored escape hatch
   from the derived split. A leading heading is its title; all other content (prose included) stays
   **on** the slide and is *not* pulled into notes.
-- `<noslide>…</noslide>` — content dropped from the deck entirely (stays in the post, off both the
-  slide and the notes).
+- `<splitslide>` — force a slide break anywhere (a void marker; also the engine's internal break).
+
+Note (for build integration): in the **published post** these deck-directive tags should be stripped
+to inert like the engine does conceptually — at minimum they must never render as literal `<slide>`
+text. (The current `<tts>`/`<notts>` tags pass through as inert custom elements; decks should match
+or improve on that.)
 
 ## Engine assets & the reader
 

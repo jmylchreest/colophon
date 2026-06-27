@@ -9,7 +9,8 @@ audio_file: assets/reading.wav
 attachments:
   - { path: assets/sample.txt, label: "Sample download", description: "A placeholder file shipped with the showcase" }
 slides:
-  split: [h2]   # this page is itself a deck — one slide per top-level topic
+  enabled: true   # this page is itself a deck
+  split: [h2]     # one slide per top-level topic
 ---
 
 A built-in reference, rendered from markdown embedded in colophon itself — it is
@@ -52,6 +53,7 @@ speech_profile: minimax            # pick a named speech profile
 image_profile: poster              # pick a named image profile
 
 slides:                            # publish a slide deck of this post (see Slides below)
+  enabled: true                    # or `slides: true`; site default set in colophon.yaml
   split: [h2]                      # boundaries (a list); overwrites the default, never merges
 
 predecessor: part-one              # the previous post in a series (slug/filename)
@@ -79,7 +81,8 @@ audio_file: assets/reading.wav
 attachments:
   - { path: assets/sample.txt, label: "Sample download", description: "A placeholder file shipped with the showcase" }
 slides:
-  split: [h2]   # this page is itself a deck — one slide per top-level topic
+  enabled: true   # this page is itself a deck
+  split: [h2]     # one slide per top-level topic
 ```
 
 ## Headings
@@ -393,9 +396,10 @@ configures it — and **overwrites** the default by key (it does not merge):
 
 ```yaml
 slides:
-  split: [h2]   # slide boundaries (a LIST). targets: h1..h6, hr, splitslide,
-                # image, table, code, math, diagram, audio, video, text:<match>
-                # default: every heading. This page uses [h2] → one slide per topic.
+  enabled: true   # opt in (site default lives in colophon.yaml; `slides: true` is shorthand)
+  split: [h2]     # slide boundaries (a LIST). targets: h1..h6, hr, splitslide,
+                  # image, table, code, math, diagram, audio, video, text:<match>
+                  # default: every heading. This page uses [h2] → one slide per topic.
 ```
 
 Three inline markers steer the split where structure isn't enough:
