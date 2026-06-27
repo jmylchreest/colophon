@@ -12,6 +12,13 @@ in full (or where it should be, when end-user docs catch up).
   but it's a new record so **likes/reposts/replies reset** and the timestamp updates. Because that's
   lossy, it runs **only on `--resync`** (an explicit opt-in); automatic edit-on-change now **skips**
   Bluesky with a note. **Mastodon** still edits in place automatically (no engagement loss).
+- **Accessibility: a sweep toward WCAG AAA** (see the `wcag-aaa-compliance` decision). Engine: code
+  blocks, Mermaid and display math are keyboard-focusable scroll regions (2.1.1); tables are wrapped
+  in a focusable `.table-scroll` (semantics preserved, no `display:block` hack); GFM task-list
+  checkboxes get an `aria-label`. Press theme: a visible keyboard-focus indicator on every control;
+  `role="img"` on the audio/attachment markers; the home page hero moved inside `<main>`; and a
+  contrast pass — `--muted`/`--faint` raised to ≥7:1 and a new `--link` token (≥7:1) for accent
+  text (links, inline code, badges, pull-quote attribution), with `--accent` kept for decoration.
 
 ## v0.0.30
 
