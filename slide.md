@@ -94,7 +94,8 @@ For each section:
 - any **heading still inside the section** (below the split level) folds into a leading **bullet
   list** (`<ul class="slide-bullets">`);
 - everything else — prose, tables, images, code, display math, Mermaid, callouts, pull-quotes — is a
-  **block on the slide**. There is **no automatic prose→notes**: what you wrote is what you see.
+  **block on the slide** (what you wrote is what you see). Prose paragraphs additionally **mirror into
+  the slide's presenter notes** (the script), shown only in presenter mode.
 - A **cover slide** (title, description, author avatar/initials + date) is prepended.
 
 **Pagination (content-aware).** Blocks are packed onto a slide up to a line budget; when the next

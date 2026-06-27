@@ -177,7 +177,7 @@ func explicitSlide(inner string) string {
 	if m := deckTitleRE.FindStringSubmatch(inner); m != nil {
 		title, inner = m[1], strings.TrimSpace(deckTitleRE.ReplaceAllString(inner, ""))
 	}
-	return slideHTML(title, false, inner)
+	return slideHTML(title, false, inner, "")
 }
 
 // sectionSlides splits a run of body HTML at the boundaries and paginates each chunk.
@@ -220,22 +220,26 @@ func paginateChunk(chunk string, meta deckMeta) []string {
 		if title == "" {
 			return nil
 		}
-		return []string{slideHTML(title, false, "")}
+		return []string{slideHTML(title, false, "", "")}
 	}
 
 	var out []string
 	for i, page := range packBlocks(blocks, meta) {
-		var body strings.Builder
+		var body, notes strings.Builder
 		for _, bl := range page {
 			body.WriteString(bl.html)
+			if bl.kind == "other" { // prose paragraphs mirror into the presenter notes (the script)
+				notes.WriteString(bl.html)
+			}
 		}
-		out = append(out, slideHTML(title, i > 0, body.String()))
+		out = append(out, slideHTML(title, i > 0, body.String(), notes.String()))
 	}
 	return out
 }
 
-// slideHTML wraps a title + body into a slide section; a continuation slide marks the title "(cont.)".
-func slideHTML(title string, cont bool, body string) string {
+// slideHTML wraps a title + body (+ presenter notes) into a slide section; a continuation slide marks
+// the title "(cont.)". Notes are hidden in the slide view and shown only in presenter mode.
+func slideHTML(title string, cont bool, body, notes string) string {
 	if strings.TrimSpace(title) == "" && strings.TrimSpace(body) == "" {
 		return ""
 	}
@@ -248,7 +252,11 @@ func slideHTML(title string, cont bool, body string) string {
 		}
 		b.WriteString(`</h2>`)
 	}
-	b.WriteString(`<div class="slide-body">` + body + `</div></section>`)
+	b.WriteString(`<div class="slide-body">` + body + `</div>`)
+	if strings.TrimSpace(notes) != "" {
+		b.WriteString(`<aside class="notes">` + notes + `</aside>`)
+	}
+	b.WriteString(`</section>`)
 	return b.String()
 }
 
@@ -510,6 +518,10 @@ html.js .slide.active{display:flex}
 .slide-body .math-display{overflow-x:auto}
 .deck-more{font:.72em system-ui,sans-serif;color:#9a9aa6;margin-top:.6rem}
 .deck-more a{color:#b9aaff}
+.notes{display:none}
+.notes::before{content:"Notes";display:block;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:#6c6c78;margin-bottom:.3rem}
+html.js .deck.presenter .slide.active{justify-content:flex-start}
+html.js .deck.presenter .notes{display:block;margin-top:auto;padding-top:1rem;border-top:1px solid #2a2a34;font:1rem/1.55 system-ui,sans-serif;color:#b2b2bc}
 .cover-inner{max-width:46rem}
 .cover-title{font-size:clamp(2.2rem,6.5vw,4.6rem);font-weight:700;line-height:1.05;letter-spacing:-.02em}
 .cover-desc{font-size:clamp(1.05rem,2.5vw,1.6rem);color:#b8b8c4;margin-top:1.2rem;line-height:1.5}
