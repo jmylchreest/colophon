@@ -11,6 +11,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
+	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
 	ghtml "github.com/yuin/goldmark/renderer/html"
@@ -35,7 +36,7 @@ func newMarkdown() goldmark.Markdown {
 		goldmark.WithParserOptions(parser.WithAutoHeadingID()),
 		goldmark.WithRendererOptions(
 			ghtml.WithUnsafe(),
-			renderer.WithNodeRenderers(util.Prioritized(codeRenderer{}, 10)),
+			renderer.WithNodeRenderers(util.Prioritized(codeRenderer{}, 10), util.Prioritized(tableRenderer{}, 10)),
 		),
 	)
 }
@@ -233,6 +234,27 @@ func renderCode(w util.BufWriter, source []byte, node ast.Node, entering bool) (
 	_, _ = w.WriteString(html.EscapeString(raw.String()))
 	_, _ = w.WriteString("</code></pre>\n")
 	return ast.WalkSkipChildren, nil
+}
+
+// --- tables ---
+
+// tableRenderer wraps a GFM table in a focusable, horizontally-scrollable container, so a
+// keyboard-only user can scroll a wide table — WCAG 2.1.1. Only the <table> element is overridden;
+// goldmark's header/row/cell renderers (which manage <thead>/<tbody> and column alignment) are
+// left untouched, so the table renders exactly as before, just inside the wrapper.
+type tableRenderer struct{}
+
+func (tableRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+	reg.Register(extast.KindTable, renderTableWrapped)
+}
+
+func renderTableWrapped(w util.BufWriter, _ []byte, _ ast.Node, entering bool) (ast.WalkStatus, error) {
+	if entering {
+		_, _ = w.WriteString(`<div class="table-scroll" tabindex="0">` + "\n<table>\n")
+	} else {
+		_, _ = w.WriteString("</table>\n</div>\n")
+	}
+	return ast.WalkContinue, nil
 }
 
 // --- math ---

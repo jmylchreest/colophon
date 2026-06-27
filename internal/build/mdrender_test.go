@@ -123,6 +123,20 @@ func TestCalloutDefaultTitle(t *testing.T) {
 	}
 }
 
+func TestTableWrappedAndKeyboardFocusable(t *testing.T) {
+	out := renderMD(t, "| A | B |\n|:-:|--:|\n| 1 | 2 |")
+	// Wrapped in a focusable, scrollable container (WCAG 2.1.1) — keyboard users can scroll it.
+	if !strings.Contains(out, `<div class="table-scroll" tabindex="0">`) {
+		t.Errorf("table not wrapped in a focusable scroll container: %s", out)
+	}
+	// Native table semantics preserved (no display:block hack) — thead/tbody still emitted.
+	for _, want := range []string{"<table>", "<thead>", "<tbody>", "<th style=\"text-align:center\">A</th>", "<th style=\"text-align:right\">B</th>"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("table markup/alignment missing %q: %s", want, out)
+		}
+	}
+}
+
 func TestPullQuote(t *testing.T) {
 	out := renderMD(t, "> [!quote] Rachel Zoe\n> Style is a way to say who you are **without** having to speak.")
 	if !strings.Contains(out, `<figure class="pullquote">`) || !strings.Contains(out, "<blockquote>") {
