@@ -156,6 +156,7 @@ func (c *PublishCmd) publishEnv(ctx context.Context, root string, cfg *config.Co
 		Theme:         env.Theme,
 		ImageProfile:  env.ImageProfile,
 		SpeechProfile: env.SpeechProfile,
+		Slides:        env.Slides,
 		Publishers:    env.Publish,
 		Routes:        routes,
 		Log:           log,

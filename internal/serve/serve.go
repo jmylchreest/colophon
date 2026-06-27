@@ -147,6 +147,7 @@ func targetsFor(cfg *config.Config, showcase bool) (string, []target, error) {
 				Theme:         e.Theme,
 				ImageProfile:  e.ImageProfile,
 				SpeechProfile: e.SpeechProfile,
+				Slides:        e.Slides,
 				Showcase:      showcase,
 				BasePath:      prefix,
 			},

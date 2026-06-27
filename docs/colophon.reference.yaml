@@ -106,6 +106,8 @@ environments:
     title: "My Blog (preview)"                 # [optional] override the site title
     image_profile: draft                       # [optional] use the cheap image profile in this env
     speech_profile: minimax                    # [optional] use the minimax voice profile in this env
+    slides:                                    # [optional] override the site slides defaults here
+      enabled: true                            #   e.g. decks on in preview, off in production
     overrides:
       cf: { branch: preview }
 

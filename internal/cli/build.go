@@ -47,6 +47,7 @@ func (c *BuildCmd) Run() error {
 		opts.Publishers = env.Publish
 		opts.ImageProfile = env.ImageProfile
 		opts.SpeechProfile = env.SpeechProfile
+		opts.Slides = env.Slides
 	}
 
 	res, err := build.Run(cfg, opts)

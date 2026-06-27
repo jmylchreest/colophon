@@ -52,6 +52,28 @@ type SlidesConfig struct {
 	Split   []string `yaml:"split,omitempty"`
 }
 
+// SlidesOverride layers over a site's SlidesConfig per environment (e.g. decks on in preview, off in
+// production). Enabled is tri-state via a pointer (nil → inherit); Split, when set, replaces the list.
+type SlidesOverride struct {
+	Enabled *bool    `yaml:"enabled,omitempty"`
+	Split   []string `yaml:"split,omitempty"`
+}
+
+// Apply returns base with this override layered on (shallow, by key): a set key replaces the base
+// value, an unset key inherits. A nil override returns base unchanged.
+func (o *SlidesOverride) Apply(base SlidesConfig) SlidesConfig {
+	if o == nil {
+		return base
+	}
+	if o.Enabled != nil {
+		base.Enabled = *o.Enabled
+	}
+	if o.Split != nil {
+		base.Split = o.Split
+	}
+	return base
+}
+
 // SearchConfig is the site's `search:` stanza. It accepts a string shorthand
 // (`search: lexical`, equivalent to `search: { mode: lexical }`) or the full map form:
 //

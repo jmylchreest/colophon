@@ -59,6 +59,8 @@ type Options struct {
 	Title   string
 	BaseURL string
 	Theme   string
+	// Slides overrides the site's slides defaults for this environment (nil → site value).
+	Slides *core.SlidesOverride
 	// BasePath prefixes every internal link (so output can be hosted under a subpath,
 	// e.g. /<site>/<env>/ for serve, or /repo/ for project pages). Empty means derive
 	// it from BaseURL's path; the result always starts and ends with "/".
@@ -200,6 +202,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	if opts.Theme != "" {
 		site.Theme = opts.Theme
 	}
+	site.Slides = opts.Slides.Apply(site.Slides)
 	outDir := opts.OutDir
 	basePath := resolveBasePath(opts.BasePath, site.BaseURL)
 	now := opts.Now

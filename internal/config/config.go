@@ -82,6 +82,9 @@ type Environment struct {
 	// post's own image_profile/speech_profile overrides these; empty → the default block.
 	ImageProfile  string `yaml:"image_profile,omitempty"`
 	SpeechProfile string `yaml:"speech_profile,omitempty"`
+	// Slides overrides the site's `slides:` defaults for this environment (e.g. decks on in
+	// preview, off in production). Shallow/by-key; nil keys inherit the site value.
+	Slides *core.SlidesOverride `yaml:"slides,omitempty"`
 	// Overrides layers per-publisher Settings, keyed by publisher id.
 	Overrides map[string]map[string]any `yaml:"overrides,omitempty"`
 }
