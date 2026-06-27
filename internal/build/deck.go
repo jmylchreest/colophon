@@ -225,14 +225,11 @@ func paginateChunk(chunk string, meta deckMeta) []string {
 
 	var out []string
 	for i, page := range packBlocks(blocks, meta) {
-		var body, notes strings.Builder
-		for _, bl := range page {
+		var body strings.Builder
+		for _, bl := range page.body {
 			body.WriteString(bl.html)
-			if bl.kind == "other" { // prose paragraphs mirror into the presenter notes (the script)
-				notes.WriteString(bl.html)
-			}
 		}
-		out = append(out, slideHTML(title, i > 0, body.String(), notes.String()))
+		out = append(out, slideHTML(title, i > 0, body.String(), page.notes))
 	}
 	return out
 }
@@ -356,39 +353,48 @@ func blockWeight(n *xhtml.Node, h string) int {
 	}
 }
 
-// packBlocks greedily fills slides to deckBudget, spilling to a new slide when the next block won't
-// fit. A block heavier than the budget gets its own slide; an oversized code block past the hard cap
-// is truncated with a link back to the post.
-func packBlocks(blocks []deckBlock, meta deckMeta) [][]deckBlock {
-	var slides [][]deckBlock
-	var cur []deckBlock
+// deckPage is one packed slide: the visible blocks plus the presenter notes (the prose) for it.
+type deckPage struct {
+	body  []deckBlock
+	notes string
+}
+
+// packBlocks greedily fills slides to deckBudget with the non-prose blocks (media, code, tables,
+// callouts, bullets…), spilling to a new slide when the next won't fit. Prose paragraphs go to the
+// slide's presenter notes instead — never both. A block heavier than the budget gets its own slide;
+// an oversized code block past the hard cap is truncated with a link back to the post.
+func packBlocks(blocks []deckBlock, meta deckMeta) []deckPage {
+	var pages []deckPage
+	cur := deckPage{}
 	w := 0
 	flush := func() {
-		if len(cur) > 0 {
-			slides = append(slides, cur)
-			cur, w = nil, 0
+		if len(cur.body) > 0 || strings.TrimSpace(cur.notes) != "" {
+			pages = append(pages, cur)
+			cur, w = deckPage{}, 0
 		}
 	}
 	for _, b := range blocks {
-		if b.weight > deckBudget {
-			flush()
-			if b.kind == "code" && b.weight > deckHardCap {
-				b = truncateCode(b, meta.PostURL)
-			}
-			slides = append(slides, []deckBlock{b})
+		if b.kind == "other" { // prose → presenter notes, off the slide and out of the budget
+			cur.notes += b.html
 			continue
 		}
-		if w+b.weight > deckBudget && len(cur) > 0 {
+		if b.weight > deckBudget || (w+b.weight > deckBudget && len(cur.body) > 0) {
 			flush()
 		}
-		cur = append(cur, b)
+		if b.kind == "code" && b.weight > deckHardCap {
+			b = truncateCode(b, meta.PostURL)
+		}
+		cur.body = append(cur.body, b)
 		w += b.weight
+		if b.weight > deckBudget {
+			flush() // oversized block stands alone
+		}
 	}
 	flush()
-	if len(slides) == 0 {
-		slides = [][]deckBlock{nil}
+	if len(pages) == 0 {
+		pages = []deckPage{{}}
 	}
-	return slides
+	return pages
 }
 
 // truncateCode keeps the first deckBudget lines of an oversized code block and appends a note linking

@@ -93,9 +93,11 @@ For each section:
 - the **boundary heading** is the slide **title**;
 - any **heading still inside the section** (below the split level) folds into a leading **bullet
   list** (`<ul class="slide-bullets">`);
-- everything else — prose, tables, images, code, display math, Mermaid, callouts, pull-quotes — is a
-  **block on the slide** (what you wrote is what you see). Prose paragraphs additionally **mirror into
-  the slide's presenter notes** (the script), shown only in presenter mode.
+- **prose paragraphs** go to the slide's **presenter notes** (the script), shown only in presenter
+  mode — *not* the slide;
+- everything else — tables, images, code, display math, Mermaid, callouts, pull-quotes, bullets — is a
+  **block on the slide**. Prose is never in both places; a section that is only prose becomes a title
+  slide with the narration in its notes.
 - A **cover slide** (title, description, author avatar/initials + date) is prepended.
 
 **Pagination (content-aware).** Blocks are packed onto a slide up to a line budget; when the next

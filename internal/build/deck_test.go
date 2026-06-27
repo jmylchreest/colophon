@@ -35,13 +35,15 @@ func TestResolveSlides(t *testing.T) {
 }
 
 func TestBuildDeckSplit(t *testing.T) {
+	// A (prose only → title slide + notes) and B (a list → on the slide). The title-less intro
+	// prose isn't a slide on its own.
 	md := "intro prose\n\n## A\n\nbody text\n\n## B\n\n- item"
 	out, err := BuildDeck(md, "Talk", []string{"h2"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(out, `<section class="slide">`); n != 3 { // intro slide + A + B (cover is extra)
-		t.Fatalf("want 3 content slides, got %d", n)
+	if n := strings.Count(out, `<section class="slide">`); n != 2 { // A + B (cover is extra)
+		t.Fatalf("want 2 content slides, got %d", n)
 	}
 	if !strings.Contains(out, `<section class="slide slide-cover">`) || !strings.Contains(out, `<h1 class="cover-title">Talk</h1>`) {
 		t.Errorf("deck should lead with a cover slide carrying the title: %s", out)
@@ -49,19 +51,26 @@ func TestBuildDeckSplit(t *testing.T) {
 	if !strings.Contains(out, `<h2 class="slide-title">A</h2>`) {
 		t.Errorf("heading should be the slide title: %s", out)
 	}
-	// Self-contained: CSS + reader JS inlined, so it works offline.
+	// Prose goes to the notes, not the slide — and is not duplicated.
+	if !strings.Contains(out, `<aside class="notes">`) || !strings.Contains(out, "body text") {
+		t.Errorf("prose should appear in the presenter notes: %s", out)
+	}
+	if strings.Contains(out, `<div class="slide-body"><p>body text</p>`) {
+		t.Error("prose must not also be on the slide body")
+	}
 	if !strings.Contains(out, "<style>") || !strings.Contains(out, "<script>") {
 		t.Error("deck must inline its CSS and JS")
 	}
 }
 
 func TestBuildDeckSplitTargets(t *testing.T) {
-	// hr as the only boundary; a stray h1 is NOT a boundary unless listed.
+	// hr boundary; the section before it is one title slide (its prose is notes), "second" is
+	// title-less prose so it isn't its own slide.
 	out, _ := BuildDeck("# Big\n\nintro\n\n---\n\nsecond", "T", []string{"hr"})
-	if n := strings.Count(out, `<section class="slide">`); n != 2 {
-		t.Errorf("hr split: want 2 slides, got %d", n)
+	if n := strings.Count(out, `<section class="slide">`); n != 1 {
+		t.Errorf("hr split: want 1 content slide, got %d", n)
 	}
-	// Default split (empty list) breaks on every heading.
+	// Default split (empty list) breaks on every heading; each gets a title slide.
 	out2, _ := BuildDeck("# A\n\nx\n\n## B\n\ny\n\n### C\n\nz", "T", nil)
 	if n := strings.Count(out2, `<section class="slide">`); n != 3 {
 		t.Errorf("default split: want 3 slides, got %d", n)
@@ -80,10 +89,11 @@ func TestBuildDeckBullets(t *testing.T) {
 }
 
 func TestBuildDeckExplicitAndSplitslide(t *testing.T) {
-	// <splitslide> forces a break; <slide>…</slide> is one verbatim slide (prose stays on it).
-	out, _ := BuildDeck("intro\n\n<splitslide>\n\nsecond\n\n<slide>\n\nhand-made **slide**\n\n</slide>", "T", []string{"splitslide"})
+	// <splitslide> forces a break between the two lists; <slide>…</slide> is one verbatim slide
+	// (its prose stays on the slide, not pushed to notes).
+	out, _ := BuildDeck("- intro\n\n<splitslide>\n\n- second\n\n<slide>\n\nhand-made **slide**\n\n</slide>", "T", []string{"splitslide"})
 	if n := strings.Count(out, `<section class="slide">`); n != 3 {
-		t.Fatalf("want 3 slides (intro / second / explicit), got %d:\n%s", n, out)
+		t.Fatalf("want 3 slides (intro list / second list / explicit), got %d:\n%s", n, out)
 	}
 	if !strings.Contains(out, "hand-made <strong>slide</strong>") {
 		t.Error("explicit slide content missing")

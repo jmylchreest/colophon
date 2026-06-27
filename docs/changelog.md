@@ -10,9 +10,9 @@ in full (or where it should be, when end-user docs catch up).
   spills to a continuation slide, an oversized code block truncates with a link back to the post,
   images/video scale to fit); **math, diagrams and syntax highlighting hydrate** from the published
   `/vendor` assets; media (images/audio/video) stays **on the slide**, not in notes; callouts and
-  pull-quotes are styled. Prose stays on the slide and also mirrors into the **presenter notes**
-  (shown in presenter mode). New keys: **Enter** plays/pauses the slide's media, **Esc** returns to
-  the post.
+  pull-quotes are styled. Prose paragraphs become the **presenter notes** (shown in presenter mode);
+  everything else is on the slide — never both. New keys: **Enter** plays/pauses the slide's media,
+  **Esc** returns to the post.
 - **Slide decks (`slides:`).** A post can be projected into a themed slide deck, published at
   `…/<slug>/slides/`, linked from the Downloads box, and flagged with a marker in the listing. It's
   derived from the post (headings → slides/bullets, prose → speaker notes, other blocks on the
