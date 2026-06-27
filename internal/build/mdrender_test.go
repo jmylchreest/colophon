@@ -22,8 +22,8 @@ $$\int_0^1 x\,dx$$`)
 	if !strings.Contains(out, `<span class="math math-inline">E = mc^2</span>`) {
 		t.Errorf("inline math missing: %s", out)
 	}
-	if !strings.Contains(out, `<div class="math math-display">\int_0^1 x\,dx</div>`) {
-		t.Errorf("display math missing: %s", out)
+	if !strings.Contains(out, `<div tabindex="0" class="math math-display">\int_0^1 x\,dx</div>`) {
+		t.Errorf("display math missing (with keyboard-focusable tabindex): %s", out)
 	}
 }
 
@@ -44,7 +44,7 @@ func TestMathProtectsFromEmphasis(t *testing.T) {
 
 func TestMermaidFence(t *testing.T) {
 	out := renderMD(t, "```mermaid\nflowchart LR\nA-->B\n```")
-	if !strings.Contains(out, `<pre class="mermaid">flowchart LR`) {
+	if !strings.Contains(out, `<pre tabindex="0" class="mermaid">flowchart LR`) {
 		t.Errorf("mermaid not emitted as enhanceable block: %s", out)
 	}
 	if strings.Contains(out, "language-mermaid") {
@@ -54,7 +54,7 @@ func TestMermaidFence(t *testing.T) {
 
 func TestCodeFenceKeepsLanguage(t *testing.T) {
 	out := renderMD(t, "```go\nfmt.Println(\"hi\")\n```")
-	if !strings.Contains(out, `<pre><code class="language-go">`) {
+	if !strings.Contains(out, `<pre tabindex="0"><code class="language-go">`) {
 		t.Errorf("code language class missing: %s", out)
 	}
 	if !strings.Contains(out, "&#34;hi&#34;") {

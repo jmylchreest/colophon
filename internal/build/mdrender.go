@@ -214,13 +214,16 @@ func renderCode(w util.BufWriter, source []byte, node ast.Node, entering bool) (
 	}
 
 	if string(lang) == "mermaid" {
-		_, _ = w.WriteString(`<pre class="mermaid">`)
+		_, _ = w.WriteString(`<pre tabindex="0" class="mermaid">`)
 		_, _ = w.WriteString(html.EscapeString(raw.String()))
 		_, _ = w.WriteString("</pre>\n")
 		return ast.WalkSkipChildren, nil
 	}
 
-	_, _ = w.WriteString("<pre><code")
+	// tabindex="0" makes the (horizontally scrollable) code block keyboard-focusable, so a
+	// keyboard-only user can scroll it — WCAG 2.1.1 (axe scrollable-region-focusable). A bare
+	// tabindex is the right fix here: an aria-label on a <pre> (generic role) is prohibited (4.1.2).
+	_, _ = w.WriteString(`<pre tabindex="0"><code`)
 	if len(lang) > 0 {
 		_, _ = w.WriteString(` class="language-`)
 		_, _ = w.WriteString(html.EscapeString(string(lang)))
@@ -317,13 +320,17 @@ func renderMath(w util.BufWriter, source []byte, node ast.Node, entering bool) (
 		return ast.WalkContinue, nil
 	}
 	n := node.(*mathNode)
-	tag, class := "span", "math math-inline"
 	if n.Display {
-		tag, class = "div", "math math-display"
+		// Display math can overflow horizontally (the theme scrolls it), so make it
+		// keyboard-focusable — WCAG 2.1.1. Inline math doesn't scroll, so it stays a span.
+		_, _ = w.WriteString(`<div tabindex="0" class="math math-display">`)
+		_, _ = w.WriteString(html.EscapeString(string(n.Value)))
+		_, _ = w.WriteString("</div>")
+		return ast.WalkContinue, nil
 	}
-	_, _ = w.WriteString("<" + tag + ` class="` + class + `">`)
+	_, _ = w.WriteString(`<span class="math math-inline">`)
 	_, _ = w.WriteString(html.EscapeString(string(n.Value)))
-	_, _ = w.WriteString("</" + tag + ">")
+	_, _ = w.WriteString("</span>")
 	return ast.WalkContinue, nil
 }
 
