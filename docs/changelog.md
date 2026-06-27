@@ -3,7 +3,7 @@
 User-facing changes by release. Each entry points at the guide where the feature is documented
 in full (or where it should be, when end-user docs catch up).
 
-## Unreleased
+## v0.0.32
 
 - **Slide decks render the post's content well by default.** A **cover slide** (title, description,
   author avatar/initials) leads; content is **paginated** to fit (blocks pack onto a slide, overflow
