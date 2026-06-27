@@ -68,10 +68,13 @@ func (s *blueskySyndicator) Syndicate(ctx context.Context, p Post) (string, erro
 	return blueskyPostURL(s.handle, created.URI), nil
 }
 
-// Update replaces the existing record in place via putRecord (same rkey), so the permalink — and
-// any likes/reposts/replies attached to it — are kept. The rkey is the last segment of the
-// recorded URL; the repo DID comes from a fresh session.
-func (s *blueskySyndicator) Update(ctx context.Context, p Post, prior Record) (string, error) {
+// Replace refreshes a Bluesky card by atomically deleting and recreating the record at the SAME
+// rkey (applyWrites). Bluesky's AppView ignores record edits (putRecord is a visual no-op), so a
+// swap is the only way to change what people see; reusing the rkey keeps the permalink (so backlinks
+// and the ledger URL stay valid), but because it's a new record the post's likes/reposts/replies
+// reset and the timestamp updates. applyWrites is a single transaction, so a failed attempt changes
+// nothing and is safe to retry. The run loop only calls this on an explicit --resync.
+func (s *blueskySyndicator) Replace(ctx context.Context, p Post, prior Record) (string, error) {
 	rkey := lastPathSegment(prior.URL)
 	if rkey == "" {
 		return "", fmt.Errorf("bluesky %q: no rkey in %q", s.id, prior.URL)
@@ -86,12 +89,16 @@ func (s *blueskySyndicator) Update(ctx context.Context, p Post, prior Record) (s
 	}); err != nil {
 		return "", fmt.Errorf("bluesky %q: createSession: %w", s.id, err)
 	}
-	// putRecord targets a fixed rkey, so it's idempotent (replaces in place) → retry any failure.
+	const coll = "app.bsky.feed.post"
+	writes := []map[string]any{
+		{"$type": "com.atproto.repo.applyWrites#delete", "collection": coll, "rkey": rkey},
+		{"$type": "com.atproto.repo.applyWrites#create", "collection": coll, "rkey": rkey, "value": blueskyRecord(p)},
+	}
 	if err := retryIdempotent(ctx, func() error {
-		return postJSON(ctx, s.service+"/xrpc/com.atproto.repo.putRecord", session.AccessJwt, nil,
-			map[string]any{"repo": session.DID, "collection": "app.bsky.feed.post", "rkey": rkey, "record": blueskyRecord(p)}, nil)
+		return postJSON(ctx, s.service+"/xrpc/com.atproto.repo.applyWrites", session.AccessJwt, nil,
+			map[string]any{"repo": session.DID, "writes": writes}, nil)
 	}); err != nil {
-		return "", fmt.Errorf("bluesky %q: putRecord: %w", s.id, err)
+		return "", fmt.Errorf("bluesky %q: applyWrites: %w", s.id, err)
 	}
 	return prior.URL, nil // the permalink is unchanged (same rkey)
 }

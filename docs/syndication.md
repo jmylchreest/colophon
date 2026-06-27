@@ -26,22 +26,28 @@ colophon syndicate --env production --allow-publish    # 2. push copies to the s
 ### Editing a syndicated copy when the post changes
 
 The ledger stores a **content fingerprint** (title, summary, custom syndication text, link, tags)
-alongside each silo URL. On a later run, if a post's content has changed, colophon **edits the
-existing silo copy in place** rather than skipping it — keeping its likes/replies/permalink:
+alongside each silo URL. On a later run, if a post's content has changed, colophon brings the
+existing silo copy up to date rather than skipping it — but *how* depends on what the silo allows:
 
-- **Mastodon** edits the status; **Bluesky** replaces the record (same rkey). **Bridgy** can't edit
-  a published copy, so its copy is left as-is and a `note=driver can't edit a published copy` line
-  is logged. The `command` driver doesn't edit.
-- A post with an **unchanged** fingerprint is skipped as before — edits only fire on a real change.
+- **Mastodon** edits the status **in place** (`PUT`), preserving its likes/replies/permalink. This
+  happens automatically on any content change.
+- **Bluesky can't edit a card in place** — its AppView ignores record edits, so an edit is
+  invisible. The only way to change a card is an **atomic swap** (delete + recreate at the *same*
+  rkey): the card re-indexes and the **permalink is kept**, but it's a new record, so the post's
+  **likes/reposts/replies reset** and the timestamp updates. Because that's lossy, automatic
+  edit-on-change **skips Bluesky** with a note — it's only done on an explicit **`--resync`** (below).
+- **Bridgy** / **command** can't edit a published copy; their copies are left as-is with a note.
+- An entry with **no recorded silo URL** (e.g. an old Bridgy post) is **skipped**, not failed.
+- A post with an **unchanged** fingerprint is skipped — edits only fire on a real change.
 - **Upgrade/backfill:** a ledger written by an older colophon has no fingerprints. The first run
   after upgrading **backfills** the current fingerprint for each entry *without editing anything*
   (there's nothing to compare against), so only genuine changes *after* that trigger an edit. The
   run reports `backfilled=N`; commit the updated ledger.
-- **`--resync`:** a one-shot that re-edits **every** already-syndicated copy to the post's current
-  content, ignoring fingerprints. Use it once after adopting this feature to bring silo copies that
-  were created (or changed) before the upgrade up to date — the backfill deliberately won't, since
-  it can't tell which were stale. Only edit-capable drivers (Mastodon/Bluesky) are touched; it
-  reports `updated=N`.
+- **`--resync`:** a one-shot that brings **every** already-syndicated copy to the post's current
+  content, ignoring fingerprints. Use it to catch up copies created/changed before adopting this
+  feature — the backfill deliberately won't, since it can't tell which were stale. On `--resync`,
+  Mastodon re-edits in place and **Bluesky does the atomic swap** (so its cards refresh, accepting
+  the engagement reset). Reports `updated=N`.
 
 It performs **irreversible external actions** (posting to real accounts), so it's fenced:
 

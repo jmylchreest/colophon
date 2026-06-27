@@ -148,7 +148,7 @@ func (c *SyndicateCmd) Run() error {
 				skipped++ // unchanged since last syndicated
 
 			default:
-				// Content changed (or --resync) → edit the silo copy in place, if we can.
+				// Content changed (or --resync) → bring the silo copy up to date.
 				if strings.TrimSpace(prior.URL) == "" {
 					// No silo handle was ever recorded (e.g. posted via a fire-and-forget driver
 					// like Bridgy) → nothing to edit. Skip cleanly; this isn't a failure.
@@ -156,21 +156,36 @@ func (c *SyndicateCmd) Run() error {
 					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "skipped", "note", "no recorded silo URL to edit")
 					continue
 				}
-				up, ok := open[id].(syndicate.Updater)
-				if !ok {
+				// In-place editors (Mastodon) edit on any change, preserving engagement. Replace-only
+				// silos (Bluesky) can't edit a card visibly, so they only act on an explicit --resync,
+				// where the swap's engagement reset is opted into.
+				up, isUpdater := open[id].(syndicate.Updater)
+				rp, isReplacer := open[id].(syndicate.Replacer)
+				var action string
+				var edit func() (string, error)
+				switch {
+				case isUpdater:
+					action, edit = "edit", func() (string, error) { return up.Update(context.Background(), post, prior) }
+				case isReplacer && c.Resync:
+					action, edit = "replace", func() (string, error) { return rp.Replace(context.Background(), post, prior) }
+				case isReplacer:
+					skipped++
+					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "skipped", "note", "silo can't edit a card in place; run --resync to refresh (resets likes/replies)")
+					continue
+				default:
 					skipped++
 					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "unsupported", "note", "driver can't edit a published copy")
 					continue
 				}
 				if c.DryRun {
-					log.Step("SYNDICATE", "would-update", "post", post.URL, "to", id)
+					log.Step("SYNDICATE", "would-"+action, "post", post.URL, "to", id)
 					updated++
 					continue
 				}
-				url, err := up.Update(context.Background(), post, prior)
+				url, err := edit()
 				if err != nil {
 					failed++
-					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "failed", "error", err.Error())
+					log.Step("SYNDICATE", action, "url", post.URL, "to", id, "status", "failed", "error", err.Error())
 					continue
 				}
 				if strings.TrimSpace(url) != "" {
@@ -179,7 +194,7 @@ func (c *SyndicateCmd) Run() error {
 				prior.Fingerprint, prior.SyndicatedAt = fp, now
 				ledger.Set(post.Key, id, prior)
 				updated++
-				log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "silo", prior.URL, "status", "ok")
+				log.Step("SYNDICATE", action, "url", post.URL, "to", id, "silo", prior.URL, "status", "ok")
 			}
 		}
 	}

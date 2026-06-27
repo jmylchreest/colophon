@@ -38,12 +38,22 @@ type Syndicator interface {
 }
 
 // Updater is an optional Syndicator capability: edit an already-syndicated copy in place when the
-// post's content changes (title/summary/text/link). A driver implements it only if its silo can
-// edit a published copy — Mastodon (PUT status) and Bluesky (putRecord) do; Bridgy can't, so the
-// run loop leaves its copy untouched and warns. prior is the existing ledger record (its URL is
-// the handle the edit derives from).
+// post's content changes (title/summary/text/link), preserving the copy's engagement. A driver
+// implements it only if its silo honours edits — Mastodon (PUT status) does. prior is the existing
+// ledger record (its URL is the handle the edit derives from). The run loop calls this both on a
+// detected content change and on --resync.
 type Updater interface {
 	Update(ctx context.Context, p Post, prior Record) (siloURL string, err error)
+}
+
+// Replacer is an optional Syndicator capability for silos that CAN'T edit a published copy in place
+// but can replace it: delete the record and recreate it at the same address. Bluesky needs this —
+// its AppView ignores record edits (putRecord is a visual no-op), so the only way to change a card
+// is an atomic delete+create on the same rkey (permalink preserved, but likes/reposts/replies reset
+// and the timestamp updates). Because it's engagement-lossy, the run loop only invokes Replace on an
+// explicit --resync, never on automatic edit-on-change.
+type Replacer interface {
+	Replace(ctx context.Context, p Post, prior Record) (siloURL string, err error)
 }
 
 // Fingerprint hashes the fields that feed a silo copy, so the ledger can tell when a syndicated

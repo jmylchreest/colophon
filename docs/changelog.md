@@ -3,6 +3,16 @@
 User-facing changes by release. Each entry points at the guide where the feature is documented
 in full (or where it should be, when end-user docs catch up).
 
+## v0.0.31
+
+- **Bluesky: refresh a card via an atomic swap, only on `--resync`.** The earlier "edit in place"
+  for Bluesky (v0.0.29) was a no-op — Bluesky's AppView ignores record edits, so the public card
+  never changed. colophon now refreshes a Bluesky card by atomically deleting and recreating the
+  record at the **same rkey** (`applyWrites`): the card re-indexes and the **permalink is kept**,
+  but it's a new record so **likes/reposts/replies reset** and the timestamp updates. Because that's
+  lossy, it runs **only on `--resync`** (an explicit opt-in); automatic edit-on-change now **skips**
+  Bluesky with a note. **Mastodon** still edits in place automatically (no engagement loss).
+
 ## v0.0.30
 
 - **Syndication card descriptions fall back to a body excerpt.** A post with no `description:`

@@ -41,14 +41,26 @@ func TestUpdaterCapability(t *testing.T) {
 		}
 		return s
 	}
-	if _, ok := mk("mastodon", map[string]any{"instance": "https://m.example", "token": "t"}).(Updater); !ok {
-		t.Error("mastodon should support Update")
+	mastodon := mk("mastodon", map[string]any{"instance": "https://m.example", "token": "t"})
+	if _, ok := mastodon.(Updater); !ok {
+		t.Error("mastodon should support in-place Update")
 	}
-	if _, ok := mk("bluesky", map[string]any{"handle": "me", "app_password": "p"}).(Updater); !ok {
-		t.Error("bluesky should support Update")
+	if _, ok := mastodon.(Replacer); ok {
+		t.Error("mastodon edits in place — it should NOT be a Replacer")
 	}
-	if _, ok := mk("bridgy", map[string]any{"network": "mastodon"}).(Updater); ok {
+	bsky := mk("bluesky", map[string]any{"handle": "me", "app_password": "p"})
+	if _, ok := bsky.(Updater); ok {
+		t.Error("bluesky must NOT support in-place Update (the AppView ignores edits)")
+	}
+	if _, ok := bsky.(Replacer); !ok {
+		t.Error("bluesky should support Replace (atomic swap)")
+	}
+	bridgy := mk("bridgy", map[string]any{"network": "mastodon"})
+	if _, ok := bridgy.(Updater); ok {
 		t.Error("bridgy must NOT support Update (one-shot publish)")
+	}
+	if _, ok := bridgy.(Replacer); ok {
+		t.Error("bridgy must NOT support Replace")
 	}
 }
 
@@ -84,16 +96,16 @@ func TestMastodonUpdate(t *testing.T) {
 	}
 }
 
-func TestBlueskyUpdate(t *testing.T) {
-	var put map[string]any
+func TestBlueskyReplace(t *testing.T) {
+	var body map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		switch {
 		case strings.HasSuffix(r.URL.Path, "createSession"):
 			_, _ = w.Write([]byte(`{"accessJwt":"jwt","did":"did:plc:abc"}`))
-		case strings.HasSuffix(r.URL.Path, "putRecord"):
-			_ = json.Unmarshal(b, &put)
-			_, _ = w.Write([]byte(`{"uri":"at://did:plc:abc/app.bsky.feed.post/3kxyz","cid":"c"}`))
+		case strings.HasSuffix(r.URL.Path, "applyWrites"):
+			_ = json.Unmarshal(b, &body)
+			_, _ = w.Write([]byte(`{}`))
 		default:
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
@@ -102,22 +114,34 @@ func TestBlueskyUpdate(t *testing.T) {
 
 	s, _ := Open(core.SyndicatorConf{ID: "b", Driver: "bluesky", Settings: map[string]any{
 		"handle": "me.bsky.social", "app_password": "pw", "service": srv.URL}})
-	up := s.(Updater)
+	rp, ok := s.(Replacer)
+	if !ok {
+		t.Fatal("bluesky should be a Replacer")
+	}
 	prior := Record{URL: "https://bsky.app/profile/me.bsky.social/post/3kxyz"}
-	url, err := up.Update(context.Background(), Post{Title: "Edited", URL: "https://b.example/p/"}, prior)
+	url, err := rp.Replace(context.Background(), Post{Title: "Edited", URL: "https://b.example/p/"}, prior)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if put["rkey"] != "3kxyz" {
-		t.Errorf("putRecord rkey = %v, want the rkey from the recorded URL", put["rkey"])
+	if body["repo"] != "did:plc:abc" {
+		t.Errorf("applyWrites repo = %v", body["repo"])
 	}
-	if put["repo"] != "did:plc:abc" || put["collection"] != "app.bsky.feed.post" {
-		t.Errorf("putRecord repo/collection = %v / %v", put["repo"], put["collection"])
+	writes, _ := body["writes"].([]any)
+	if len(writes) != 2 {
+		t.Fatalf("want delete+create, got %d writes", len(writes))
 	}
-	if rec, _ := put["record"].(map[string]any); rec["text"] != "Edited" {
-		t.Errorf("putRecord record text = %v", put["record"])
+	del, _ := writes[0].(map[string]any)
+	cre, _ := writes[1].(map[string]any)
+	if !strings.HasSuffix(del["$type"].(string), "#delete") || del["rkey"] != "3kxyz" {
+		t.Errorf("first write should delete rkey 3kxyz, got %v", del)
+	}
+	if !strings.HasSuffix(cre["$type"].(string), "#create") || cre["rkey"] != "3kxyz" {
+		t.Errorf("second write should recreate the SAME rkey, got %v", cre)
+	}
+	if rec, _ := cre["value"].(map[string]any); rec["text"] != "Edited" {
+		t.Errorf("recreated record text = %v", cre["value"])
 	}
 	if url != prior.URL {
-		t.Errorf("edited permalink should be unchanged, got %q", url)
+		t.Errorf("permalink should be unchanged (same rkey), got %q", url)
 	}
 }
