@@ -8,7 +8,7 @@
 /* ---------- token contract (neutral defaults; themes override) ---------- */
 :root {
   --bg: #0c0c10; --surface: #14141a; --elevated: #1c1c24; --border: #2a2a34;
-  --text: #ededf1; --muted: #8c8c98; --faint: #55555f;
+  --text: #ededf1; --muted: #b2b2bc; --faint: #aaaab4; /* muted/faint >= 7:1 for WCAG AAA (1.4.6) */
   --accent: #7c8cff; --accent-2: #ff9ec9; --on-accent: #0b0b10;
   --accent-soft: rgba(124,140,255,0.13);
   --glow-1: transparent; --glow-2: transparent;

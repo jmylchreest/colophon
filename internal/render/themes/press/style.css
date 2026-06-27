@@ -6,7 +6,7 @@
 
 :root {
   --bg: #08080b; --surface: #0e0e13; --elevated: #16161d; --border: #23232e;
-  --text: #ededf1; --muted: #8c8c98; --faint: #55555f;
+  --text: #ededf1; --muted: #b2b2bc; --faint: #aaaab4; /* muted/faint >= 7:1 for WCAG AAA (1.4.6) */
   --accent: #a594ff; --accent-2: #ff9ec9; --on-accent: #0b0b10;
   --accent-soft: rgba(165,148,255,0.13);
   --glow-1: rgba(165,148,255,0.34); --glow-2: rgba(255,158,201,0.20);
@@ -16,7 +16,7 @@
 }
 html[data-theme="light"] {
   --bg: #f7f6f3; --surface: #ffffff; --elevated: #f1eef1; --border: #e6e2e6;
-  --text: #1a1a1f; --muted: #6c6c77; --faint: #9a9aa4;
+  --text: #1a1a1f; --muted: #4a4a53; --faint: #54545d; /* muted/faint >= 7:1 for WCAG AAA (1.4.6) */
   --accent: #6a4bff; --accent-2: #e9609f; --on-accent: #ffffff;
   --accent-soft: rgba(106,75,255,0.09);
   --glow-1: rgba(106,75,255,0.18); --glow-2: rgba(233,96,159,0.12);
