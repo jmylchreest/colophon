@@ -39,6 +39,17 @@ type Site struct {
 	Search SearchConfig `yaml:"search,omitempty"`
 	// Analytics configures privacy-respecting telemetry (statsfactory). Inert until keyed.
 	Analytics Analytics `yaml:"analytics,omitempty"`
+	// Slides is the site default for derived slide decks: whether posts get one, and the slide
+	// boundaries. A post overrides either key in its `slides:` frontmatter (shallow, by key).
+	Slides SlidesConfig `yaml:"slides,omitempty"`
+}
+
+// SlidesConfig is the `slides:` stanza — the deck defaults at the site scope. Enabled gates deck
+// generation; Split lists the slide boundaries (empty → the engine default of every heading). A
+// post's frontmatter overrides each key it sets.
+type SlidesConfig struct {
+	Enabled bool     `yaml:"enabled,omitempty"`
+	Split   []string `yaml:"split,omitempty"`
 }
 
 // SearchConfig is the site's `search:` stanza. It accepts a string shorthand

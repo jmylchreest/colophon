@@ -31,6 +31,13 @@ sites:
     search:
       mode: lexical                            # [optional] lexical | semantic | off (default off)
       fuzzy: true                              # [optional] default false; trigram+Levenshtein typo tolerance
+    # Derived slide decks. Site defaults; a post overrides either key in its `slides:`
+    # frontmatter (shallow/by-key — a key replaces this value, omitted keys inherit).
+    slides:
+      enabled: false                           # [optional] default off; a post opts in with `slides: true`
+      split: [h2]                              # [optional] slide boundaries (a list). default: every heading.
+                                               #   targets: h1..h6, hr, splitslide, image, table, code,
+                                               #   math, diagram, audio, video, text:<match>
     # Reader analytics for THIS site. One block per provider; inert until configured.
     analytics:
       statsfactory:

@@ -240,6 +240,36 @@ the syndication feeds so podcast/feed clients can fetch them:
 - **RSS** — carries a single `<enclosure>` per the spec: the audio reading wins, else the first
   `feed: true` attachment.
 
+### Slide decks
+
+A post can be projected into a **themed slide deck** — published at `…/<slug>/slides/`, linked from
+the post's Downloads box, and flagged with a slides marker in the listing (alongside the audio and
+attachment markers). It's **derived** from the post: headings become slides (or bullets), prose
+becomes speaker notes, and other blocks render on the slide. With JavaScript it's a keyboard/swipe
+presentation (<kbd>P</kbd> = presenter notes, <kbd>F</kbd> = fullscreen); with JS off the same file
+reads as a long-form document.
+
+Set the site default in `colophon.yaml` (`slides.enabled`), then opt a post in or out:
+
+```yaml
+---
+title: A Short Talk
+slides: true                 # or the block form below
+# slides:
+#   enabled: true
+#   split: [h2]              # slide boundaries (a list). default: every heading.
+---
+```
+
+- **`split`** lists the boundaries: `h1`–`h6`, `hr`, `splitslide`, the block kinds `image`/`table`/
+  `code`/`math`/`diagram`/`audio`/`video`, and `text:<match>` (split before a block whose text begins
+  with the match). The default splits on every heading; narrow it (e.g. `[h2]`) to fold deeper
+  headings into bullets.
+- The post's `slides:` **overwrites** the site default by key (it does not deep-merge): a key you set
+  replaces that value, keys you omit inherit.
+- Three inline markers mirror the `<tts>` family: `<splitslide>` forces a break, `<slide>…</slide>`
+  makes one verbatim slide, and `<noslide>…</noslide>` stays in the post but is kept out of the deck.
+
 ### How file references resolve
 
 Two kinds of reference resolve differently:

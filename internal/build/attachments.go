@@ -27,6 +27,17 @@ type pageAttachment struct {
 	Bytes     int64  // file size, 0 if unknown (external link)
 	Size      string // human-readable size, "" if unknown
 	Feed      bool   // also list as a feed enclosure/attachment
+	View      bool   // open in the browser (no download attr) — e.g. the slide deck page
+}
+
+// slidesAttachment is the synthetic Downloads-box entry for a post's derived slide deck. It opens
+// in the browser (View) rather than downloading, and is never a feed enclosure.
+func slidesAttachment(url string, bytes int) pageAttachment {
+	return pageAttachment{
+		URL: url, Abs: url, Label: "Slides", Desc: "Presentation — opens in your browser",
+		Name: "slides", Type: "text/html", TypeLabel: "DECK",
+		Bytes: int64(bytes), Size: humanSize(int64(bytes)), View: true,
+	}
 }
 
 // resolveAttachments turns a post's frontmatter attachments into copied+routed download links.
@@ -75,6 +86,7 @@ func attachmentVars(as []pageAttachment) []map[string]any {
 		out[i] = map[string]any{
 			"url": a.URL, "label": a.Label, "description": a.Desc, "name": a.Name,
 			"type": a.Type, "type_label": a.TypeLabel, "size": a.Size, "bytes": a.Bytes,
+			"view": a.View,
 		}
 	}
 	return out
@@ -95,7 +107,11 @@ func attachmentsHTML(as []pageAttachment) string {
 	for _, a := range as {
 		b.WriteString(`<li class="dl-item"><a class="dl" href="`)
 		b.WriteString(html.EscapeString(a.URL))
-		b.WriteString(`" download>`)
+		if a.View {
+			b.WriteString(`">`) // a viewable artifact (the deck) opens in the browser, not download
+		} else {
+			b.WriteString(`" download>`)
+		}
 		b.WriteString(clip)
 		b.WriteString(`<span class="dl-main"><span class="dl-label">`)
 		b.WriteString(html.EscapeString(a.Label))

@@ -77,6 +77,11 @@ type Frontmatter struct {
 	SpeechProfile string `yaml:"speech_profile,omitempty"`
 	ImageProfile  string `yaml:"image_profile,omitempty"`
 
+	// Slides opts this post into (or out of) a derived slide deck, overriding the site default.
+	// `slides: true`/`false` toggles it; the `slides: {enabled, split}` map form also sets the
+	// slide boundaries. Each key overrides the site `slides:` value it sets (shallow, by key).
+	Slides *SlidesConfig `yaml:"slides,omitempty"`
+
 	// Attachments are downloadable files published with the post — scripts, archives,
 	// datasets, PDFs, etc. Each entry is either a bare source-relative path (or [[embed]])
 	// or a {path, label, feed} mapping. The build copies/routes them exactly like images.
@@ -173,6 +178,32 @@ func (s *SyndicateChoice) UnmarshalYAML(value *yaml.Node) error {
 		return nil
 	}
 	return value.Decode(&s.Targets)
+}
+
+// SlidesConfig is a post's `slides:` frontmatter — the per-post deck override. Enabled is
+// tri-state (nil → inherit the site default); Split, when set, replaces the site split list.
+type SlidesConfig struct {
+	Enabled *bool    `yaml:"enabled,omitempty"`
+	Split   []string `yaml:"split,omitempty"`
+}
+
+// UnmarshalYAML accepts `slides: true`/`false` (shorthand for enabled) or the {enabled, split} map.
+func (s *SlidesConfig) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		var b bool
+		if err := value.Decode(&b); err != nil {
+			return err
+		}
+		s.Enabled = &b
+		return nil
+	}
+	type rawSlides SlidesConfig
+	var r rawSlides
+	if err := value.Decode(&r); err != nil {
+		return err
+	}
+	*s = SlidesConfig(r)
+	return nil
 }
 
 // UnmarshalYAML accepts either a scalar path or a {path,label,feed} mapping.

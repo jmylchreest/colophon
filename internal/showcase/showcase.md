@@ -389,10 +389,13 @@ picks a provider profile.
 
 ## Slides (decks)
 
-*(Spike — see `slide.md`.)* A post can also be projected into a **themed slide deck**, derived from
-its own structure: headings become slides/bullets, prose becomes speaker notes, and every block
-(code, tables, figures, math, diagrams, callouts) renders on the slide. The `slides:` frontmatter
-configures it — and **overwrites** the default by key (it does not merge):
+A post can also be projected into a **themed slide deck**, published at `…/<slug>/slides/` and linked
+from the Downloads box (this page links its own under *Downloads*). It's derived from the post's
+structure: headings become slides/bullets, prose becomes speaker notes, and every block (code,
+tables, figures, math, diagrams, callouts) renders on the slide. With JavaScript it's an
+arrow-key/swipe presentation (press <kbd>P</kbd> for presenter notes, <kbd>F</kbd> for fullscreen);
+without it the same file degrades to a readable long-form document. The `slides:` frontmatter
+configures it — and **overwrites** the site default by key (it does not merge):
 
 ```yaml
 slides:

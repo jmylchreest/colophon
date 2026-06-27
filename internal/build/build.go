@@ -154,6 +154,11 @@ type page struct {
 	Attachments    []pageAttachment // downloadable files shipped with the post (Downloads block + feeds)
 	HasAttachments bool             // post ships at least one attachment (theme marker + filtering)
 
+	Slides     string // URL of the derived slide deck (…/<slug>/slides/), or "" when disabled
+	SlidesOut  string // output path for the deck HTML (relative to OutDir)
+	SlidesHTML string // the rendered deck document, written at SlidesOut
+	HasSlides  bool   // post has a published slide deck (downloads entry + post-list marker)
+
 	Syndication    []string // URLs this post also lives at (manual POSSE / ledger) — u-syndication links
 	WebmentionsOff bool     // post opted out of the responses display (frontmatter webmentions: false)
 
@@ -261,7 +266,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		gr.retry = retryPolicyFor("IMAGE", opts.Log)
 		ar.retry = retryPolicyFor("AUDIO", opts.Log)
 	}
-	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, router, gr, ar, imageGen, opts.Log)
+	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, site.Slides, router, gr, ar, imageGen, opts.Log)
 	if err != nil {
 		return Result{}, err
 	}
@@ -399,7 +404,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	// post, most-recent-first) are built up front so every page's header can show the strip.
 	list := make([]map[string]any, len(posts))
 	for i, p := range posts {
-		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "audio": p.Audio, "has_audio": p.HasAudio, "has_attachments": p.HasAttachments, "tags": tagLinks(p.Tags, basePath), "series": seriesListName(&posts[i])}
+		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "audio": p.Audio, "has_audio": p.HasAudio, "has_attachments": p.HasAttachments, "has_slides": p.HasSlides, "slides": p.Slides, "tags": tagLinks(p.Tags, basePath), "series": seriesListName(&posts[i])}
 	}
 	// Publish file-path author avatars through the same asset pipeline as markdown embeds,
 	// emitting a depth-independent src (the topbar strip is built once for every page depth).
@@ -474,6 +479,8 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"audio":            p.Audio,
 			"audio_type":       p.AudioType,
 			"has_audio":        p.HasAudio,
+			"slides":           p.Slides,
+			"has_slides":       p.HasSlides,
 			"attachments":      attachmentVars(p.Attachments),
 			"attachments_html": attachmentsHTML(p.Attachments),
 			"has_attachments":  p.HasAttachments,
@@ -555,6 +562,11 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		}
 		if err := write(p.Out, []byte(html)); err != nil {
 			return Result{}, err
+		}
+		if p.HasSlides {
+			if err := write(p.SlidesOut, []byte(p.SlidesHTML)); err != nil {
+				return Result{}, err
+			}
 		}
 	}
 
@@ -776,7 +788,7 @@ type assetRef struct {
 // (includeDrafts false) when it is a draft or its publish_after is still in the future;
 // preview builds include both, marking embargoed ones. Two passes so wikilinks resolve
 // against every other document's URL.
-func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, baseURL string, router *core.Router, gr *genResolver, ar *audioResolver, imageGen bool, log *clog.Logger) ([]page, []assetRef, *time.Time, error) {
+func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, baseURL string, siteSlides core.SlidesConfig, router *core.Router, gr *genResolver, ar *audioResolver, imageGen bool, log *clog.Logger) ([]page, []assetRef, *time.Time, error) {
 	var items []included
 	var next *time.Time
 	links := linkResolver{}
@@ -841,6 +853,15 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 			title = it.slug
 		}
 		html := buf.String()
+		// Derive the slide deck from the rendered body (gen: images/glossary already resolved) while
+		// it still carries the <slide>/<splitslide>/<noslide> markers, then strip those markers so the
+		// published post never shows them as text.
+		slidesEnabled, slidesSplit := resolveSlides(siteSlides, fm.Slides)
+		deckHTML := ""
+		if slidesEnabled {
+			deckHTML = buildDeckHTML(html, title, slidesSplit)
+		}
+		html = StripDeckMarkers(html)
 		desc := fm.Description
 		if desc == "" {
 			desc = excerpt(html, 200)
@@ -896,8 +917,19 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 				}
 			}
 		}
+		if deckHTML != "" {
+			p.SlidesHTML = deckHTML
+			p.SlidesOut = filepath.Join(filepath.FromSlash(it.slug), "slides", "index.html")
+			p.Slides = basePath + it.slug + "/slides/"
+			p.HasSlides = true
+		}
 		p.Attachments = resolveAttachments(context.Background(), it, basePath, baseURL, router)
-		p.HasAttachments = len(p.Attachments) > 0
+		p.HasAttachments = len(p.Attachments) > 0 // real files only → post-list paperclip marker
+		if p.HasSlides {
+			// The deck rides in the Downloads box (so the minimal/no-JS themes surface it too), but
+			// it doesn't count toward HasAttachments — the post-list shows a distinct slides marker.
+			p.Attachments = append(p.Attachments, slidesAttachment(p.Slides, len(deckHTML)))
+		}
 		p.Aliases = normalizeAliases(fm.Aliases)
 		p.Lang = fm.Lang
 		p.GlossaryOff = fm.Glossary != nil && !*fm.Glossary
@@ -952,6 +984,22 @@ func resolvePageType(fm markdown.Frontmatter) string {
 // chronological post (list, feeds, tags). The built-in "page" is standing; "post" and any
 // custom type are listed.
 func standingType(t string) bool { return t == "page" }
+
+// resolveSlides applies a post's `slides:` frontmatter over the site default. The override is
+// shallow/by-key (not a deep-merge): a key the post sets replaces the site value, omitted keys
+// inherit. Returns whether a deck is built and the slide-boundary list (nil → engine default).
+func resolveSlides(site core.SlidesConfig, fm *markdown.SlidesConfig) (bool, []string) {
+	enabled, split := site.Enabled, site.Split
+	if fm != nil {
+		if fm.Enabled != nil {
+			enabled = *fm.Enabled
+		}
+		if fm.Split != nil {
+			split = fm.Split
+		}
+	}
+	return enabled, split
+}
 
 // templateFor picks the per-page-type template: the theme's "<type>.html" if it provides one,
 // else the default single-entry template "page.html".

@@ -3,7 +3,36 @@ package build
 import (
 	"strings"
 	"testing"
+
+	"github.com/jmylchreest/colophon/internal/core"
+	"github.com/jmylchreest/colophon/markdown"
 )
+
+func TestStripDeckMarkers(t *testing.T) {
+	out := StripDeckMarkers(`<p>before <noslide>keep me</noslide> after</p><splitslide><slide>one</slide>`)
+	for _, bad := range []string{"<noslide>", "</noslide>", "<splitslide>", "<slide>", "</slide>"} {
+		if strings.Contains(out, bad) {
+			t.Errorf("marker %q not stripped: %s", bad, out)
+		}
+	}
+	if !strings.Contains(out, "keep me") || !strings.Contains(out, "one") {
+		t.Errorf("wrapped content should survive: %s", out)
+	}
+}
+
+func TestResolveSlides(t *testing.T) {
+	site := core.SlidesConfig{Enabled: true, Split: []string{"h2"}}
+	if en, sp := resolveSlides(site, nil); !en || len(sp) != 1 || sp[0] != "h2" {
+		t.Errorf("nil frontmatter should inherit site: en=%v sp=%v", en, sp)
+	}
+	off := false
+	if en, sp := resolveSlides(site, &markdown.SlidesConfig{Enabled: &off}); en || sp[0] != "h2" {
+		t.Errorf("per-post disable should win but split inherit: en=%v sp=%v", en, sp)
+	}
+	if en, sp := resolveSlides(site, &markdown.SlidesConfig{Split: []string{"h1", "hr"}}); !en || len(sp) != 2 {
+		t.Errorf("split override should replace, enabled inherit: en=%v sp=%v", en, sp)
+	}
+}
 
 func TestBuildDeckSplit(t *testing.T) {
 	md := "intro prose\n\n## A\n\nbody text\n\n## B\n\n- item"

@@ -3,6 +3,18 @@
 User-facing changes by release. Each entry points at the guide where the feature is documented
 in full (or where it should be, when end-user docs catch up).
 
+## Unreleased
+
+- **Slide decks (`slides:`).** A post can be projected into a themed slide deck, published at
+  `…/<slug>/slides/`, linked from the Downloads box, and flagged with a marker in the listing. It's
+  derived from the post (headings → slides/bullets, prose → speaker notes, other blocks on the
+  slide); with JS it's a keyboard/swipe presentation (presenter notes, fullscreen), and with JS off
+  the same file reads as a long-form document. Configure with `slides.enabled`/`slides.split` at the
+  site level and override per post (`slides: true`/`false` or the block form; overwrites by key).
+  Split targets: `h1`–`h6`, `hr`, `splitslide`, `image`/`table`/`code`/`math`/`diagram`/`audio`/
+  `video`, and `text:<match>`. Inline markers `<splitslide>`, `<slide>…</slide>` and `<noslide>…
+  </noslide>` mirror the `<tts>` family. See [Authoring content → Slide decks](content.md#slide-decks).
+
 ## v0.0.31
 
 - **Bluesky: refresh a card via an atomic swap, only on `--resync`.** The earlier "edit in place"

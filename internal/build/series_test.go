@@ -30,7 +30,7 @@ func seriesDoc(slug string, day int, predecessor, series string) sourceDoc {
 func buildWithSeries(t *testing.T, docs []sourceDoc) map[string]*page {
 	t.Helper()
 	now := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC)
-	pages, _, _, err := buildPages(docs, false, now, "/", "", nil, nil, nil, false, nil)
+	pages, _, _, err := buildPages(docs, false, now, "/", "", core.SlidesConfig{}, nil, nil, nil, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

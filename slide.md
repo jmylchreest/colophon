@@ -1,7 +1,10 @@
-# Design (DRAFT, temporary): Themed presentations / decks
+# Design: Themed presentations / decks
 
-Status: design only — no engine code yet. Scope agreed in conversation; this captures it so we
-build against a fixed contract. Move to `docs/design/` when it firms up.
+Status: **implemented** (build integration done; `<slide>`/`<splitslide>`/`<noslide>` markup, the
+`slides.split` targets, bullets, the `slides.enabled` site/post config, publishing at `…/<slug>/slides/`,
+the Downloads-box entry, the post-list marker, and no-JS degradation are all wired). Still rough:
+true-offline bundling (inline images + pre-rendered KaTeX/Mermaid) is deferred; `text:` and `###→bullets`
+are in. The `colophon deck <file>` CLI remains as a one-shot generator. Move to `docs/` when it firms up.
 
 ## Overview
 

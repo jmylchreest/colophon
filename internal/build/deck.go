@@ -80,7 +80,14 @@ func BuildDeck(md, title string, split []string) (string, error) {
 	if err := sharedMarkdown.Convert([]byte(preprocessCallouts(md)), &buf); err != nil {
 		return "", err
 	}
-	body := deckNoSlideRE.ReplaceAllString(buf.String(), "") // <noslide>…</noslide> never reaches the deck
+	return buildDeckHTML(buf.String(), title, split), nil
+}
+
+// buildDeckHTML turns already-rendered post body HTML into the deck document. The build feeds it the
+// post's own rendered HTML (so gen: images, glossary, math etc. are already resolved); the CLI feeds
+// it freshly converted markdown. The body still carries the <slide>/<splitslide>/<noslide> markers.
+func buildDeckHTML(body, title string, split []string) string {
+	body = deckNoSlideRE.ReplaceAllString(body, "") // <noslide>…</noslide> never reaches the deck
 	bound := deckBoundaryRE(split)
 
 	// Walk the body, lifting <slide>…</slide> out as explicit slides and auto-splitting the runs
@@ -103,8 +110,16 @@ func BuildDeck(md, title string, split []string) (string, error) {
 	if len(out) == 0 {
 		out = []string{`<section class="slide"><div class="slide-body"></div></section>`}
 	}
-	return deckDoc(title, out), nil
+	return deckDoc(title, out)
 }
+
+// deckMarkerRE matches the deck-only directive tags. StripDeckMarkers removes them from the published
+// post HTML (and feeds) so they never render as literal text — the inner content of <slide>/<noslide>
+// stays, only the tags and the void <splitslide> go. (The deck builder consumes them before this.)
+var deckMarkerRE = regexp.MustCompile(`(?is)</?slide>|</?noslide>|<splitslide\s*/?>`)
+
+// StripDeckMarkers strips the deck directive tags, leaving wrapped content in place.
+func StripDeckMarkers(s string) string { return deckMarkerRE.ReplaceAllString(s, "") }
 
 // autoSlides splits a run of body HTML at the boundary regex and renders each chunk as a derived slide.
 func autoSlides(body string, bound *regexp.Regexp) []string {
@@ -189,10 +204,15 @@ func deckDoc(title string, slides []string) string {
 // downloaded file works offline. TODO: inline images as data: URIs + pre-render KaTeX/Mermaid for
 // a fully offline copy; restyle from the active theme's tokens instead of these hard-coded ones.
 const deckCSS = `*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Georgia,'Times New Roman',serif;background:#0e0e13;color:#ededf1;overflow:hidden}
-.deck{position:fixed;inset:0}
-.slide{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;padding:7vh 9vw;gap:1.4rem}
-.slide.active{display:flex}
+body{font-family:Georgia,'Times New Roman',serif;background:#0e0e13;color:#ededf1}
+/* No-JS default: slides stack as a readable, scrollable long-form document (notes shown). */
+.deck{max-width:62rem;margin:0 auto}
+.slide{display:flex;flex-direction:column;justify-content:center;gap:1.4rem;padding:7vh 9vw;min-height:100vh;border-bottom:1px solid #20202a}
+/* JS projection mode (html.js): one slide at a time, fixed to the viewport, notes hidden. */
+html.js body{overflow:hidden}
+html.js .deck{max-width:none;margin:0;position:fixed;inset:0}
+html.js .slide{position:absolute;inset:0;display:none;min-height:0;border-bottom:none}
+html.js .slide.active{display:flex}
 .slide-title{font-size:clamp(2rem,6vw,4rem);font-weight:600;line-height:1.08;letter-spacing:-.01em}
 .slide-body{font-size:clamp(1.1rem,2.7vw,1.9rem);line-height:1.5}
 .slide-body h3{font-size:1.3em;margin:.4em 0}
@@ -207,15 +227,18 @@ body{font-family:Georgia,'Times New Roman',serif;background:#0e0e13;color:#ededf
 .slide-body th,.slide-body td{border-bottom:1px solid #2a2a34;padding:.45rem .8rem;text-align:left}
 .slide-body img{max-width:100%;max-height:56vh;border-radius:10px}
 .slide-body blockquote,.slide-body .pullquote{font-style:italic;border-left:3px solid #7c8cff;padding-left:1rem}
-.notes{display:none}
-.deck.presenter .slide.active{justify-content:flex-start}
-.deck.presenter .notes{display:block;margin-top:auto;padding-top:1rem;border-top:1px solid #2a2a34;font:1.05rem/1.5 system-ui,sans-serif;color:#b2b2bc}
+.notes{font:1.05rem/1.6 system-ui,sans-serif;color:#b2b2bc;border-top:1px solid #2a2a34;padding-top:1rem;margin-top:1rem}
+.notes::before{content:"Notes";display:block;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:#6c6c78;margin-bottom:.35rem}
+html.js .notes{display:none}
+html.js .deck.presenter .slide.active{justify-content:flex-start}
+html.js .deck.presenter .notes{display:block;margin-top:auto}
 .deck-counter{position:fixed;bottom:1rem;right:1.3rem;font:600 .8rem system-ui;color:#8c8c98}
 .deck-hint{position:fixed;bottom:1rem;left:1.3rem;font:.72rem system-ui;color:#55555f}
 :focus-visible{outline:2px solid #7c8cff;outline-offset:3px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}`
 
 const deckJS = `(function(){
+document.documentElement.className+=' js'; // switch CSS from the no-JS document to projection mode
 var slides=[].slice.call(document.querySelectorAll('.slide'));if(!slides.length)return;
 var deck=document.querySelector('.deck');
 var counter=document.createElement('div');counter.className='deck-counter';counter.setAttribute('aria-live','polite');document.body.appendChild(counter);
