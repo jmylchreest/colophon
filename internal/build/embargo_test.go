@@ -59,7 +59,7 @@ func TestBuildPagesEmbargo(t *testing.T) {
 	}
 
 	t.Run("production excludes future + draft", func(t *testing.T) {
-		pages, _, next, err := buildPages(docs, false, now, "/", "", core.SlidesConfig{}, nil, nil, nil, false, nil)
+		pages, _, next, err := buildPages(docs, false, now, "/", "", core.SlidesConfig{}, nil, "en", nil, nil, nil, false, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,7 +73,7 @@ func TestBuildPagesEmbargo(t *testing.T) {
 	})
 
 	t.Run("preview includes embargoed, marked", func(t *testing.T) {
-		pages, _, _, err := buildPages(docs, true, now, "/", "", core.SlidesConfig{}, nil, nil, nil, false, nil)
+		pages, _, _, err := buildPages(docs, true, now, "/", "", core.SlidesConfig{}, nil, "en", nil, nil, nil, false, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,7 +89,7 @@ func TestBuildPagesEmbargo(t *testing.T) {
 
 	t.Run("after timestamp auto-includes", func(t *testing.T) {
 		later := time.Date(2026, 6, 15, 13, 30, 0, 0, time.UTC)
-		pages, _, next, err := buildPages(docs, false, later, "/", "", core.SlidesConfig{}, nil, nil, nil, false, nil)
+		pages, _, next, err := buildPages(docs, false, later, "/", "", core.SlidesConfig{}, nil, "en", nil, nil, nil, false, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -24,6 +24,11 @@ sites:
     title: "My Blog"                           # [required]
     base_url: "{env:SITE_URL:-http://localhost:8080}"  # [required] canonical origin
     theme: press                               # [optional] default: the bundled "default" theme
+    lang: en                                   # [optional] site default BCP-47 language (default "en")
+    languages: [en, es]                        # [optional] enable multi-language posts. A file
+                                               #   <slug>.es.md is the Spanish translation of <slug>.md,
+                                               #   published at /es/<slug>/, linked by hreflang + a
+                                               #   theme language selector. The default lang stays at /.
     personas: [default]                        # [optional] writing voices available to the agent
     federation:
       feeds: [rss, atom, json]                 # [optional] default: none; emit at least one

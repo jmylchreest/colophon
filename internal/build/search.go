@@ -139,7 +139,7 @@ func SearchIndex(cfg *config.Config, opts Options) (*search.Index, error) {
 		return nil, err
 	}
 	router := core.NewRouter(resolveRoutesFromConfig(site.Routing, cfg), opts.Publishers)
-	pages, _, _, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, site.Slides, router, nil, nil, false, nil)
+	pages, _, _, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, site.Slides, site.Languages, defaultLang(site.Lang), router, nil, nil, false, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -103,6 +103,7 @@
           <div class="mt">{% if date %}<time class="dt-published" datetime="{{ date }}">{{ date }}</time> · {% endif %}{{ read_time }} min read</div>
         </div>
       </div>
+      {% if has_translations %}<nav class="post-langs" aria-label="Available languages">{% for t in translations %}{% if t.current %}<span class="post-lang is-current" aria-current="true" lang="{{ t.lang }}">{{ t.label }}</span>{% else %}<a class="post-lang" href="{{ t.url }}" hreflang="{{ t.lang }}" lang="{{ t.lang }}">{{ t.label }}</a>{% endif %}{% endfor %}</nav>{% endif %}
     </header>
 
     {% if has_audio %}<figure class="post-audio" data-audioplayer data-src="{{ audio }}" data-label-play="{{ audio_play }}" data-label-pause="{{ audio_pause }}"><figcaption>{{ audio_listen }}</figcaption><audio controls preload="none" src="{{ audio }}"></audio></figure>{% endif %}
@@ -140,6 +141,7 @@
 <footer class="foot"><span>Published with colophon</span></footer>
 
 <script defer src="{{ base_path }}app.js"></script>
+{% if has_translations %}<script>(function(){var nav=document.querySelector('.post-langs');if(!nav)return;var cur=(document.documentElement.lang||'en').toLowerCase().split('-')[0];var alts=[].slice.call(nav.querySelectorAll('a[hreflang]'));var prefs=(navigator.languages||[navigator.language||'']).map(function(l){return (l||'').toLowerCase().split('-')[0];});var pick=null;for(var p=0;p<prefs.length&&!pick;p++){if(prefs[p]===cur)return;for(var j=0;j<alts.length;j++){if(alts[j].getAttribute('hreflang').toLowerCase().split('-')[0]===prefs[p]){pick=alts[j];break;}}}if(!pick)return;var key='press-lang-dismissed';try{if(localStorage.getItem(key))return;}catch(e){}var bar=document.createElement('div');bar.className='lang-suggest';bar.setAttribute('role','region');bar.setAttribute('aria-label','Language suggestion');var msg=document.createElement('span');msg.textContent='Also available in ';var go=document.createElement('a');go.className='lang-suggest-go';go.href=pick.href;go.setAttribute('hreflang',pick.getAttribute('hreflang'));go.setAttribute('lang',pick.getAttribute('hreflang'));go.textContent=pick.textContent;var x=document.createElement('button');x.type='button';x.className='lang-suggest-x';x.setAttribute('aria-label','Dismiss');x.textContent='×';x.addEventListener('click',function(){bar.parentNode&&bar.parentNode.removeChild(bar);try{localStorage.setItem(key,'1');}catch(e){}});bar.appendChild(msg);bar.appendChild(go);bar.appendChild(x);document.body.appendChild(bar);})();</script>{% endif %}
 {% if has_audio %}<script defer src="{{ base_path }}player.js"></script>{% endif %}
 {% if search %}<script type="module" src="{{ base_path }}search-ui.js"></script>{% endif %}
 {% if mentions_enabled or has_syndication %}<link rel="stylesheet" href="{{ base_path }}mentions.css">{% endif %}{% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}

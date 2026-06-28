@@ -274,6 +274,35 @@ slides: true                 # or the block form below
 - Three inline markers mirror the `<tts>` family: `<splitslide>` forces a break, `<slide>…</slide>`
   makes one verbatim slide, and `<noslide>…</noslide>` stays in the post but is kept out of the deck.
 
+### Multiple languages (translations)
+
+Publish the same post in several languages. Enable the languages on the site, then add a translation
+with a `.<lang>.md` filename:
+
+```yaml
+# colophon.yaml
+sites:
+  - lang: en                 # the default language (stays at the normal URL)
+    languages: [en, es, fr]  # the languages you publish in
+```
+
+```
+content/posts/my-post.md       → English   →  /posts/my-post/
+content/posts/my-post.es.md    → Spanish   →  /es/posts/my-post/
+content/posts/my-post.fr.md    → French    →  /fr/posts/my-post/
+```
+
+- Translations are linked by their **base slug** (`my-post`); each can set its own `title`,
+  `description`, hero, even `slug`. The default language stays at the normal path; others are
+  published under a **`/<lang>/`** prefix.
+- Every translation emits **`hreflang` alternates** (plus `x-default`) so search engines serve the
+  right language, and the **press** theme shows a **language selector** in the post header.
+- A small, dismissible banner offers a reader their preferred language (from the browser) when the
+  post is available in it — it never force-redirects.
+- Each translation is a normal post, so it gets its own spoken reading, feeds, glossary and deck.
+- A `.<lang>` is only treated as a language when `<lang>` is in `languages` — a file like
+  `my.notes.md` is unaffected.
+
 ### How file references resolve
 
 Two kinds of reference resolve differently:

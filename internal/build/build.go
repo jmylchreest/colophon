@@ -165,6 +165,9 @@ type page struct {
 	Syndication    []string // URLs this post also lives at (manual POSSE / ledger) — u-syndication links
 	WebmentionsOff bool     // post opted out of the responses display (frontmatter webmentions: false)
 
+	TransKey     string        // language-neutral slug grouping a post's translations (empty = monolingual)
+	Translations []translation // the languages this post is available in (≥2 → selector + hreflang)
+
 	Tags       []string
 	Categories []string
 	Author     string        // author id from frontmatter (the byline)
@@ -270,7 +273,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 		gr.retry = retryPolicyFor("IMAGE", opts.Log)
 		ar.retry = retryPolicyFor("AUDIO", opts.Log)
 	}
-	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, site.Slides, router, gr, ar, imageGen, opts.Log)
+	pages, assets, nextEmbargo, err := buildPages(docs, opts.IncludeDrafts, now, basePath, site.BaseURL, site.Slides, site.Languages, defaultLang(site.Lang), router, gr, ar, imageGen, opts.Log)
 	if err != nil {
 		return Result{}, err
 	}
@@ -505,6 +508,8 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 			"syndication":      pageSyndication(p, synLedger),
 			"syndication_html": syndicationHTML(pageSyndication(p, synLedger)),
 			"has_syndication":  len(pageSyndication(p, synLedger)) > 0,
+			"translations":     transVars(p.Translations),
+			"has_translations": len(p.Translations) > 1,
 			"tags":             tagLinks(p.Tags, basePath),
 			"category":         pageCategory(p),
 			"read_time":        readingTime(p.HTML),
@@ -784,7 +789,9 @@ func resolveSources(cfg *config.Config) ([]core.Source, error) {
 type included struct {
 	c         core.Content
 	src       core.Source
-	slug      string
+	slug      string // routed slug (lang-prefixed for non-default languages)
+	lang      string // resolved BCP-47 language
+	transKey  string // language-neutral slug, for grouping translations
 	embargoed bool
 }
 
@@ -801,7 +808,7 @@ type assetRef struct {
 // (includeDrafts false) when it is a draft or its publish_after is still in the future;
 // preview builds include both, marking embargoed ones. Two passes so wikilinks resolve
 // against every other document's URL.
-func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, baseURL string, siteSlides core.SlidesConfig, router *core.Router, gr *genResolver, ar *audioResolver, imageGen bool, log *clog.Logger) ([]page, []assetRef, *time.Time, error) {
+func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, baseURL string, siteSlides core.SlidesConfig, langs []string, defLang string, router *core.Router, gr *genResolver, ar *audioResolver, imageGen bool, log *clog.Logger) ([]page, []assetRef, *time.Time, error) {
 	var items []included
 	var next *time.Time
 	links := linkResolver{}
@@ -814,9 +821,20 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		if !includeDrafts && (fm.Draft || embargoed) {
 			continue
 		}
-		slug := slugFor(c.SourcePath, fm.Slug)
+		// A `<slug>.<lang>.md` filename (lang ∈ site Languages) is a translation: strip the infix to
+		// the language-neutral base slug, set the language, and route non-default languages under
+		// `/<lang>/…`. An explicit frontmatter `lang:` still applies when there's no filename infix.
+		deLanged, lang := splitLangFromPath(c.SourcePath, langs, defLang)
+		if strings.EqualFold(lang, defLang) && fm.Lang != "" {
+			lang = fm.Lang
+		}
+		slug := slugFor(deLanged, fm.Slug)
+		transKey := slug
+		if !strings.EqualFold(lang, defLang) {
+			slug = path.Join(normalizeSlug(lang), slug)
+		}
 		links.add(c.SourcePath, slug, basePath)
-		items = append(items, included{c: c, src: sd.src, slug: slug, embargoed: embargoed})
+		items = append(items, included{c: c, src: sd.src, slug: slug, lang: lang, transKey: transKey, embargoed: embargoed})
 	}
 
 	// Collect referenced assets, co-located beside their page so the relative ref still
@@ -946,7 +964,8 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		p.Attachments = resolveAttachments(context.Background(), it, basePath, baseURL, router)
 		p.HasAttachments = len(p.Attachments) > 0 // real files only → post-list paperclip marker
 		p.Aliases = normalizeAliases(fm.Aliases)
-		p.Lang = fm.Lang
+		p.Lang = it.lang
+		p.TransKey = it.transKey
 		p.GlossaryOff = fm.Glossary != nil && !*fm.Glossary
 		p.HeroAlt, p.ImageAlt = fm.HeroAlt, fm.ImageAlt
 		p.HeroFit, p.HeroPos = fm.HeroFit, fm.HeroPosition
@@ -967,6 +986,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 	}
 
 	sort.SliceStable(pages, func(i, j int) bool { return pages[i].Date > pages[j].Date })
+	groupTranslations(pages, defLang, basePath, baseURL)
 	return pages, assets, next, nil
 }
 

@@ -5,6 +5,13 @@ in full (or where it should be, when end-user docs catch up).
 
 ## Unreleased
 
+- **Multi-language posts (translations).** Set `languages:` on the site and add a `<slug>.<lang>.md`
+  file (e.g. `my-post.es.md`) to publish a translation at `/<lang>/<slug>/`, linked to the original by
+  its base slug. Translations emit `hreflang` alternates (with `x-default`); the **press** theme shows
+  a **language selector** in the post header and a dismissible "available in your language" banner
+  driven by the browser's preference (no forced redirect). Each translation is a normal post with its
+  own reading/feeds/glossary/deck. See [Authoring content → Multiple languages](content.md#multiple-languages-translations).
+
 - **Slide decks: styled by the site theme + a fuller reader.** A published deck now links the active
   theme's stylesheet and renders content in the theme's `.prose` class, so quotes, callouts, code,
   tables and Mermaid look like the site and theme authors can style `.slide*` themselves. The reader

@@ -66,6 +66,14 @@ func seoHead(site core.Site, p page, author core.Author) string {
 		}
 	}
 	b.WriteString(`<link rel="canonical" href="` + html.EscapeString(canonical) + "\">\n")
+	// hreflang alternates: tell search engines about this post's other-language versions, plus an
+	// x-default pointing at the site's default language.
+	for _, t := range p.Translations {
+		b.WriteString(`<link rel="alternate" hreflang="` + html.EscapeString(t.Lang) + `" href="` + html.EscapeString(t.Abs) + "\">\n")
+		if t.Default {
+			b.WriteString(`<link rel="alternate" hreflang="x-default" href="` + html.EscapeString(t.Abs) + "\">\n")
+		}
+	}
 	meta("name", "description", desc)
 	if noindex {
 		b.WriteString("<meta name=\"robots\" content=\"noindex,nofollow\">\n")
