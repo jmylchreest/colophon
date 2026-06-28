@@ -551,6 +551,11 @@ html.js .deck.presenter .notes{display:block;margin-top:auto;padding-top:1rem;bo
 .deck-nav:hover,.deck-nav:focus-visible{opacity:.92}
 .deck-nav-prev{left:.7rem}
 .deck-nav-next{right:.7rem}
+/* Presenter-notes + fullscreen toggles — on-screen so they work on touch / without a keyboard. */
+.deck-tools{position:fixed;top:.8rem;right:.9rem;display:flex;gap:.45rem;z-index:11}
+.deck-tool{width:44px;height:44px;border:0;border-radius:10px;background:color-mix(in srgb,var(--text,#ededf1) 12%,transparent);color:var(--text,#ededf1);font-size:1.3rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:.4;transition:opacity .2s}
+.deck-tool:hover,.deck-tool:focus-visible{opacity:.95}
+.deck-tool[aria-pressed=true]{opacity:.95;background:var(--accent,#7c8cff);color:var(--on-accent,#0b0b10)}
 @media(max-width:640px){.deck-nav{opacity:.5}.deck-hint{display:none}}
 :focus-visible{outline:2px solid var(--accent,#7c8cff);outline-offset:3px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}`
@@ -573,9 +578,15 @@ else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);}
 else if(e.key==='Home'){show(0);}else if(e.key==='End'){show(slides.length-1);}
 else if(e.key==='Enter'){var m=slides[i].querySelector('audio,video');if(m){if(m.paused){m.play();}else{m.pause();}e.preventDefault();}}
 else if(e.key==='Escape'){window.close();if(post){location.href=post;}}
-else if(e.key==='p'||e.key==='P'){deck.classList.toggle('presenter');}
-else if(e.key==='f'||e.key==='F'){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}else{document.exitFullscreen();}}
+else if(e.key==='p'||e.key==='P'){togglePresenter();}
+else if(e.key==='f'||e.key==='F'){toggleFull();}
 });
+function togglePresenter(){var on=deck.classList.toggle('presenter');if(pBtn)pBtn.setAttribute('aria-pressed',on);fit(slides[i]);}
+function toggleFull(){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}else{document.exitFullscreen();}}
+function tool(label,glyph,fn){var b=document.createElement('button');b.type='button';b.className='deck-tool';b.setAttribute('aria-label',label);b.textContent=glyph;b.addEventListener('click',fn);return b;}
+var pBtn=tool('Toggle presenter notes','≡',togglePresenter);pBtn.setAttribute('aria-pressed','false');
+var fBtn=tool('Toggle fullscreen','⛶',toggleFull);
+var tools=document.createElement('div');tools.className='deck-tools';tools.appendChild(pBtn);tools.appendChild(fBtn);document.body.appendChild(tools);
 var prev=document.createElement('button');prev.className='deck-nav deck-nav-prev';prev.setAttribute('aria-label','Previous slide');prev.textContent='‹';prev.addEventListener('click',function(){show(i-1);});document.body.appendChild(prev);
 var next=document.createElement('button');next.className='deck-nav deck-nav-next';next.setAttribute('aria-label','Next slide');next.textContent='›';next.addEventListener('click',function(){show(i+1);});document.body.appendChild(next);
 var tx=0,ty=0,tskip=false;
