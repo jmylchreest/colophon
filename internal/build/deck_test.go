@@ -35,9 +35,9 @@ func TestResolveSlides(t *testing.T) {
 }
 
 func TestBuildDeckSplit(t *testing.T) {
-	// A (prose only → title slide + notes) and B (a list → on the slide). The title-less intro
-	// prose isn't a slide on its own.
-	md := "intro prose\n\n## A\n\nbody text\n\n## B\n\n- item"
+	// A has a list (a visual cue) so its prose narrates from the notes; B is pure prose, so the
+	// prose is the slide (not a blank title slide with the text hidden in notes).
+	md := "## A\n\nnarration for A\n\n- item one\n- item two\n\n## B\n\nB is all prose"
 	out, err := BuildDeck(md, "Talk", []string{"h2"})
 	if err != nil {
 		t.Fatal(err)
@@ -48,15 +48,16 @@ func TestBuildDeckSplit(t *testing.T) {
 	if !strings.Contains(out, `<section class="slide slide-cover">`) || !strings.Contains(out, `<h1 class="cover-title">Talk</h1>`) {
 		t.Errorf("deck should lead with a cover slide carrying the title: %s", out)
 	}
-	if !strings.Contains(out, `<h2 class="slide-title">A</h2>`) {
+	if !strings.Contains(out, `<h2 class="slide-title">A`) {
 		t.Errorf("heading should be the slide title: %s", out)
 	}
-	// Prose goes to the notes, not the slide — and is not duplicated.
-	if !strings.Contains(out, `<aside class="notes prose">`) || !strings.Contains(out, "body text") {
-		t.Errorf("prose should appear in the presenter notes: %s", out)
+	// A's prose (it has a list) narrates from the presenter notes.
+	if !strings.Contains(out, `<aside class="notes prose">`) || !strings.Contains(out, "narration for A") {
+		t.Errorf("a visual section's prose should be in the notes: %s", out)
 	}
-	if strings.Contains(out, `<div class="slide-body"><p>body text</p>`) {
-		t.Error("prose must not also be on the slide body")
+	// B is pure prose → it renders ON the slide, never a blank slide.
+	if !strings.Contains(out, "B is all prose") {
+		t.Errorf("a prose-only section should render on the slide: %s", out)
 	}
 	if !strings.Contains(out, "<style>") || !strings.Contains(out, "<script>") {
 		t.Error("deck must inline its CSS and JS")
@@ -64,11 +65,11 @@ func TestBuildDeckSplit(t *testing.T) {
 }
 
 func TestBuildDeckSplitTargets(t *testing.T) {
-	// hr boundary; the section before it is one title slide (its prose is notes), "second" is
-	// title-less prose so it isn't its own slide.
+	// hr boundary; a stray h1 is NOT a boundary (it titles the first section). The first section
+	// (Big + its prose) and the title-less "second" prose each become a slide.
 	out, _ := BuildDeck("# Big\n\nintro\n\n---\n\nsecond", "T", []string{"hr"})
-	if n := strings.Count(out, `<section class="slide">`); n != 1 {
-		t.Errorf("hr split: want 1 content slide, got %d", n)
+	if n := strings.Count(out, `<section class="slide">`); n != 2 {
+		t.Errorf("hr split: want 2 content slides, got %d", n)
 	}
 	// Default split (empty list) breaks on every heading; each gets a title slide.
 	out2, _ := BuildDeck("# A\n\nx\n\n## B\n\ny\n\n### C\n\nz", "T", nil)

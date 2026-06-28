@@ -225,7 +225,17 @@ func paginateChunk(chunk string, meta deckMeta) []string {
 		return []string{slideHTML(title, false, "", "")}
 	}
 
-	packed := packBlocks(blocks, meta)
+	// If the section has any visual block (list, code, image, table, quote, callout, math, diagram),
+	// the prose narrates from the notes; if it's pure prose, the prose IS the slide (don't leave it
+	// blank with the text hidden in notes).
+	hasVisual := false
+	for _, b := range blocks {
+		if b.kind != "other" {
+			hasVisual = true
+			break
+		}
+	}
+	packed := packBlocks(blocks, meta, hasVisual)
 	out := make([]string, 0, len(packed))
 	for i, page := range packed {
 		var body strings.Builder
@@ -364,11 +374,12 @@ type deckPage struct {
 	notes string
 }
 
-// packBlocks greedily fills slides to deckBudget with the non-prose blocks (media, code, tables,
-// callouts, bullets…), spilling to a new slide when the next won't fit. Prose paragraphs go to the
-// slide's presenter notes instead — never both. A block heavier than the budget gets its own slide;
-// an oversized code block past the hard cap is truncated with a link back to the post.
-func packBlocks(blocks []deckBlock, meta deckMeta) []deckPage {
+// packBlocks greedily fills slides to deckBudget, spilling to a new slide when the next block won't
+// fit. When proseToNotes is set the prose paragraphs go to the slide's presenter notes instead of the
+// body (the visual blocks are the slide) — never both; otherwise prose is packed onto the slide like
+// any block (so a prose-only section isn't a blank slide). An oversized code block past the hard cap
+// is truncated with a link back to the post.
+func packBlocks(blocks []deckBlock, meta deckMeta, proseToNotes bool) []deckPage {
 	var pages []deckPage
 	cur := deckPage{}
 	w := 0
@@ -379,7 +390,7 @@ func packBlocks(blocks []deckBlock, meta deckMeta) []deckPage {
 		}
 	}
 	for _, b := range blocks {
-		if b.kind == "other" { // prose → presenter notes, off the slide and out of the budget
+		if proseToNotes && b.kind == "other" { // prose → presenter notes, off the slide and out of the budget
 			cur.notes += b.html
 			continue
 		}
@@ -521,7 +532,7 @@ html.js body{overflow:hidden}
 html.js .deck{max-width:none;margin:0;position:fixed;inset:0}
 html.js .slide{position:absolute;inset:0;display:none;min-height:0;border-bottom:none}
 html.js .slide.active{display:flex}
-.slide-title{font-family:var(--serif,Georgia,serif);font-size:clamp(1.7rem,5vw,3.3rem);font-weight:600;line-height:1.1;letter-spacing:-.01em;flex:none}
+.slide-title{font-family:var(--serif,Georgia,serif);font-size:clamp(1.7rem,5vw,3.3rem);font-weight:600;line-height:1.1;letter-spacing:-.01em;flex:none;margin-bottom:.7rem}
 .slide-title .cont{font-size:.45em;font-weight:400;color:var(--muted,#8c8c98);letter-spacing:0}
 .slide-body{font-size:clamp(1rem,2.5vw,1.6rem);transform-origin:top center;width:100%;padding:0!important}
 .slide-body>*,.notes>*{animation:none!important}
