@@ -89,17 +89,31 @@ func TestBuildDeckBullets(t *testing.T) {
 	}
 }
 
-func TestBuildDeckExplicitAndSplitslide(t *testing.T) {
-	// <splitslide> forces a break between the two lists; <slide>…</slide> is one verbatim slide
-	// (its prose stays on the slide, not pushed to notes).
-	out, _ := BuildDeck("- intro\n\n<splitslide>\n\n- second\n\n<slide>\n\nhand-made **slide**\n\n</slide>", "T", []string{"splitslide"})
-	if n := strings.Count(out, `<section class="slide">`); n != 3 {
-		t.Fatalf("want 3 slides (intro list / second list / explicit), got %d:\n%s", n, out)
+func TestBuildDeckSplitslide(t *testing.T) {
+	// <splitslide> forces a break between the two lists.
+	out, _ := BuildDeck("- one\n\n<splitslide>\n\n- two", "T", []string{"splitslide"})
+	if n := strings.Count(out, `<section class="slide">`); n != 2 {
+		t.Fatalf("splitslide: want 2 slides, got %d:\n%s", n, out)
 	}
-	if !strings.Contains(out, "hand-made <strong>slide</strong>") {
-		t.Error("explicit slide content missing")
+}
+
+func TestBuildDeckExplicitSlide(t *testing.T) {
+	// A section wrapped with <slide>…</slide>: the author controls the slide, so its content is the
+	// slide and the section's prose narrates from the notes — never auto-added to the slide.
+	md := "## Topic\n\nThis prose explains the point.\n\n<slide>\n\nThe **key** point\n\n</slide>"
+	out, _ := BuildDeck(md, "T", []string{"h2"})
+	if n := strings.Count(out, `<section class="slide">`); n != 1 {
+		t.Fatalf("want 1 content slide, got %d:\n%s", n, out)
 	}
-	if strings.Contains(out, `<aside class="notes">hand-made`) {
-		t.Error("explicit-slide prose must stay ON the slide, not go to notes")
+	if !strings.Contains(out, "The <strong>key</strong> point") {
+		t.Error("explicit <slide> content should be on the slide")
+	}
+	start := strings.Index(out, `<div class="slide-body prose">`)
+	slideBody := out[start : start+strings.Index(out[start:], `</div>`)]
+	if strings.Contains(slideBody, "This prose explains") {
+		t.Errorf("section prose must NOT be on the slide when wrapped by <slide>: %s", slideBody)
+	}
+	if !strings.Contains(out, `<aside class="notes prose">`) || !strings.Contains(out, "This prose explains the point") {
+		t.Errorf("section prose should go to the presenter notes: %s", out)
 	}
 }

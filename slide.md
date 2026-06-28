@@ -147,9 +147,10 @@ only the deck builder acts on them. The symmetry is exact:
 | — | `<splitslide>` | a structural slide break (no speech equivalent) |
 
 - `<noslide>…</noslide>` — stripped from the deck only; stays in the post (the `<notts>` mirror).
-- `<slide>…</slide>` — everything inside becomes **one verbatim slide**: an authored escape hatch
-  from the derived split. A leading heading is its title; all other content (prose included) stays
-  **on** the slide and is *not* pulled into notes.
+- `<slide>…</slide>` — the **author controls the slide**: its contents become the slide (verbatim,
+  prose included), and the rest of that **section's prose narrates from the notes** rather than being
+  auto-added to the slide. Use it to keep a prose-heavy section's slide clean — wrap the bit you want
+  shown, and the surrounding narration drops to the notes.
 - `<splitslide>` — force a slide break anywhere (a void marker; also the engine's internal break).
 
 Note (for build integration): in the **published post** these deck-directive tags should be stripped

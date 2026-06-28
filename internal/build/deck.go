@@ -116,14 +116,7 @@ func buildDeckHTML(body string, split []string, meta deckMeta) string {
 
 	slides := make([]string, 0, 16)
 	slides = append(slides, coverSlide(meta))
-	// Walk the body, lifting <slide>…</slide> out as verbatim slides and paginating the runs between.
-	last := 0
-	for _, m := range deckSlideWrapRE.FindAllStringSubmatchIndex(body, -1) {
-		slides = append(slides, sectionSlides(body[last:m[0]], bound, meta)...)
-		slides = append(slides, explicitSlide(body[m[2]:m[3]]))
-		last = m[1]
-	}
-	slides = append(slides, sectionSlides(body[last:], bound, meta)...)
+	slides = append(slides, sectionSlides(body, bound, meta)...)
 
 	out := slides[:0]
 	for _, s := range slides {
@@ -167,18 +160,33 @@ func coverSlide(meta deckMeta) string {
 	return b.String()
 }
 
-// explicitSlide renders a <slide>…</slide> block verbatim as one slide: a leading heading is its
-// title, everything else stays on the slide (the fit safety-net scales it if it overflows).
-func explicitSlide(inner string) string {
-	inner = strings.TrimSpace(inner)
-	if inner == "" {
-		return ""
+// explicitSectionSlide renders a section that contains one or more <slide>…</slide> blocks: the
+// author has chosen the slide, so the <slide> contents (plus any other non-prose blocks) are the
+// slide, and the section's PROSE narrates from the presenter notes — it's never auto-added to the
+// slide. One slide for the section (the fit safety-net scales it if it overflows).
+func explicitSectionSlide(title, chunk string) []string {
+	var slide, notes strings.Builder
+	add := func(frag string) { // content outside a <slide>: prose → notes, other blocks → slide
+		for _, b := range splitBlocks(frag) {
+			if b.kind == "other" {
+				notes.WriteString(b.html)
+			} else {
+				slide.WriteString(b.html)
+			}
+		}
 	}
-	title := ""
-	if m := deckTitleRE.FindStringSubmatch(inner); m != nil {
-		title, inner = m[1], strings.TrimSpace(deckTitleRE.ReplaceAllString(inner, ""))
+	last := 0
+	for _, m := range deckSlideWrapRE.FindAllStringSubmatchIndex(chunk, -1) {
+		add(chunk[last:m[0]])
+		slide.WriteString(strings.TrimSpace(chunk[m[2]:m[3]])) // the <slide> inner, verbatim
+		last = m[1]
 	}
-	return slideHTML(title, false, inner, "")
+	add(chunk[last:])
+	body := strings.TrimSpace(slide.String())
+	if title == "" && body == "" {
+		return nil
+	}
+	return []string{slideHTML(title, false, body, strings.TrimSpace(notes.String()))}
 }
 
 // sectionSlides splits a run of body HTML at the boundaries and paginates each chunk.
@@ -203,6 +211,12 @@ func paginateChunk(chunk string, meta deckMeta) []string {
 	if m := deckTitleRE.FindStringSubmatch(chunk); m != nil {
 		title = strings.TrimSpace(m[1])
 		chunk = deckTitleRE.ReplaceAllString(chunk, "")
+	}
+
+	// An explicit <slide>…</slide> in this section means the author controls the slide: its content
+	// is the slide and the section's prose goes to the notes, never auto-added to the slide.
+	if deckSlideWrapRE.MatchString(chunk) {
+		return explicitSectionSlide(title, chunk)
 	}
 
 	var blocks []deckBlock
