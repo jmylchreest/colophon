@@ -12,8 +12,10 @@ in full (or where it should be, when end-user docs catch up).
   **fullscreen** toggles (so they work without a keyboard); a **light/dark** toggle (reusing the
   theme's `data-theme`); a large **mobile presenter card** (the notes fill the phone as a teleprompter
   while the slide shows on the big screen); and an **autocue** that auto-scrolls each slide's notes and
-  auto-advances at a reading pace (stop with Back, restart from the button). Mermaid renders lazily per
-  slide (it can't measure a hidden one), and a `<base href>` fixes co-located asset URLs in the deck.
+  auto-advances at a reading pace — adjustable live with `+`/`−` (or the on-screen slower/faster
+  buttons), shown in the counter and remembered. Stop with Back, restart from the button. Mermaid
+  renders lazily per slide (it can't measure a hidden one), and a `<base href>` fixes co-located
+  asset URLs in the deck.
 
 ## v0.0.32
 
