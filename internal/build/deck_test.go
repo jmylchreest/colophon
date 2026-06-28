@@ -52,7 +52,7 @@ func TestBuildDeckSplit(t *testing.T) {
 		t.Errorf("heading should be the slide title: %s", out)
 	}
 	// Prose goes to the notes, not the slide — and is not duplicated.
-	if !strings.Contains(out, `<aside class="notes">`) || !strings.Contains(out, "body text") {
+	if !strings.Contains(out, `<aside class="notes prose">`) || !strings.Contains(out, "body text") {
 		t.Errorf("prose should appear in the presenter notes: %s", out)
 	}
 	if strings.Contains(out, `<div class="slide-body"><p>body text</p>`) {

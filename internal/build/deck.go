@@ -252,9 +252,11 @@ func slideHTML(title string, cont bool, body, notes string) string {
 		}
 		b.WriteString(`</h2>`)
 	}
-	b.WriteString(`<div class="slide-body">` + body + `</div>`)
+	// .prose is the theme's content class — the active theme styles blocks (quotes, callouts, code,
+	// tables, mermaid) so a deck looks like the site and theme authors can style it.
+	b.WriteString(`<div class="slide-body prose">` + body + `</div>`)
 	if strings.TrimSpace(notes) != "" {
-		b.WriteString(`<aside class="notes">` + notes + `</aside>`)
+		b.WriteString(`<aside class="notes prose">` + notes + `</aside>`)
 	}
 	b.WriteString(`</section>`)
 	return b.String()
@@ -462,9 +464,13 @@ func nodeText(n *xhtml.Node) string {
 
 func deckDoc(meta deckMeta, slides []string, body string) string {
 	hHead, hScripts := deckHydration(meta.BasePath, body)
+	// Link the active theme's stylesheet first (it styles the .prose content and supplies the
+	// tokens the deck chrome reads), then the deck's own structural CSS overrides layout.
 	return `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
 		`<meta name="viewport" content="width=device-width,initial-scale=1">` +
-		`<title>` + html.EscapeString(meta.Title) + `</title><style>` + deckCSS + `</style>` + hHead + `</head>` +
+		`<title>` + html.EscapeString(meta.Title) + `</title>` +
+		`<link rel="stylesheet" href="` + meta.BasePath + `style.css">` +
+		`<style>` + deckCSS + `</style>` + hHead + `</head>` +
 		`<body data-post="` + html.EscapeString(meta.PostURL) + `"><main class="deck" aria-label="Slide deck">` +
 		strings.Join(slides, "\n") + `</main><script>` + deckJS + `</script>` + hScripts + `</body></html>`
 }
@@ -482,64 +488,59 @@ func deckHydration(base, body string) (head, scripts string) {
 		s.WriteString(`<script defer src="` + base + `vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>`)
 	}
 	if strings.Contains(body, `class="mermaid`) {
-		s.WriteString(`<script defer src="` + base + `vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:'dark'})"></script>`)
+		// Load the lib only — the reader renders each diagram when its slide first becomes visible
+		// (Mermaid can't measure a display:none container, so startOnLoad would emit empty SVGs).
+		s.WriteString(`<script defer src="` + base + `vendor/mermaid/mermaid.min.js"></script>`)
 	}
 	return h.String(), s.String()
 }
 
-// deckCSS / deckJS — inline reader (nav, presenter view, fullscreen, fit-to-viewport). Inlined so the
-// downloaded file works offline (KaTeX/Mermaid/highlight still load from /vendor; full offline is a
-// later step). TODO: restyle from the active theme's tokens instead of these hard-coded ones.
-const deckCSS = `*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Georgia,'Times New Roman',serif;background:#0e0e13;color:#ededf1}
-/* No-JS default: slides stack as a readable, scrollable long-form document. */
+// deckCSS / deckJS — the inline reader: STRUCTURAL slide layout + nav/presenter/fullscreen/fit, reading
+// the active theme's tokens. The theme's own stylesheet (linked in deckDoc) styles the .prose content
+// and may style the .slide* structure too. (KaTeX/Mermaid/highlight load from /vendor; full offline is
+// a later step.)
+// deckCSS is STRUCTURAL only — slide layout, projection, cover, nav chrome and the fit transform.
+// Colours/typography read the active theme's tokens (var(--bg)/--text/--accent/…) with fallbacks, and
+// the slide content (in .prose) is styled by the theme's stylesheet, so a deck matches the site and
+// theme authors can style .slide* themselves.
+const deckCSS = `*{box-sizing:border-box}
+body{margin:0}
+/* No-JS default: slides stack as a readable, scrollable document; the theme styles the content. */
 .deck{max-width:62rem;margin:0 auto}
-.slide{display:flex;flex-direction:column;justify-content:flex-start;gap:1.2rem;padding:7vh 8vw;min-height:100vh;border-bottom:1px solid #20202a}
+.slide{display:flex;flex-direction:column;justify-content:flex-start;gap:1rem;padding:6vh 7vw;min-height:100vh;border-bottom:1px solid var(--border,#2a2a34)}
 .slide-cover{justify-content:center}
 /* JS projection mode (html.js): one slide at a time, fixed to the viewport. */
 html.js body{overflow:hidden}
 html.js .deck{max-width:none;margin:0;position:fixed;inset:0}
 html.js .slide{position:absolute;inset:0;display:none;min-height:0;border-bottom:none}
 html.js .slide.active{display:flex}
-.slide-title{font-size:clamp(1.7rem,5vw,3.3rem);font-weight:600;line-height:1.1;letter-spacing:-.01em;flex:none}
-.slide-title .cont{font-size:.45em;font-weight:400;color:#8c8c98;letter-spacing:0}
-.slide-body{font-size:clamp(1rem,2.5vw,1.7rem);line-height:1.5;transform-origin:top center;width:100%}
-.slide-body>*+*{margin-top:.9rem}
-.slide-body h3,.slide-body h4{font-size:1.2em;margin:.3em 0}
-.slide-body ul,.slide-body ol{margin-left:1.4rem}
-.slide-body li{margin:.35rem 0}
-.slide-bullets{list-style:none;margin-left:0!important;display:flex;flex-direction:column;gap:.7rem}
+.slide-title{font-family:var(--serif,Georgia,serif);font-size:clamp(1.7rem,5vw,3.3rem);font-weight:600;line-height:1.1;letter-spacing:-.01em;flex:none}
+.slide-title .cont{font-size:.45em;font-weight:400;color:var(--muted,#8c8c98);letter-spacing:0}
+.slide-body{font-size:clamp(1rem,2.5vw,1.6rem);transform-origin:top center;width:100%;padding:0!important}
+.slide-body>*,.notes>*{animation:none!important}
+.slide-body>*:first-child{margin-top:0}
+.slide-body pre{font-size:.62em!important}
+.slide-body img,.slide-body video{max-height:60vh;margin:.5rem auto!important}
+.slide-body pre.mermaid svg{max-height:60vh}
+.slide-body audio{width:100%}
+.slide-bullets{list-style:none!important;margin-left:0!important;padding-left:0!important;display:flex;flex-direction:column;gap:.7rem}
 .slide-bullets>li{margin:0;padding-left:1.6rem;position:relative}
 .slide-bullets>li::before{content:"";position:absolute;left:0;top:.55em;width:.5rem;height:.5rem;background:currentColor;opacity:.55;border-radius:2px}
-.slide-body pre{background:#14141a;border:1px solid #2a2a34;border-radius:10px;padding:.9rem 1.1rem;overflow:auto;font:.62em/1.5 ui-monospace,monospace}
-.slide-body :not(pre)>code{font-family:ui-monospace,monospace;font-size:.88em;background:#1b1b22;padding:.05em .35em;border-radius:4px}
-.slide-body table{border-collapse:collapse;font-size:.9em}
-.slide-body th,.slide-body td{border-bottom:1px solid #2a2a34;padding:.4rem .7rem;text-align:left}
-.slide-body img,.slide-body video{max-width:100%;max-height:64vh;border-radius:10px;display:block;margin-inline:auto}
-.slide-body audio{width:100%}
-.slide-body figure{margin:0}
-.slide-body figcaption{font-size:.7em;color:#9a9aa6;margin-top:.4rem;text-align:center}
-.slide-body blockquote{font-style:italic;border-left:3px solid #7c8cff;padding-left:1rem}
-.slide-body .pullquote{border-left:3px solid #7c8cff;padding-left:1.1rem;font-style:italic}
-.slide-body .pullquote figcaption{font-style:normal;text-align:left;color:#b9aaff;margin-top:.5rem}
-.slide-body .callout{border:1px solid #2a2a34;border-left:3px solid #7c8cff;border-radius:8px;padding:.8rem 1.1rem;background:#15151c}
-.slide-body .callout-title,.slide-body .callout-label{font-weight:600;margin-bottom:.3rem}
-.slide-body .math-display{overflow-x:auto}
-.deck-more{font:.72em system-ui,sans-serif;color:#9a9aa6;margin-top:.6rem}
-.deck-more a{color:#b9aaff}
-.notes{display:none}
-.notes::before{content:"Notes";display:block;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:#6c6c78;margin-bottom:.3rem}
-html.js .deck.presenter .slide.active{justify-content:flex-start}
-html.js .deck.presenter .notes{display:block;margin-top:auto;padding-top:1rem;border-top:1px solid #2a2a34;font:1rem/1.55 system-ui,sans-serif;color:#b2b2bc}
+.deck-more{font:.72em var(--sans,system-ui);color:var(--muted,#9a9aa6);margin-top:.6rem}
+.deck-more a{color:var(--link,#b9aaff)}
 .cover-inner{max-width:46rem}
-.cover-title{font-size:clamp(2.2rem,6.5vw,4.6rem);font-weight:700;line-height:1.05;letter-spacing:-.02em}
-.cover-desc{font-size:clamp(1.05rem,2.5vw,1.6rem);color:#b8b8c4;margin-top:1.2rem;line-height:1.5}
+.cover-title{font-family:var(--serif,Georgia,serif);font-size:clamp(2.2rem,6.5vw,4.6rem);font-weight:700;line-height:1.05;letter-spacing:-.02em}
+.cover-desc{font-size:clamp(1.05rem,2.5vw,1.6rem);color:var(--muted,#b8b8c4);margin-top:1.2rem;line-height:1.5}
 .cover-by{display:flex;align-items:center;gap:.85rem;margin-top:2.2rem}
-.cover-avatar{width:3rem;height:3rem;border-radius:50%;object-fit:cover;background:#2a2a34;display:inline-flex;align-items:center;justify-content:center;font:600 1rem system-ui,sans-serif;color:#cfcfe0}
-.cover-name{font:1.05rem/1.3 system-ui,sans-serif;color:#cdcdd8}
-.deck-counter{position:fixed;bottom:1rem;right:1.3rem;font:600 .8rem system-ui;color:#8c8c98}
-.deck-hint{position:fixed;bottom:1rem;left:1.3rem;font:.72rem system-ui;color:#55555f}
-:focus-visible{outline:2px solid #7c8cff;outline-offset:3px}
+.cover-avatar{width:3rem;height:3rem;border-radius:50%;object-fit:cover;background:var(--elevated,#2a2a34);display:inline-flex;align-items:center;justify-content:center;font:600 1rem var(--sans,system-ui);color:var(--text,#cfcfe0)}
+.cover-name{font:1.05rem/1.3 var(--sans,system-ui);color:var(--muted,#cdcdd8)}
+.notes{display:none;padding:0}
+.notes::before{content:"Notes";display:block;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#6c6c78);margin-bottom:.3rem}
+html.js .deck.presenter .slide.active{justify-content:flex-start}
+html.js .deck.presenter .notes{display:block;margin-top:auto;padding-top:1rem;border-top:1px solid var(--border,#2a2a34);font:1rem/1.55 var(--sans,system-ui);color:var(--muted,#b2b2bc)}
+.deck-counter{position:fixed;bottom:1rem;right:1.3rem;font:600 .8rem var(--sans,system-ui);color:var(--muted,#8c8c98);z-index:10}
+.deck-hint{position:fixed;bottom:1rem;left:1.3rem;font:.72rem var(--sans,system-ui);color:var(--faint,#55555f);z-index:10}
+:focus-visible{outline:2px solid var(--accent,#7c8cff);outline-offset:3px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}`
 
 const deckJS = `(function(){
@@ -550,8 +551,10 @@ var post=document.body.getAttribute('data-post')||'';
 var counter=document.createElement('div');counter.className='deck-counter';counter.setAttribute('aria-live','polite');document.body.appendChild(counter);
 var hint=document.createElement('div');hint.className='deck-hint';hint.textContent='← → navigate · Enter play/pause · P presenter · F fullscreen · Esc exit';document.body.appendChild(hint);
 var i=Math.min(slides.length-1,Math.max(0,(parseInt(location.hash.slice(1),10)||1)-1));
+var mermaidReady=false;
+function renderMermaid(s){if(!window.mermaid)return;if(!mermaidReady){try{mermaid.initialize({startOnLoad:false,theme:'dark'});}catch(e){}mermaidReady=true;}var nodes=s.querySelectorAll('.mermaid:not([data-processed])');if(!nodes.length)return;try{var p=mermaid.run({nodes:nodes});if(p&&p.then){p.then(function(){fit(s);});}}catch(e){}}
 function fit(s){var b=s.querySelector('.slide-body');if(!b)return;b.style.transform='';var avail=s.clientHeight-b.offsetTop-24;if(avail>0&&b.scrollHeight>avail+2){b.style.transform='scale('+Math.max(0.45,avail/b.scrollHeight).toFixed(3)+')';}}
-function show(n){i=Math.max(0,Math.min(slides.length-1,n));slides.forEach(function(s,k){s.classList.toggle('active',k===i);s.setAttribute('aria-hidden',k!==i);if(k===i){s.tabIndex=-1;s.focus({preventScroll:true});fit(s);}});location.hash=i+1;counter.textContent=(i+1)+' / '+slides.length;}
+function show(n){i=Math.max(0,Math.min(slides.length-1,n));slides.forEach(function(s,k){s.classList.toggle('active',k===i);s.setAttribute('aria-hidden',k!==i);if(k===i){s.tabIndex=-1;s.focus({preventScroll:true});renderMermaid(s);fit(s);}});location.hash=i+1;counter.textContent=(i+1)+' / '+slides.length;}
 document.addEventListener('keydown',function(e){
 if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){show(i+1);e.preventDefault();}
 else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);}
@@ -563,6 +566,6 @@ else if(e.key==='f'||e.key==='F'){if(!document.fullscreenElement){document.docum
 });
 window.addEventListener('hashchange',function(){var n=(parseInt(location.hash.slice(1),10)||1)-1;if(n!==i)show(n);});
 window.addEventListener('resize',function(){fit(slides[i]);});
-window.addEventListener('load',function(){fit(slides[i]);});
+window.addEventListener('load',function(){renderMermaid(slides[i]);fit(slides[i]);});
 show(i);
 })();`
