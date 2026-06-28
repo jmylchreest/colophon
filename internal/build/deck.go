@@ -472,7 +472,8 @@ func deckDoc(meta deckMeta, slides []string, body string) string {
 	if meta.PostURL != "" {
 		base = `<base href="` + html.EscapeString(meta.PostURL) + `">`
 	}
-	return `<!doctype html><html lang="en"><head><meta charset="utf-8">` + base +
+	return `<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8">` +
+		`<script>try{var t=localStorage.getItem('press-theme');document.documentElement.dataset.theme=t||(matchMedia&&matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');}catch(e){}</script>` + base +
 		`<meta name="viewport" content="width=device-width,initial-scale=1">` +
 		`<title>` + html.EscapeString(meta.Title) + `</title>` +
 		`<link rel="stylesheet" href="` + meta.BasePath + `style.css">` +
@@ -510,7 +511,7 @@ func deckHydration(base, body string) (head, scripts string) {
 // the slide content (in .prose) is styled by the theme's stylesheet, so a deck matches the site and
 // theme authors can style .slide* themselves.
 const deckCSS = `*{box-sizing:border-box}
-body{margin:0}
+body{margin:0;transition:background-color .35s ease,color .35s ease}
 /* No-JS default: slides stack as a readable, scrollable document; the theme styles the content. */
 .deck{max-width:62rem;margin:0 auto}
 .slide{display:flex;flex-direction:column;justify-content:flex-start;gap:1rem;padding:6vh 7vw;min-height:100vh;border-bottom:1px solid var(--border,#2a2a34)}
@@ -543,7 +544,7 @@ html.js .slide.active{display:flex}
 .notes{display:none;padding:0}
 .notes::before{content:"Notes";display:block;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#6c6c78);margin-bottom:.3rem}
 html.js .deck.presenter .slide.active{justify-content:flex-start}
-html.js .deck.presenter .notes{display:block;margin-top:auto;padding-top:1rem;border-top:1px solid var(--border,#2a2a34);font:1rem/1.55 var(--sans,system-ui);color:var(--muted,#b2b2bc)}
+html.js .deck.presenter .notes{display:block;margin-top:auto;max-height:42vh;overflow-y:auto;padding-top:1rem;border-top:1px solid var(--border,#2a2a34);font:1.05rem/1.6 var(--sans,system-ui);color:var(--text,#d6d6e0)}
 .deck-counter{position:fixed;bottom:1rem;right:1.3rem;font:600 .8rem var(--sans,system-ui);color:var(--muted,#8c8c98);z-index:10}
 .deck-hint{position:fixed;bottom:1rem;left:1.3rem;font:.72rem var(--sans,system-ui);color:var(--faint,#55555f);z-index:10}
 /* On-screen prev/next (tap targets for touch / no-keyboard; 46px meets WCAG 2.5.5). */
@@ -557,41 +558,60 @@ html.js .deck.presenter .notes{display:block;margin-top:auto;padding-top:1rem;bo
 .deck-tool:hover,.deck-tool:focus-visible{opacity:.95}
 .deck-tool[aria-pressed=true]{opacity:.95;background:var(--accent,#7c8cff);color:var(--on-accent,#0b0b10)}
 @media(max-width:640px){.deck-nav{opacity:.5}.deck-hint{display:none}}
+/* Presenter on a phone = a teleprompter card: the cue shrinks, the notes fill the screen big. */
+@media(max-width:760px){
+html.js .deck.presenter .slide.active{padding:4vh 6vw}
+html.js .deck.presenter .slide-title{font-size:1.3rem}
+html.js .deck.presenter .slide-body{font-size:.92rem;max-height:24vh;overflow:hidden;opacity:.65}
+html.js .deck.presenter .notes{flex:1 1 auto;min-height:0;max-height:none;font-size:1.6rem;line-height:1.65;margin-top:.7rem}
+}
 :focus-visible{outline:2px solid var(--accent,#7c8cff);outline-offset:3px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}`
 
 const deckJS = `(function(){
-document.documentElement.className+=' js'; // switch CSS from the no-JS document to projection mode
+var d=document.documentElement;d.className+=' js'; // switch CSS from the no-JS document to projection mode
 var slides=[].slice.call(document.querySelectorAll('.slide'));if(!slides.length)return;
 var deck=document.querySelector('.deck');
 var post=document.body.getAttribute('data-post')||'';
 var counter=document.createElement('div');counter.className='deck-counter';counter.setAttribute('aria-live','polite');document.body.appendChild(counter);
-var hint=document.createElement('div');hint.className='deck-hint';hint.textContent='← → navigate · Enter play/pause · P presenter · F fullscreen · Esc exit';document.body.appendChild(hint);
+var hint=document.createElement('div');hint.className='deck-hint';hint.textContent='← → navigate · Enter play/pause · P presenter · T theme · F fullscreen · Esc exit';document.body.appendChild(hint);
 var i=Math.min(slides.length-1,Math.max(0,(parseInt(location.hash.slice(1),10)||1)-1));
 var mermaidReady=false;
-function renderMermaid(s){if(!window.mermaid)return;if(!mermaidReady){try{mermaid.initialize({startOnLoad:false,theme:'dark'});}catch(e){}mermaidReady=true;}var nodes=s.querySelectorAll('.mermaid:not([data-processed])');if(!nodes.length)return;try{var p=mermaid.run({nodes:nodes});if(p&&p.then){p.then(function(){fit(s);});}}catch(e){}}
+function renderMermaid(s){if(!window.mermaid)return;if(!mermaidReady){try{mermaid.initialize({startOnLoad:false,theme:(d.dataset.theme==='light'?'default':'dark')});}catch(e){}mermaidReady=true;}var nodes=s.querySelectorAll('.mermaid:not([data-processed])');if(!nodes.length)return;try{var p=mermaid.run({nodes:nodes});if(p&&p.then){p.then(function(){fit(s);});}}catch(e){}}
 function fit(s){var b=s.querySelector('.slide-body');if(!b)return;b.style.transform='';var avail=s.clientHeight-b.offsetTop-24;if(avail>0&&b.scrollHeight>avail+2){b.style.transform='scale('+Math.max(0.45,avail/b.scrollHeight).toFixed(3)+')';}}
 function show(n){i=Math.max(0,Math.min(slides.length-1,n));slides.forEach(function(s,k){s.classList.toggle('active',k===i);s.setAttribute('aria-hidden',k!==i);if(k===i){s.tabIndex=-1;s.focus({preventScroll:true});renderMermaid(s);fit(s);}});location.hash=i+1;counter.textContent=(i+1)+' / '+slides.length;}
+function go(n){stopAuto();show(n);} // any MANUAL navigation cancels the autocue
 document.addEventListener('keydown',function(e){
-if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){show(i+1);e.preventDefault();}
-else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(i-1);}
-else if(e.key==='Home'){show(0);}else if(e.key==='End'){show(slides.length-1);}
+if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){go(i+1);e.preventDefault();}
+else if(e.key==='ArrowLeft'||e.key==='PageUp'){go(i-1);}
+else if(e.key==='Home'){go(0);}else if(e.key==='End'){go(slides.length-1);}
 else if(e.key==='Enter'){var m=slides[i].querySelector('audio,video');if(m){if(m.paused){m.play();}else{m.pause();}e.preventDefault();}}
 else if(e.key==='Escape'){window.close();if(post){location.href=post;}}
 else if(e.key==='p'||e.key==='P'){togglePresenter();}
 else if(e.key==='f'||e.key==='F'){toggleFull();}
+else if(e.key==='t'||e.key==='T'){setTheme(d.dataset.theme==='dark'?'light':'dark');}
 });
 function togglePresenter(){var on=deck.classList.toggle('presenter');if(pBtn)pBtn.setAttribute('aria-pressed',on);fit(slides[i]);}
-function toggleFull(){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}else{document.exitFullscreen();}}
+function toggleFull(){if(!document.fullscreenElement){d.requestFullscreen&&d.requestFullscreen();}else{document.exitFullscreen();}}
+function setTheme(t){d.dataset.theme=t;try{localStorage.setItem('press-theme',t);}catch(e){}if(tBtn)tBtn.setAttribute('aria-label',t==='dark'?'Switch to light theme':'Switch to dark theme');}
+// Autocue: a teleprompter — auto-scroll the slide's notes, then advance. Cancelled by manual nav.
+var autoOn=false,autoRAF=0,autoStart=0,autoDur=0;
+function notesEl(n){return slides[n]&&slides[n].querySelector('.notes');}
+function slideDur(n){var el=notesEl(n);var w=el?(el.textContent.match(/\S+/g)||[]).length:0;return Math.max(4000,w/2.3*1000+1200);} // ~140 wpm + buffer
+function autoTick(now){if(!autoOn)return;var el=notesEl(i);var t=autoDur>0?Math.min(1,(now-autoStart)/autoDur):1;if(el&&el.scrollHeight>el.clientHeight+4){el.scrollTop=t*(el.scrollHeight-el.clientHeight);}if(t>=1){if(i<slides.length-1){beginAuto(i+1);}else{stopAuto();}return;}autoRAF=requestAnimationFrame(autoTick);}
+function beginAuto(n){if(n!=null&&n!==i)show(n);if(!deck.classList.contains('presenter'))togglePresenter();autoOn=true;if(aBtn){aBtn.setAttribute('aria-pressed','true');aBtn.textContent='⏸';}autoDur=slideDur(i);autoStart=performance.now();cancelAnimationFrame(autoRAF);autoRAF=requestAnimationFrame(autoTick);}
+function stopAuto(){if(!autoOn)return;autoOn=false;if(aBtn){aBtn.setAttribute('aria-pressed','false');aBtn.textContent='▶';}cancelAnimationFrame(autoRAF);}
 function tool(label,glyph,fn){var b=document.createElement('button');b.type='button';b.className='deck-tool';b.setAttribute('aria-label',label);b.textContent=glyph;b.addEventListener('click',fn);return b;}
+var aBtn=tool('Autocue — auto-advance with notes','▶',function(){autoOn?stopAuto():beginAuto();});aBtn.setAttribute('aria-pressed','false');
 var pBtn=tool('Toggle presenter notes','≡',togglePresenter);pBtn.setAttribute('aria-pressed','false');
 var fBtn=tool('Toggle fullscreen','⛶',toggleFull);
-var tools=document.createElement('div');tools.className='deck-tools';tools.appendChild(pBtn);tools.appendChild(fBtn);document.body.appendChild(tools);
-var prev=document.createElement('button');prev.className='deck-nav deck-nav-prev';prev.setAttribute('aria-label','Previous slide');prev.textContent='‹';prev.addEventListener('click',function(){show(i-1);});document.body.appendChild(prev);
-var next=document.createElement('button');next.className='deck-nav deck-nav-next';next.setAttribute('aria-label','Next slide');next.textContent='›';next.addEventListener('click',function(){show(i+1);});document.body.appendChild(next);
+var tBtn=tool(d.dataset.theme==='dark'?'Switch to light theme':'Switch to dark theme','◐',function(){setTheme(d.dataset.theme==='dark'?'light':'dark');});
+var tools=document.createElement('div');tools.className='deck-tools';tools.appendChild(aBtn);tools.appendChild(pBtn);tools.appendChild(fBtn);tools.appendChild(tBtn);document.body.appendChild(tools);
+var prev=document.createElement('button');prev.className='deck-nav deck-nav-prev';prev.setAttribute('aria-label','Previous slide');prev.textContent='‹';prev.addEventListener('click',function(){go(i-1);});document.body.appendChild(prev);
+var next=document.createElement('button');next.className='deck-nav deck-nav-next';next.setAttribute('aria-label','Next slide');next.textContent='›';next.addEventListener('click',function(){go(i+1);});document.body.appendChild(next);
 var tx=0,ty=0,tskip=false;
-document.addEventListener('touchstart',function(e){var t=e.changedTouches[0];tx=t.clientX;ty=t.clientY;tskip=!!(e.target.closest&&e.target.closest('audio,video,.slide-body pre'));},{passive:true});
-document.addEventListener('touchend',function(e){if(tskip)return;var t=e.changedTouches[0];var dx=t.clientX-tx,dy=t.clientY-ty;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4){show(dx<0?i+1:i-1);}},{passive:true});
+document.addEventListener('touchstart',function(e){var t=e.changedTouches[0];tx=t.clientX;ty=t.clientY;tskip=!!(e.target.closest&&e.target.closest('audio,video,.slide-body pre,.notes'));},{passive:true});
+document.addEventListener('touchend',function(e){if(tskip)return;var t=e.changedTouches[0];var dx=t.clientX-tx,dy=t.clientY-ty;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4){go(dx<0?i+1:i-1);}},{passive:true});
 window.addEventListener('hashchange',function(){var n=(parseInt(location.hash.slice(1),10)||1)-1;if(n!==i)show(n);});
 window.addEventListener('resize',function(){fit(slides[i]);});
 window.addEventListener('load',function(){renderMermaid(slides[i]);fit(slides[i]);});

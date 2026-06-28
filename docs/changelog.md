@@ -3,6 +3,18 @@
 User-facing changes by release. Each entry points at the guide where the feature is documented
 in full (or where it should be, when end-user docs catch up).
 
+## Unreleased
+
+- **Slide decks: styled by the site theme + a fuller reader.** A published deck now links the active
+  theme's stylesheet and renders content in the theme's `.prose` class, so quotes, callouts, code,
+  tables and Mermaid look like the site and theme authors can style `.slide*` themselves. The reader
+  gained: **touch/swipe** navigation and on-screen **prev/next** buttons; on-screen **presenter** and
+  **fullscreen** toggles (so they work without a keyboard); a **light/dark** toggle (reusing the
+  theme's `data-theme`); a large **mobile presenter card** (the notes fill the phone as a teleprompter
+  while the slide shows on the big screen); and an **autocue** that auto-scrolls each slide's notes and
+  auto-advances at a reading pace (stop with Back, restart from the button). Mermaid renders lazily per
+  slide (it can't measure a hidden one), and a `<base href>` fixes co-located asset URLs in the deck.
+
 ## v0.0.32
 
 - **Slide decks render the post's content well by default.** A **cover slide** (title, description,
