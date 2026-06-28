@@ -466,7 +466,13 @@ func deckDoc(meta deckMeta, slides []string, body string) string {
 	hHead, hScripts := deckHydration(meta.BasePath, body)
 	// Link the active theme's stylesheet first (it styles the .prose content and supplies the
 	// tokens the deck chrome reads), then the deck's own structural CSS overrides layout.
-	return `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
+	// <base> points at the post directory so the body's page-relative asset URLs (images, video,
+	// audio) resolve correctly even though the deck lives one level deeper at …/<slug>/slides/.
+	base := ""
+	if meta.PostURL != "" {
+		base = `<base href="` + html.EscapeString(meta.PostURL) + `">`
+	}
+	return `<!doctype html><html lang="en"><head><meta charset="utf-8">` + base +
 		`<meta name="viewport" content="width=device-width,initial-scale=1">` +
 		`<title>` + html.EscapeString(meta.Title) + `</title>` +
 		`<link rel="stylesheet" href="` + meta.BasePath + `style.css">` +
