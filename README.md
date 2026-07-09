@@ -116,7 +116,7 @@ image goes (`hero: "gen:a lighthouse on a rocky coast"`), or give a post an audi
 ```yaml
 generation:
   image:
-    provider: minimax            # google | openai | minimax | together | deepinfra | custom
+    provider: minimax            # google | openai | xai | minimax | together | deepinfra | custom
   speech:
     provider: minimax            # text-to-speech reading → themed player + podcast enclosure
     voice: "English_Graceful_Lady"
@@ -127,6 +127,7 @@ generation:
 | `google` | `gemini-3.1-flash-image` | `GEMINI_API_KEY` |
 | `minimax` | `image-01` | `MINIMAX_API_KEY` |
 | `openai` | `gpt-image-1` | `OPENAI_API_KEY` |
+| `xai` | `grok-imagine-image-quality` | `XAI_API_KEY` |
 
 Full details — caching, providers, house style, the `--generate-ai` step and the kill
 switch — in **[Image & audio generation](docs/image-generation.md)**.

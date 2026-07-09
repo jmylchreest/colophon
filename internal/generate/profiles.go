@@ -35,6 +35,7 @@ type Settings struct {
 	OutputDir     string
 	BaseURL       string
 	APIPath       string
+	AspectKey     string // see profile.aspectKey
 	APIKey        string
 	Defaults      map[string]string
 	Concurrency   int
@@ -49,6 +50,7 @@ type profile struct {
 	apiPath      string
 	defaultModel string
 	keyEnv       []string
+	aspectKey    string // request field carrying the normalised `aspect` param, for OpenAI-compatible hosts that accept one (xAI)
 }
 
 // profiles are the built-in provider presets. `custom` carries no endpoint: the
@@ -57,6 +59,7 @@ var profiles = map[string]profile{
 	driverGoogle:  {driver: driverGoogle, baseURL: "https://generativelanguage.googleapis.com", defaultModel: "gemini-3.1-flash-image", keyEnv: []string{"GEMINI_API_KEY", "GOOGLE_API_KEY"}},
 	driverMiniMax: {driver: driverMiniMax, baseURL: "https://api.minimax.io/v1", apiPath: "/image_generation", defaultModel: "image-01", keyEnv: []string{"MINIMAX_API_KEY"}},
 	"openai":      {driver: driverOpenAI, baseURL: "https://api.openai.com/v1", apiPath: "/images/generations", defaultModel: "gpt-image-1", keyEnv: []string{"OPENAI_API_KEY"}},
+	"xai":         {driver: driverOpenAI, baseURL: "https://api.x.ai/v1", apiPath: "/images/generations", defaultModel: "grok-imagine-image-quality", keyEnv: []string{"XAI_API_KEY"}, aspectKey: "aspect_ratio"},
 	"together":    {driver: driverOpenAI, baseURL: "https://api.together.ai/v1", apiPath: "/images/generations", keyEnv: []string{"TOGETHER_API_KEY"}},
 	"deepinfra":   {driver: driverOpenAI, baseURL: "https://api.deepinfra.com/v1/openai", apiPath: "/images/generations", keyEnv: []string{"DEEPINFRA_API_KEY"}},
 	"custom":      {driver: driverOpenAI},
@@ -64,7 +67,7 @@ var profiles = map[string]profile{
 
 // Providers lists the configurable provider names, for diagnostics/help.
 func Providers() []string {
-	return []string{driverGoogle, driverMiniMax, "openai", "together", "deepinfra", "custom"}
+	return []string{driverGoogle, driverMiniMax, "openai", "xai", "together", "deepinfra", "custom"}
 }
 
 // Resolve applies the provider profile to a config block, layering explicit fields
@@ -86,6 +89,7 @@ func Resolve(g core.ImageGen) (Settings, error) {
 		OutputDir:     firstNonEmpty(g.OutputDir, DefaultOutputDir),
 		BaseURL:       firstNonEmpty(g.BaseURL, p.baseURL),
 		APIPath:       firstNonEmpty(g.APIPath, p.apiPath),
+		AspectKey:     p.aspectKey,
 		APIKey:        strings.TrimSpace(g.APIKey),
 		Defaults:      g.Defaults,
 		Concurrency:   g.Concurrency,

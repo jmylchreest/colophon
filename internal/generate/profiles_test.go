@@ -47,6 +47,29 @@ func TestResolveExplicitOverrides(t *testing.T) {
 	}
 }
 
+func TestResolveXAIProfile(t *testing.T) {
+	t.Setenv("XAI_API_KEY", "xai-key")
+	s, err := Resolve(core.ImageGen{Provider: "xai"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Driver != driverOpenAI {
+		t.Errorf("xai should use the OpenAI-compatible driver, got %q", s.Driver)
+	}
+	if s.Model != "grok-imagine-image-quality" {
+		t.Errorf("model = %q, want grok-imagine-image-quality", s.Model)
+	}
+	if s.BaseURL != "https://api.x.ai/v1" || s.APIPath != "/images/generations" {
+		t.Errorf("endpoint = %q%q", s.BaseURL, s.APIPath)
+	}
+	if s.APIKey != "xai-key" {
+		t.Errorf("APIKey should come from XAI_API_KEY, got %q", s.APIKey)
+	}
+	if s.AspectKey != "aspect_ratio" {
+		t.Errorf("AspectKey = %q, want aspect_ratio", s.AspectKey)
+	}
+}
+
 func TestResolveCustomProvider(t *testing.T) {
 	s, err := Resolve(core.ImageGen{
 		Provider: "custom",

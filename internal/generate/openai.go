@@ -6,12 +6,13 @@ import (
 	"fmt"
 )
 
-// openaiDriver calls an OpenAI-compatible images endpoint (OpenAI, Together,
+// openaiDriver calls an OpenAI-compatible images endpoint (OpenAI, xAI, Together,
 // DeepInfra, or any `custom` host). The image is returned either inline as base64
 // (data[].b64_json) or as a URL to fetch (data[].url) — both are handled.
 type openaiDriver struct {
-	endpoint string
-	apiKey   string
+	endpoint  string
+	apiKey    string
+	aspectKey string // when set, the `aspect` param is sent under this field (xAI: aspect_ratio)
 }
 
 type openaiResponse struct {
@@ -30,6 +31,9 @@ func (d *openaiDriver) Generate(ctx context.Context, req ImageRequest) (ImageRes
 	}
 	if size := req.Params["size"]; size != "" {
 		body["size"] = size
+	}
+	if a := req.Params["aspect"]; a != "" && d.aspectKey != "" {
+		body[d.aspectKey] = a
 	}
 	var out openaiResponse
 	headers := map[string]string{"Authorization": "Bearer " + d.apiKey}

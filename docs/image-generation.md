@@ -74,12 +74,25 @@ generation:
 | `google` | `gemini-3.1-flash-image` | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) |
 | `minimax` | `image-01` | `MINIMAX_API_KEY` |
 | `openai` | `gpt-image-1` | `OPENAI_API_KEY` |
+| `xai` | `grok-imagine-image-quality` | `XAI_API_KEY` |
 | `together` | *(set `model:`)* | `TOGETHER_API_KEY` |
 | `deepinfra` | *(set `model:`)* | `DEEPINFRA_API_KEY` |
 | `custom` | *(set `model:`)* | set `api_key:` |
 
 `custom` targets any OpenAI-compatible images endpoint — also set `base_url:` and
 `api_path:` (e.g. `/images/generations`).
+
+`xai` is Grok Imagine: xAI's OpenAI-compatible images endpoint. Set
+`model: grok-imagine-image` for the cheaper tier, and use `aspect` as usual (it is
+sent as xAI's `aspect_ratio`):
+
+```yaml
+generation:
+  image:
+    provider: xai                # Grok Imagine — reads XAI_API_KEY
+    defaults:
+      aspect: "16:9"
+```
 
 ### API keys
 

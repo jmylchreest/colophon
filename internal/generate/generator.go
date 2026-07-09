@@ -27,7 +27,7 @@ func New(s Settings) (ImageGenerator, error) {
 		if s.BaseURL == "" || s.APIPath == "" {
 			return nil, fmt.Errorf("provider %q: base_url and api_path are required", s.Provider)
 		}
-		g = &openaiDriver{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey}
+		g = &openaiDriver{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey, aspectKey: s.AspectKey}
 	case driverMiniMax:
 		g = &minimaxDriver{endpoint: s.BaseURL + s.APIPath, apiKey: s.APIKey}
 	default:
