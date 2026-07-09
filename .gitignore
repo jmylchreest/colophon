@@ -25,3 +25,4 @@ dist-*/
 # Editors / OS / assistant tooling
 .DS_Store
 .claude/
+.playwright-mcp/
