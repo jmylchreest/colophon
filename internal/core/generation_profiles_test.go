@@ -8,7 +8,7 @@ func TestSpeechResolveProfile(t *testing.T) {
 		Provider:          "elevenlabs",
 		Voice:             "default-voice",
 		Model:             "eleven_v3",
-		PronunciationDict: "en_GB",
+		PronunciationDict: PronunciationDicts{"": "en_GB"},
 		Reuse:             "exact",
 		Transcript:        SpeechTranscript{Blocks: map[string]string{"code": "cue"}, WrapUp: &wrapUp},
 		Profiles: map[string]SpeechGen{
@@ -33,7 +33,7 @@ func TestSpeechResolveProfile(t *testing.T) {
 	if mm.Provider != "minimax" || mm.Voice != "mm-voice" {
 		t.Errorf("minimax overrides not applied: %+v", mm)
 	}
-	if mm.Model != "eleven_v3" || mm.PronunciationDict != "en_GB" {
+	if mm.Model != "eleven_v3" || mm.PronunciationDict[""] != "en_GB" {
 		t.Errorf("minimax should inherit model/dict, got %+v", mm)
 	}
 	if mm.Transcript.Blocks["code"] != "cue" || mm.Transcript.WrapUp == nil || *mm.Transcript.WrapUp {

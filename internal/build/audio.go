@@ -25,13 +25,18 @@ import (
 // setup — e.g. the ElevenLabs dictionary sync — happens once per profile, only if used). The
 // resolver caches one of these per effective profile name as posts reference them.
 type resolvedSpeech struct {
-	settings      generate.SpeechSettings
-	provider      string
-	pronunciation []generate.Pronunciation
-	cacheDir      string
-	reuseContent  bool
-	resolveErr    error // ResolveProfile/ResolveSpeech failure → TTS disabled for posts using it
+	settings     generate.SpeechSettings
+	provider     string
+	cacheDir     string
+	reuseContent bool
+	resolveErr   error // ResolveProfile/ResolveSpeech failure → TTS disabled for posts using it
 
+	mu   sync.Mutex          // guards gens (produce() workers race to a profile's generators)
+	gens map[string]*dictGen // generator per pronunciation dict ref ("" = none): the dict is provider state (ElevenLabs syncs each as its own account dictionary), so languages don't share one
+}
+
+// dictGen is one (speech profile, pronunciation dict) generator, built once on first use.
+type dictGen struct {
 	once sync.Once
 	gen  generate.SpeechGenerator
 	err  error // generator construction (PrepareSpeech/NewSpeech) failure
@@ -80,6 +85,7 @@ type audioJob struct {
 	cache   string          // tts: absolute cache path, named by content identity
 	legacy  string          // tts: pre-split single-hash cache path, adopted on migration if present
 	rs      *resolvedSpeech // tts: the resolved speech profile that renders this clip
+	dict    string          // tts: pronunciation dict ref for this post's language ("" = none)
 	force   bool            // tts: re-render even if cache exists (--regenerate)
 	size    int64           // filled after run()
 	peaks   []float64       // waveform amplitude peaks (0–1), when computed
@@ -107,6 +113,7 @@ type audioResolver struct {
 	defaultAudioOn bool                       // per-post audio: default when a post sets none
 	regenerate     bool                       // --regenerate: re-render even when cached
 	profiles       map[string]*resolvedSpeech // resolved speech profiles, keyed by effective name
+	pronMu         sync.Mutex                 // guards pronCache (read from produce() workers via ensureGen)
 	pronCache      map[string][]generate.Pronunciation
 	jobs           map[string]*audioJob
 }
@@ -141,7 +148,7 @@ func (ar *audioResolver) resolved(postProfile string) *resolvedSpeech {
 	if rs, ok := ar.profiles[key]; ok {
 		return rs
 	}
-	rs := &resolvedSpeech{}
+	rs := &resolvedSpeech{gens: map[string]*dictGen{}}
 	g, err := ar.speechGen.ResolveProfile(name)
 	if err == nil {
 		var s generate.SpeechSettings
@@ -152,7 +159,6 @@ func (ar *audioResolver) resolved(postProfile string) *resolvedSpeech {
 			rs.provider = s.Provider
 			rs.reuseContent = s.Reuse == "content"
 			rs.cacheDir = ar.dirFor(s.OutputDir)
-			rs.pronunciation = ar.loadPron(s.PronunciationDict)
 		}
 	}
 	if err != nil {
@@ -172,12 +178,15 @@ func (ar *audioResolver) dirFor(dir string) string {
 }
 
 // loadPron loads a pronunciation dictionary by ref (built-in name or path), caching by ref so
-// profiles that share a dict load it once.
+// posts and profiles that share a dict load it once. Safe from produce() workers (ensureGen
+// loads a generator's dict concurrently).
 func (ar *audioResolver) loadPron(ref string) []generate.Pronunciation {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		return nil
 	}
+	ar.pronMu.Lock()
+	defer ar.pronMu.Unlock()
 	if p, ok := ar.pronCache[ref]; ok {
 		return p
 	}
@@ -192,21 +201,29 @@ func (ar *audioResolver) loadPron(ref string) []generate.Pronunciation {
 	return entries
 }
 
-// ensureGen builds (once) the generator for a resolved profile, running provider setup
-// (e.g. the ElevenLabs dictionary sync) and warning on failure.
-func (ar *audioResolver) ensureGen(rs *resolvedSpeech) (generate.SpeechGenerator, error) {
-	rs.once.Do(func() {
-		s, err := generate.PrepareSpeech(context.Background(), rs.settings, rs.pronunciation, rs.cacheDir)
+// ensureGen builds (once) the generator for a resolved profile rendering with the given
+// pronunciation dict, running provider setup (the ElevenLabs sync uploads each dict as its own
+// account dictionary, so per-language dicts under one profile never mix) and warning on failure.
+func (ar *audioResolver) ensureGen(rs *resolvedSpeech, dictRef string) (generate.SpeechGenerator, error) {
+	rs.mu.Lock()
+	dg := rs.gens[dictRef]
+	if dg == nil {
+		dg = &dictGen{}
+		rs.gens[dictRef] = dg
+	}
+	rs.mu.Unlock()
+	dg.once.Do(func() {
+		s, err := generate.PrepareSpeech(context.Background(), rs.settings, dictRef, ar.loadPron(dictRef), rs.cacheDir)
 		if err != nil {
 			ar.log.Step("AUDIO", "", "warn", "pronunciation dictionary sync failed: "+err.Error())
 			s = rs.settings
 		}
-		rs.gen, rs.err = generate.NewSpeech(s)
-		if rs.err != nil {
-			ar.log.Step("AUDIO", rs.provider, "warn", "speech generator unavailable: "+rs.err.Error())
+		dg.gen, dg.err = generate.NewSpeech(s)
+		if dg.err != nil {
+			ar.log.Step("AUDIO", rs.provider, "warn", "speech generator unavailable: "+dg.err.Error())
 		}
 	})
-	return rs.gen, rs.err
+	return dg.gen, dg.err
 }
 
 func (ar *audioResolver) active() bool { return ar != nil }
@@ -288,7 +305,10 @@ func (ar *audioResolver) registerTTS(label, htmlBody, lang, postVoice, author, p
 	if v := strings.TrimSpace(ar.voiceFor(postVoice, author, persona)); v != "" {
 		voice = v
 	}
-	pron := generate.FilterPronunciation(rs.pronunciation, text)
+	// The dictionary follows the post's language (naked config ref = the site default language),
+	// so an English dict never rewrites a Spanish reading.
+	dictRef := rs.settings.PronunciationDict.For(lang, ar.defaultLang)
+	pron := generate.FilterPronunciation(ar.loadPron(dictRef), text)
 	// Publish and cache under the content identity (text + pronunciation) so the URL is stable
 	// across provider/model/voice changes; the renderer is recorded in the sidecar, and reuse
 	// policy decides whether a renderer change re-renders the single content-named file.
@@ -297,7 +317,7 @@ func (ar *audioResolver) registerTTS(label, htmlBody, lang, postVoice, author, p
 	mime = ttsOutputMIME
 	if _, seen := ar.jobs[outPath]; !seen {
 		ar.jobs[outPath] = &audioJob{
-			kind: "tts", outPath: outPath, mime: mime, rs: rs,
+			kind: "tts", outPath: outPath, mime: mime, rs: rs, dict: dictRef,
 			req:    generate.SpeechRequest{Text: text, Voice: voice, Model: rs.settings.Model, Pronunciation: pron},
 			cache:  filepath.Join(rs.cacheDir, content+ttsOutputExt),
 			legacy: filepath.Join(rs.cacheDir, generate.SpeechStem(rs.provider, rs.settings.Model, voice, label, text, pron)+ttsOutputExt),
@@ -357,14 +377,24 @@ func (ar *audioResolver) run(write func(string, []byte) error, now time.Time) er
 	}
 	sort.Strings(keys)
 
-	// Sync provider-side state (the ElevenLabs IPA pronunciation dictionary) for every speech
-	// profile in play even when its readings are all cached, so the dictionary exists and
-	// refreshes on any --generate-ai build — not only when a reading is (re)generated. Skipped
-	// for providers that send pronunciations inline (MiniMax), and a no-op when nothing changed.
+	// Sync provider-side state (the ElevenLabs IPA pronunciation dictionaries) for every
+	// (speech profile, dict) pair in play even when its readings are all cached, so each
+	// dictionary exists and refreshes on any --generate-ai build — not only when a reading is
+	// (re)generated. Skipped for providers that send pronunciations inline (MiniMax), and a
+	// no-op when nothing changed.
 	if ar.generateAI {
-		for _, rs := range ar.profiles {
-			if rs.resolveErr == nil && generate.NeedsDictSync(rs.settings, rs.pronunciation) {
-				_, _ = ar.ensureGen(rs)
+		synced := map[*resolvedSpeech]map[string]bool{}
+		for _, k := range keys {
+			j := ar.jobs[k]
+			if j.kind != "tts" || j.rs == nil || j.rs.resolveErr != nil || synced[j.rs][j.dict] {
+				continue
+			}
+			if synced[j.rs] == nil {
+				synced[j.rs] = map[string]bool{}
+			}
+			synced[j.rs][j.dict] = true
+			if generate.NeedsDictSync(j.rs.settings, ar.loadPron(j.dict)) {
+				_, _ = ar.ensureGen(j.rs, j.dict)
 			}
 		}
 	}
@@ -521,7 +551,7 @@ func (ar *audioResolver) produce(j *audioJob, now time.Time) (out audioOutcome) 
 			out.logArgs = []any{"skip", path.Base(j.outPath), "hint", "build --generate-ai to create it"}
 			return out
 		}
-		gen, err := ar.ensureGen(rs)
+		gen, err := ar.ensureGen(rs, j.dict)
 		if err != nil {
 			out.logArgs = []any{"skip", path.Base(j.outPath)}
 			return out

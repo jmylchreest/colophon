@@ -152,6 +152,21 @@
     }
   }
 
+  // Language chips on the post list: give the visitor's own preferred language the accent so
+  // a reader of a non-default language spots their translation at a glance. Advisory only —
+  // mirrors the post-page banner's contract: suggest, never redirect.
+  function initLangChips() {
+    var chips = document.querySelectorAll('.chip-lang');
+    if (!chips.length || !navigator.languages) return;
+    var prefs = navigator.languages.map(function (l) { return l.toLowerCase().split('-')[0]; });
+    chips.forEach(function (c) {
+      var lang = (c.getAttribute('hreflang') || '').toLowerCase().split('-')[0];
+      if (lang && prefs.indexOf(lang) !== -1 && c.getAttribute('aria-current') !== 'true') {
+        c.classList.add('chip-lang-pref');
+      }
+    });
+  }
+
   initTheme();
   initProgress();
   initAuthors();
@@ -159,4 +174,5 @@
   initFeeds();
   initMenu();
   initPostList();
+  initLangChips();
 })();

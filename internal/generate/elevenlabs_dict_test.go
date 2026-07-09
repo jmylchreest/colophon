@@ -89,7 +89,7 @@ func TestSyncElevenLabsDict_Lifecycle(t *testing.T) {
 	s := SpeechSettings{Driver: driverElevenLabs, BaseURL: srv.URL, APIKey: "k", SiteID: "blog.example"}
 	v1 := []Pronunciation{{Word: "router", IPA: "ˈruːtə"}, {Word: "route", IPA: "rˈuːt"}, {Word: "nginx", Say: "engine x"}}
 
-	loc, err := syncElevenLabsDict(context.Background(), s, v1, dir)
+	loc, err := syncElevenLabsDict(context.Background(), s, "en_GB", v1, dir)
 	if err != nil || loc == nil || loc.DictID != "dict1" || loc.VersionID != "v1" {
 		t.Fatalf("create: loc=%+v err=%v", loc, err)
 	}
@@ -98,7 +98,7 @@ func TestSyncElevenLabsDict_Lifecycle(t *testing.T) {
 	}
 
 	// Unchanged → cached, no API calls.
-	if _, err := syncElevenLabsDict(context.Background(), s, v1, dir); err != nil {
+	if _, err := syncElevenLabsDict(context.Background(), s, "en_GB", v1, dir); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(calls, []string{"list", "create", "list"}) {
@@ -107,7 +107,7 @@ func TestSyncElevenLabsDict_Lifecycle(t *testing.T) {
 
 	// Changed (drop "route", change "router") → list, then add-rules + remove-rules on same id.
 	v2 := []Pronunciation{{Word: "router", IPA: "ˈruːtər"}}
-	loc, err = syncElevenLabsDict(context.Background(), s, v2, dir)
+	loc, err = syncElevenLabsDict(context.Background(), s, "en_GB", v2, dir)
 	if err != nil || loc.DictID != "dict1" {
 		t.Fatalf("update: loc=%+v err=%v", loc, err)
 	}
@@ -139,7 +139,7 @@ func TestSyncElevenLabsDict_RecreatesArchived(t *testing.T) {
 		driverElevenLabs: {DictID: "old", VersionID: "v1", Hash: rulesHash(ipaRules(pron)), Words: []string{"zebra"}},
 	})
 	s := SpeechSettings{Driver: driverElevenLabs, BaseURL: srv.URL, APIKey: "k", SiteID: "blog.example"}
-	loc, err := syncElevenLabsDict(context.Background(), s, pron, dir)
+	loc, err := syncElevenLabsDict(context.Background(), s, "en_GB", pron, dir)
 	if err != nil || !created || loc.DictID != "new" {
 		t.Fatalf("archived dict should be recreated, created=%v loc=%+v err=%v", created, loc, err)
 	}
@@ -167,21 +167,23 @@ func TestSyncElevenLabsDict_RecreatesDeleted(t *testing.T) {
 		driverElevenLabs: {DictID: "gone", VersionID: "v9", Hash: rulesHash(ipaRules(pron)), Words: []string{"zebra"}},
 	})
 	s := SpeechSettings{Driver: driverElevenLabs, BaseURL: srv.URL, APIKey: "k", SiteID: "blog.example"}
-	loc, err := syncElevenLabsDict(context.Background(), s, pron, dir)
+	loc, err := syncElevenLabsDict(context.Background(), s, "en_GB", pron, dir)
 	if err != nil || !created || loc.DictID != "newdict" {
 		t.Fatalf("expected recreate of deleted dict, created=%v loc=%+v err=%v", created, loc, err)
 	}
 }
 
-// On a lost state file, an existing dictionary on the account is found by name and adopted
-// (no duplicate create).
+// On a lost state file, an existing dictionary on the account is found by its (dict-tagged)
+// name and adopted (no duplicate create). A bare pre-per-language name is NOT adopted by name —
+// only via the state file with a matching hash — so one language's rules can never land in
+// another language's dictionary.
 func TestSyncElevenLabsDict_FindByName(t *testing.T) {
 	var created bool
 	mux := http.NewServeMux()
 	mux.HandleFunc("/pronunciation-dictionaries", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"pronunciation_dictionaries": []map[string]any{
-			{"id": "other", "name": "colophon:someone-else", "latest_version_id": "vx"},
-			{"id": "mine", "name": "colophon:blog.example", "latest_version_id": "v9"},
+			{"id": "other", "name": "colophon:someone-else/en_GB", "latest_version_id": "vx"},
+			{"id": "mine", "name": "colophon:blog.example/en_GB", "latest_version_id": "v9"},
 		}})
 	})
 	mux.HandleFunc("/pronunciation-dictionaries/add-from-rules", func(w http.ResponseWriter, r *http.Request) { created = true })
@@ -192,7 +194,7 @@ func TestSyncElevenLabsDict_FindByName(t *testing.T) {
 	defer srv.Close()
 
 	s := SpeechSettings{Driver: driverElevenLabs, BaseURL: srv.URL, APIKey: "k", SiteID: "blog.example"}
-	loc, err := syncElevenLabsDict(context.Background(), s, []Pronunciation{{Word: "zebra", IPA: "ˈzɛbrə"}}, t.TempDir())
+	loc, err := syncElevenLabsDict(context.Background(), s, "en_GB", []Pronunciation{{Word: "zebra", IPA: "ˈzɛbrə"}}, t.TempDir())
 	if err != nil || loc.DictID != "mine" {
 		t.Fatalf("expected to adopt 'mine', got loc=%+v err=%v", loc, err)
 	}

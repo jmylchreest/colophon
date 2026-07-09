@@ -113,6 +113,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   padding: 0.1rem 0.6rem; text-decoration: none; transition: all 0.2s; }
 .chip:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .chip-series { color: var(--link); border-color: color-mix(in srgb, var(--accent) 28%, transparent); background: var(--accent-soft); }
+/* language chips: one per available translation, linking straight to that version. Text codes,
+   not flags — a flag names a country, not a language. The reader's own preferred language
+   (html.js only; see app.js) gets the accent so a non-default-language visitor spots their
+   version at a glance; aria-current marks the row's own language. */
+.chip-lang { text-transform: uppercase; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; }
+.chip-lang[aria-current="true"] { color: var(--faint); border-style: dashed; }
+.chip-lang.chip-lang-pref { color: var(--link); border-color: color-mix(in srgb, var(--accent) 28%, transparent); background: var(--accent-soft); }
 /* media indicators: inert accent marks in the row's top-right corner — a speaker for an audio
    reading, a paperclip for downloadable attachments. They signal, they are not controls:
    pointer-events:none lets the click fall through to the row's stretched post link, so clicking

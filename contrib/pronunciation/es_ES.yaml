@@ -1,0 +1,35 @@
+# Spanish (es_ES) pronunciation dictionary for colophon TTS.
+# Reference it from a site with:
+#   generation: { speech: { pronunciation_dict: { es: es_ES } } }
+# (a naked `pronunciation_dict: <ref>` applies to the site's default language only).
+#
+# Each entry has `word` plus one of:
+#   ipa:  phonetic transcription (precise; rendered to each provider's phoneme mechanism)
+#   say:  plain respelling (portable; substituted as text on any provider)
+#
+# Scope: English tech loanwords that multilingual voices tend to read with Spanish letter
+# values ("WiFi" as "vifi", "router" with a Spanish ou) or to over-anglicise mid-sentence.
+# Respellings use Spanish orthography so any voice renders them the way Spanish speakers
+# actually say them. Deliberately small — overriding words the voice already says correctly
+# tends to make them worse. Audition before adding entries.
+pronunciations:
+  - word: router
+    say: rúter
+  - word: WiFi
+    say: güifi
+  - word: cache
+    say: caché
+  - word: byte
+    say: báit
+  - word: bytes
+    say: báits
+  - word: email
+    say: imeil
+  - word: backend
+    say: báquend
+  - word: frontend
+    say: fróntend
+  - word: nginx
+    say: ényin equis
+  - word: daemon
+    say: démon

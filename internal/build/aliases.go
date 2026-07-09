@@ -25,13 +25,15 @@ func AliasConflicts(cfg *config.Config) ([]AliasConflict, error) {
 	if err != nil {
 		return nil, err
 	}
+	langs, defLang := siteLangs(cfg)
 	pageSlug := map[string]bool{}
 	for _, sd := range docs {
-		pageSlug[slugFor(sd.doc.SourcePath, sd.doc.Frontmatter.Slug)] = true
+		s, _, _ := resolveLangSlug(sd.doc.SourcePath, sd.doc.Frontmatter, langs, defLang)
+		pageSlug[s] = true
 	}
 	owners := map[string][]string{} // alias path -> claiming slugs
 	for _, sd := range docs {
-		slug := slugFor(sd.doc.SourcePath, sd.doc.Frontmatter.Slug)
+		slug, _, _ := resolveLangSlug(sd.doc.SourcePath, sd.doc.Frontmatter, langs, defLang)
 		for _, a := range normalizeAliases(sd.doc.Frontmatter.Aliases) {
 			owners[a] = append(owners[a], slug)
 		}

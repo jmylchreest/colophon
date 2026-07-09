@@ -4,6 +4,9 @@ import (
 	"path"
 	"sort"
 	"strings"
+
+	"github.com/jmylchreest/colophon/internal/config"
+	"github.com/jmylchreest/colophon/markdown"
 )
 
 // translation is one language a post is available in — for the language selector and the
@@ -63,6 +66,35 @@ func splitLangFromPath(src string, langs []string, def string) (string, string) 
 	return src, def
 }
 
+// resolveLangSlug resolves a document to its routed slug THE way the build does — the single
+// source of truth shared by buildPages, Entries (doctor/posts/new/syndicate/serve) and
+// AliasConflicts, so tooling never disagrees with the build about where a page publishes:
+// strip a `.<lang>` translation infix from the source path, fall back to an explicit
+// frontmatter `lang:` when there is no infix, honour the frontmatter slug override, and route
+// non-default languages under `/<lang>/…`. transKey is the language-neutral slug that groups
+// a post with its sibling translations.
+func resolveLangSlug(src string, fm markdown.Frontmatter, langs []string, defLang string) (slug, transKey, lang string) {
+	deLanged, lang := splitLangFromPath(src, langs, defLang)
+	if strings.EqualFold(lang, defLang) && fm.Lang != "" {
+		lang = fm.Lang
+	}
+	transKey = slugFor(deLanged, fm.Slug)
+	slug = transKey
+	if !strings.EqualFold(lang, defLang) {
+		slug = path.Join(normalizeSlug(lang), slug)
+	}
+	return slug, transKey, lang
+}
+
+// siteLangs returns the configured language set and default language for slug routing,
+// matching what build.Run derives from the first site.
+func siteLangs(cfg *config.Config) (langs []string, defLang string) {
+	if len(cfg.Sites) == 0 {
+		return nil, defaultLang("")
+	}
+	return cfg.Sites[0].Languages, defaultLang(cfg.Sites[0].Lang)
+}
+
 // groupTranslations links pages that share a language-neutral slug (transKey) into each other's
 // Translations list, sorted default-first then by code, with the current/default flags set. Pages
 // with no sibling translations are left untouched.
@@ -102,6 +134,21 @@ func groupTranslations(pages []page, defLang, basePath, baseURL string) {
 			pages[j].Translations = list
 		}
 	}
+}
+
+// defaultTranslation reports whether a page's translation group includes the site-default-
+// language version, and whether the page carrying ts IS that version. (false, false) for a
+// monolingual page.
+func defaultTranslation(ts []translation) (hasDefault, isCurrentDefault bool) {
+	for _, t := range ts {
+		if t.Default {
+			hasDefault = true
+			if t.Current {
+				isCurrentDefault = true
+			}
+		}
+	}
+	return hasDefault, isCurrentDefault
 }
 
 // transVars projects a page's translations into the template context.

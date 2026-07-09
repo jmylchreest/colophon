@@ -15,6 +15,8 @@ type Entry struct {
 	SourcePath  string    `json:"source_path"`
 	Slug        string    `json:"slug"`
 	URL         string    `json:"url"`
+	Lang        string    `json:"lang,omitempty"`      // resolved language; empty only when unset site-wide
+	TransKey    string    `json:"trans_key,omitempty"` // language-neutral slug shared by a post's translations
 	Title       string    `json:"title"`
 	Type        string    `json:"type"`
 	Author      string    `json:"author,omitempty"`
@@ -41,10 +43,14 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	langs, defLang := siteLangs(cfg)
 	out := make([]Entry, 0, len(docs))
 	for _, d := range docs {
 		fm := d.doc.Frontmatter
-		slug := slugFor(d.doc.SourcePath, fm.Slug)
+		// Resolve the routed slug exactly as the build does, so translations carry their
+		// /<lang>/ prefix here too (doctor collision checks, syndication ledger keys and
+		// permalinks, serve's `latest` target all key on this).
+		slug, transKey, lang := resolveLangSlug(d.doc.SourcePath, fm, langs, defLang)
 		// Mirror the page's description: an explicit `description:`, else a short excerpt of the
 		// rendered body — so consumers (syndication cards, feeds, tooling) get a summary for posts
 		// that set none.
@@ -56,6 +62,8 @@ func Entries(cfg *config.Config) ([]Entry, error) {
 			SourcePath:       d.doc.SourcePath,
 			Slug:             slug,
 			URL:              slug + "/",
+			Lang:             lang,
+			TransKey:         transKey,
 			Title:            fm.Title,
 			Type:             resolvePageType(fm),
 			Author:           fm.Author,
@@ -96,6 +104,11 @@ func Slugs(cfg *config.Config) (map[string]bool, error) {
 	set := make(map[string]bool, len(entries))
 	for _, e := range entries {
 		set[e.Slug] = true
+		// Reserve the language-neutral base too, so `colophon new foo` won't claim a slug
+		// whose only current occupant is a translation routed under /<lang>/foo.
+		if e.TransKey != "" {
+			set[e.TransKey] = true
+		}
 	}
 	return set, nil
 }

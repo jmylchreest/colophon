@@ -26,7 +26,7 @@ func (f *fakeSpeech) Generate(_ context.Context, _ generate.SpeechRequest) (gene
 func newTTSResolver(t *testing.T, generateAI bool) (*audioResolver, *audioJob) {
 	t.Helper()
 	dir := t.TempDir()
-	rs := &resolvedSpeech{settings: generate.SpeechSettings{Model: "m1"}, cacheDir: dir}
+	rs := &resolvedSpeech{settings: generate.SpeechSettings{Model: "m1"}, cacheDir: dir, gens: map[string]*dictGen{}}
 	ar := &audioResolver{generateAI: generateAI, profiles: map[string]*resolvedSpeech{"default": rs}}
 	j := &audioJob{
 		kind: "tts", outPath: genOutDir + "/clip" + ttsOutputExt, mime: ttsOutputMIME,
@@ -37,11 +37,12 @@ func newTTSResolver(t *testing.T, generateAI bool) (*audioResolver, *audioJob) {
 	return ar, j
 }
 
-// withSpeechGen pre-injects a generator into a resolved profile, consuming its once-cell so
-// produce() uses the fake instead of building a real generator.
+// withSpeechGen pre-injects a generator into a resolved profile (under the no-dict slot),
+// consuming its once-cell so produce() uses the fake instead of building a real generator.
 func withSpeechGen(rs *resolvedSpeech, g generate.SpeechGenerator) {
-	rs.gen = g
-	rs.once.Do(func() {})
+	dg := &dictGen{gen: g}
+	dg.once.Do(func() {})
+	rs.gens[""] = dg
 }
 
 // TestGenerateSingleRender: a generated reading makes exactly one provider call — the waveform

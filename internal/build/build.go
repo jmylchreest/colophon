@@ -409,9 +409,24 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 
 	// Index-item maps for posts and the author strip (one avatar per persona that wrote a
 	// post, most-recent-first) are built up front so every page's header can show the strip.
-	list := make([]map[string]any, len(posts))
+	// A translated post appears ONCE — as its default-language version carrying a `langs`
+	// selector (each entry links straight to that language's URL) — not as one row per
+	// language. A group with no default-language member keeps a row per version. listPosts
+	// stays in lockstep with list: the author strip and tag pages pair posts[i]↔list[i]
+	// positionally, so they must see the same filtered set.
+	list := make([]map[string]any, 0, len(posts))
+	listPosts := make([]page, 0, len(posts))
 	for i, p := range posts {
-		list[i] = map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "audio": p.Audio, "has_audio": p.HasAudio, "has_attachments": p.HasAttachments, "has_slides": p.HasSlides, "slides": p.Slides, "tags": tagLinks(p.Tags, basePath), "series": seriesListName(&posts[i])}
+		hasDefault, isDefault := defaultTranslation(p.Translations)
+		if hasDefault && !isDefault {
+			continue
+		}
+		m := map[string]any{"title": p.Title, "url": p.URL, "date": p.Date, "type": p.Type, "draft": p.Draft, "embargoed": p.Embargoed, "embargo_until": p.EmbargoUntil, "image": p.Image, "image_alt": p.ImageAlt, "image_style": imageStyle(p.ImageFit, p.ImagePos), "audio": p.Audio, "has_audio": p.HasAudio, "has_attachments": p.HasAttachments, "has_slides": p.HasSlides, "slides": p.Slides, "tags": tagLinks(p.Tags, basePath), "series": seriesListName(&posts[i])}
+		if len(p.Translations) > 1 {
+			m["langs"] = transVars(p.Translations)
+		}
+		list = append(list, m)
+		listPosts = append(listPosts, p)
 	}
 	// Publish file-path author avatars through the same asset pipeline as markdown embeds,
 	// emitting a depth-independent src (the topbar strip is built once for every page depth).
@@ -423,7 +438,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 	}
 	assets = append(assets, resolveAuthorAvatars(cfg, uniqueSources(docs), router, basePath, seenAssets, opts.Log)...)
 
-	authorGroups := collectAuthors(cfg, posts, list, basePath)
+	authorGroups := collectAuthors(cfg, listPosts, list, basePath)
 	authors := authorStrip(authorGroups)
 	// The silo icon font is also used by author profile links (their recognised silos), which
 	// render independently of webmentions/syndication — so the font must ship whenever any of the
@@ -641,7 +656,7 @@ func Run(cfg *config.Config, opts Options) (Result, error) {
 
 	// Tag pages: one post listing per tag, reusing the index template with a heading. Tag
 	// chips on each post (page.html) link here, so tags become cross-entry navigation.
-	if err := writeTagPages(write, eng, chrome, posts, list); err != nil {
+	if err := writeTagPages(write, eng, chrome, listPosts, list); err != nil {
 		return Result{}, err
 	}
 
@@ -824,15 +839,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		// A `<slug>.<lang>.md` filename (lang ∈ site Languages) is a translation: strip the infix to
 		// the language-neutral base slug, set the language, and route non-default languages under
 		// `/<lang>/…`. An explicit frontmatter `lang:` still applies when there's no filename infix.
-		deLanged, lang := splitLangFromPath(c.SourcePath, langs, defLang)
-		if strings.EqualFold(lang, defLang) && fm.Lang != "" {
-			lang = fm.Lang
-		}
-		slug := slugFor(deLanged, fm.Slug)
-		transKey := slug
-		if !strings.EqualFold(lang, defLang) {
-			slug = path.Join(normalizeSlug(lang), slug)
-		}
+		slug, transKey, lang := resolveLangSlug(c.SourcePath, fm, langs, defLang)
 		links.add(c.SourcePath, slug, basePath)
 		items = append(items, included{c: c, src: sd.src, slug: slug, lang: lang, transKey: transKey, embargoed: embargoed})
 	}
@@ -949,7 +956,10 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 					p.Audio, p.AudioAbs, p.AudioType, p.AudioOut, p.HasAudio = rel, abs, mime, out, true
 				}
 			} else if ar.wantsAudio(fm.Audio) {
-				if rel, abs, mime, out, ok := ar.registerTTS(it.slug, html, fm.Lang, fm.AudioVoice, fm.Author, resolvePersona(fm), fm.SpeechProfile); ok {
+				// it.lang, not fm.Lang: a translation's language usually comes from the filename infix
+				// (foo.es.md), which resolveLangSlug folds into it.lang; fm.Lang alone would voice the
+				// Spanish reading's cues in the site default language.
+				if rel, abs, mime, out, ok := ar.registerTTS(it.slug, html, it.lang, fm.AudioVoice, fm.Author, resolvePersona(fm), fm.SpeechProfile); ok {
 					p.Audio, p.AudioAbs, p.AudioType, p.AudioOut, p.HasAudio = rel, abs, mime, out, true
 				}
 			}

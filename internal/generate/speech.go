@@ -39,7 +39,7 @@ type SpeechSettings struct {
 	Model             string
 	Voice             string
 	OutputDir         string
-	PronunciationDict string // path to a JSON pronunciation dictionary (relative to site root)
+	PronunciationDict core.PronunciationDicts // per-language pronunciation dictionary refs ("" key = site default language)
 	BaseURL           string
 	APIPath           string
 	APIKey            string
@@ -94,7 +94,7 @@ func ResolveSpeech(g core.SpeechGen) (SpeechSettings, error) {
 		Model:             firstNonEmpty(g.Model, p.defaultModel),
 		Voice:             firstNonEmpty(g.Voice, p.defaultVoice),
 		OutputDir:         firstNonEmpty(g.OutputDir, DefaultOutputDir),
-		PronunciationDict: strings.TrimSpace(g.PronunciationDict),
+		PronunciationDict: g.PronunciationDict,
 		Reuse:             strings.ToLower(strings.TrimSpace(g.Reuse)),
 		BaseURL:           firstNonEmpty(g.BaseURL, p.baseURL),
 		APIPath:           firstNonEmpty(g.APIPath, p.apiPath),

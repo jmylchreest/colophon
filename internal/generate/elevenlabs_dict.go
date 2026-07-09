@@ -103,13 +103,16 @@ func NeedsDictSync(s SpeechSettings, pron []Pronunciation) bool {
 
 // PrepareSpeech performs any one-time, provider-specific setup needed before generation and
 // returns settings ready for NewSpeech. For ElevenLabs it syncs the IPA pronunciation dictionary
-// (create/update/reuse, tracked in stateDir) and pins the resulting locator. For other providers
-// it is a no-op. A sync failure is returned so the caller can warn and proceed without it.
-func PrepareSpeech(ctx context.Context, s SpeechSettings, pron []Pronunciation, stateDir string) (SpeechSettings, error) {
+// (create/update/reuse, tracked in stateDir) and pins the resulting locator. dictTag names WHICH
+// dictionary this generator renders with (the configured ref, e.g. "en_GB") so per-language
+// dicts under one profile sync as separate account dictionaries instead of overwriting each
+// other. For other providers it is a no-op. A sync failure is returned so the caller can warn
+// and proceed without it.
+func PrepareSpeech(ctx context.Context, s SpeechSettings, dictTag string, pron []Pronunciation, stateDir string) (SpeechSettings, error) {
 	if s.Driver != driverElevenLabs {
 		return s, nil
 	}
-	loc, err := syncElevenLabsDict(ctx, s, pron, stateDir)
+	loc, err := syncElevenLabsDict(ctx, s, dictTag, pron, stateDir)
 	if err != nil {
 		return s, err
 	}
@@ -117,7 +120,7 @@ func PrepareSpeech(ctx context.Context, s SpeechSettings, pron []Pronunciation, 
 	return s, nil
 }
 
-func syncElevenLabsDict(ctx context.Context, s SpeechSettings, pron []Pronunciation, stateDir string) (*elevenLabsLocator, error) {
+func syncElevenLabsDict(ctx context.Context, s SpeechSettings, dictTag string, pron []Pronunciation, stateDir string) (*elevenLabsLocator, error) {
 	rules := ipaRules(pron)
 	if len(rules) == 0 {
 		return nil, nil // nothing IPA to upload; Say substitution covers the rest
@@ -125,11 +128,23 @@ func syncElevenLabsDict(ctx context.Context, s SpeechSettings, pron []Pronunciat
 	hash := rulesHash(rules)
 	statePath := filepath.Join(stateDir, prondictStateFile)
 	all := readPronDictState(statePath)
-	cur := all[driverElevenLabs]
+	stateKey := driverElevenLabs
+	if dictTag != "" {
+		stateKey += ":" + dictTag
+	}
+	cur, tracked := all[stateKey]
+	if !tracked && dictTag != "" {
+		// Pre-per-language state was keyed by driver alone. Adopt it only when this dict's rules
+		// are the ones previously synced (hash match) — reusing the account dictionary across the
+		// upgrade — never otherwise, or a second language's rules would land in the wrong dict.
+		if legacy, ok := all[driverElevenLabs]; ok && legacy.Hash == hash {
+			cur = legacy
+		}
+	}
 
 	base := s.BaseURL + "/pronunciation-dictionaries"
 	hdr := map[string]string{"xi-api-key": s.APIKey}
-	name := dictName(s.SiteID)
+	name := dictName(s.SiteID, dictTag)
 
 	// List the account's dictionaries once to reconcile our state with reality: a tracked
 	// dictionary may have been deleted or archived out of band (recreate it), and on a cold start
@@ -191,7 +206,7 @@ func syncElevenLabsDict(ctx context.Context, s SpeechSettings, pron []Pronunciat
 	if dictID == "" {
 		return nil, fmt.Errorf("dictionary id missing in response")
 	}
-	all[driverElevenLabs] = prondictState{DictID: dictID, VersionID: versionID, Hash: hash, Words: ruleWords(rules)}
+	all[stateKey] = prondictState{DictID: dictID, VersionID: versionID, Hash: hash, Words: ruleWords(rules)}
 	if err := writePronDictState(statePath, all); err != nil {
 		return nil, fmt.Errorf("persist dictionary state: %w", err)
 	}
@@ -199,8 +214,17 @@ func syncElevenLabsDict(ctx context.Context, s SpeechSettings, pron []Pronunciat
 }
 
 // dictName is the deterministic, account-unique name for a site's dictionary, so it can be
-// found again if the local state file is lost. Site-id namespaces shared accounts.
-func dictName(siteID string) string {
+// found again if the local state file is lost. Site-id namespaces shared accounts; dictTag
+// (the configured dict ref) namespaces per-language dictionaries within a site.
+func dictName(siteID, dictTag string) string {
+	name := dictBaseName(siteID)
+	if dictTag != "" {
+		name += "/" + dictTag
+	}
+	return name
+}
+
+func dictBaseName(siteID string) string {
 	if siteID == "" {
 		return "colophon"
 	}

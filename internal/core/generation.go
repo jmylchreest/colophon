@@ -35,10 +35,14 @@ type SpeechGen struct {
 	Model     string `yaml:"model,omitempty"`      // overrides the profile default
 	Voice     string `yaml:"voice,omitempty"`      // default voice id
 	OutputDir string `yaml:"output_dir,omitempty"` // cache dir; default content/assets/generated
-	// PronunciationDict applies a pronunciation dictionary to generated readings. It is either a
-	// built-in name shipped under contrib (e.g. "en_GB") or a path (relative to site root) to a
-	// YAML dict ({pronunciations: [{word, ipa|say}]}); legacy JSON tone/map files also load.
-	PronunciationDict string `yaml:"pronunciation_dict,omitempty"`
+	// PronunciationDict applies pronunciation dictionaries to generated readings, per language.
+	// Each ref is either a built-in name shipped under contrib (e.g. "en_GB", "es_ES") or a path
+	// (relative to site root) to a YAML dict ({pronunciations: [{word, ipa|say}]}); legacy JSON
+	// tone/map files also load. A naked scalar (`pronunciation_dict: en_GB`) is sugar for the
+	// site's default language; a map (`pronunciation_dict: {en: en_GB, es: es_ES}`) keys dicts by
+	// BCP-47 tag, matched exact-then-base (es-MX → es). A post whose language has no entry gets
+	// no dictionary — an English dict never rewrites a Spanish reading.
+	PronunciationDict PronunciationDicts `yaml:"pronunciation_dict,omitempty"`
 	// Reuse controls cache reuse when the renderer changes (provider/model/voice). "exact"
 	// (default) re-renders on any change; "content" reuses an existing reading of the same text
 	// (any prior voice) instead of re-rendering, so swapping providers doesn't regenerate.
@@ -235,7 +239,7 @@ func mergeSpeechGen(base, ov SpeechGen) SpeechGen {
 	out.Model = pick(ov.Model, base.Model)
 	out.Voice = pick(ov.Voice, base.Voice)
 	out.OutputDir = pick(ov.OutputDir, base.OutputDir)
-	out.PronunciationDict = pick(ov.PronunciationDict, base.PronunciationDict)
+	out.PronunciationDict = PronunciationDicts(mergeStrMap(base.PronunciationDict, ov.PronunciationDict))
 	out.Reuse = pick(ov.Reuse, base.Reuse)
 	out.BaseURL = pick(ov.BaseURL, base.BaseURL)
 	out.APIPath = pick(ov.APIPath, base.APIPath)

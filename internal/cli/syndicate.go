@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/jmylchreest/colophon/internal/build"
+	"github.com/jmylchreest/colophon/internal/clog"
 	"github.com/jmylchreest/colophon/internal/config"
+	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/syndicate"
 )
 
@@ -53,22 +55,9 @@ func (c *SyndicateCmd) Run() error {
 		return fmt.Errorf("environment %q is gated (allow_publish: false); pass --allow-publish to syndicate (or --dry-run to preview)", c.Env)
 	}
 
-	// Open the configured syndicators named by the env (and only those).
-	open := map[string]syndicate.Syndicator{}
-	for _, sc := range site.Federation.Syndication {
-		if !contains(allowed, sc.ID) {
-			continue
-		}
-		s, err := syndicate.Open(sc)
-		if err != nil {
-			return err
-		}
-		open[sc.ID] = s
-	}
-	for _, id := range allowed {
-		if _, ok := open[id]; !ok {
-			return fmt.Errorf("environment %q syndicates to %q, but no federation.syndication entry has that id", c.Env, id)
-		}
+	open, err := openSyndicators(site.Federation.Syndication, allowed, c.Env)
+	if err != nil {
+		return err
 	}
 
 	ledger, existed, err := syndicate.LoadLedger(root)
@@ -91,7 +80,7 @@ func (c *SyndicateCmd) Run() error {
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	posted, updated, backfilled, skipped, failed := 0, 0, 0, 0, 0
+	r := &synRunner{open: open, ledger: ledger, log: log, dryRun: c.DryRun, resync: c.Resync, now: now}
 	for _, e := range entries {
 		if e.Type != "post" || e.Draft || e.SyndicateOff {
 			continue
@@ -111,106 +100,156 @@ func (c *SyndicateCmd) Run() error {
 		}
 		fp := syndicate.Fingerprint(post)
 		for _, id := range targets {
-			prior, exists := ledger.Get(post.Key, id)
-			switch {
-			case !exists:
-				// New (post, driver) → post a fresh copy.
-				if c.DryRun {
-					log.Step("SYNDICATE", "would-post", "post", post.URL, "to", id)
-					posted++
-					continue
-				}
-				url, err := open[id].Syndicate(context.Background(), post)
-				if err != nil {
-					failed++
-					log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "status", "failed", "error", err.Error())
-					continue
-				}
-				ledger.Set(post.Key, id, syndicate.Record{URL: url, SyndicatedAt: now, Fingerprint: fp})
-				posted++
-				log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "silo", url, "status", "ok")
-
-			case !c.Resync && prior.Fingerprint == "":
-				// Ledger entry written before update support: record the current fingerprint
-				// without editing (there's nothing to compare against), so future edits to the
-				// post are detected from here on. This is the one-time backfill. (--resync skips
-				// this and forces an edit instead.)
-				if c.DryRun {
-					log.Step("SYNDICATE", "would-backfill", "post", post.URL, "to", id)
-					backfilled++
-					continue
-				}
-				prior.Fingerprint = fp
-				ledger.Set(post.Key, id, prior)
-				backfilled++
-
-			case !c.Resync && prior.Fingerprint == fp:
-				skipped++ // unchanged since last syndicated
-
-			default:
-				// Content changed (or --resync) → bring the silo copy up to date.
-				if strings.TrimSpace(prior.URL) == "" {
-					// No silo handle was ever recorded (e.g. posted via a fire-and-forget driver
-					// like Bridgy) → nothing to edit. Skip cleanly; this isn't a failure.
-					skipped++
-					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "skipped", "note", "no recorded silo URL to edit")
-					continue
-				}
-				// In-place editors (Mastodon) edit on any change, preserving engagement. Replace-only
-				// silos (Bluesky) can't edit a card visibly, so they only act on an explicit --resync,
-				// where the swap's engagement reset is opted into.
-				up, isUpdater := open[id].(syndicate.Updater)
-				rp, isReplacer := open[id].(syndicate.Replacer)
-				var action string
-				var edit func() (string, error)
-				switch {
-				case isUpdater:
-					action, edit = "edit", func() (string, error) { return up.Update(context.Background(), post, prior) }
-				case isReplacer && c.Resync:
-					action, edit = "replace", func() (string, error) { return rp.Replace(context.Background(), post, prior) }
-				case isReplacer:
-					skipped++
-					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "skipped", "note", "silo can't edit a card in place; run --resync to refresh (resets likes/replies)")
-					continue
-				default:
-					skipped++
-					log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "unsupported", "note", "driver can't edit a published copy")
-					continue
-				}
-				if c.DryRun {
-					log.Step("SYNDICATE", "would-"+action, "post", post.URL, "to", id)
-					updated++
-					continue
-				}
-				url, err := edit()
-				if err != nil {
-					failed++
-					log.Step("SYNDICATE", action, "url", post.URL, "to", id, "status", "failed", "error", err.Error())
-					continue
-				}
-				if strings.TrimSpace(url) != "" {
-					prior.URL = url
-				}
-				prior.Fingerprint, prior.SyndicatedAt = fp, now
-				ledger.Set(post.Key, id, prior)
-				updated++
-				log.Step("SYNDICATE", action, "url", post.URL, "to", id, "silo", prior.URL, "status", "ok")
-			}
+			r.reconcile(post, fp, id)
 		}
 	}
 
 	if c.DryRun {
-		log.Step("SYNDICATE", c.Env, "dry_run", true, "would_post", posted, "would_update", updated, "would_backfill", backfilled, "already", skipped)
+		log.Step("SYNDICATE", c.Env, "dry_run", true, "would_post", r.posted, "would_update", r.updated, "would_backfill", r.backfilled, "already", r.skipped)
 		return nil
 	}
 	if err := ledger.Save(); err != nil {
 		return fmt.Errorf("save ledger: %w", err)
 	}
-	log.Step("SYNDICATE", c.Env, "posted", posted, "updated", updated, "backfilled", backfilled, "already", skipped, "failed", failed)
-	if failed > 0 {
-		return fmt.Errorf("%d syndication(s) failed", failed)
+	log.Step("SYNDICATE", c.Env, "posted", r.posted, "updated", r.updated, "backfilled", r.backfilled, "already", r.skipped, "failed", r.failed)
+	if r.failed > 0 {
+		return fmt.Errorf("%d syndication(s) failed", r.failed)
 	}
 	return nil
+}
+
+// openSyndicators opens the configured syndicators named by the env's allowed set (and only
+// those), erroring when the env names an id with no federation.syndication entry.
+func openSyndicators(confs []core.SyndicatorConf, allowed []string, envName string) (map[string]syndicate.Syndicator, error) {
+	open := map[string]syndicate.Syndicator{}
+	for _, sc := range confs {
+		if !contains(allowed, sc.ID) {
+			continue
+		}
+		s, err := syndicate.Open(sc)
+		if err != nil {
+			return nil, err
+		}
+		open[sc.ID] = s
+	}
+	for _, id := range allowed {
+		if _, ok := open[id]; !ok {
+			return nil, fmt.Errorf("environment %q syndicates to %q, but no federation.syndication entry has that id", envName, id)
+		}
+	}
+	return open, nil
+}
+
+// synRunner reconciles each eligible (post, target) pair against the ledger, one method per
+// ledger state, counting what happened (or, in dry-run, what would). It mutates the ledger but
+// never saves it — the caller decides (dry-run discards).
+type synRunner struct {
+	open   map[string]syndicate.Syndicator
+	ledger *syndicate.Ledger
+	log    *clog.Logger
+	dryRun bool
+	resync bool
+	now    string // RFC3339 stamp written to touched ledger records
+
+	posted, updated, backfilled, skipped, failed int
+}
+
+// reconcile routes one (post, target) pair to the handler for its ledger state.
+func (r *synRunner) reconcile(post syndicate.Post, fp, id string) {
+	prior, exists := r.ledger.Get(post.Key, id)
+	switch {
+	case !exists:
+		r.postNew(post, fp, id)
+	case !r.resync && prior.Fingerprint == "":
+		r.backfill(post, fp, id, prior)
+	case !r.resync && prior.Fingerprint == fp:
+		r.skipped++ // unchanged since last syndicated
+	default:
+		r.edit(post, fp, id, prior)
+	}
+}
+
+// postNew posts a fresh copy for a (post, driver) pair the ledger has never seen.
+func (r *synRunner) postNew(post syndicate.Post, fp, id string) {
+	if r.dryRun {
+		r.log.Step("SYNDICATE", "would-post", "post", post.URL, "to", id)
+		r.posted++
+		return
+	}
+	url, err := r.open[id].Syndicate(context.Background(), post)
+	if err != nil {
+		r.failed++
+		r.log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "status", "failed", "error", err.Error())
+		return
+	}
+	r.ledger.Set(post.Key, id, syndicate.Record{URL: url, SyndicatedAt: r.now, Fingerprint: fp})
+	r.posted++
+	r.log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "silo", url, "status", "ok")
+}
+
+// backfill handles a ledger entry written before update support: record the current
+// fingerprint without editing (there's nothing to compare against), so future edits to the
+// post are detected from here on. This is the one-time backfill. (--resync skips this and
+// forces an edit instead.)
+func (r *synRunner) backfill(post syndicate.Post, fp, id string, prior syndicate.Record) {
+	if r.dryRun {
+		r.log.Step("SYNDICATE", "would-backfill", "post", post.URL, "to", id)
+		r.backfilled++
+		return
+	}
+	prior.Fingerprint = fp
+	r.ledger.Set(post.Key, id, prior)
+	r.backfilled++
+}
+
+// edit brings a changed (or --resync'd) silo copy up to date, via whichever capability the
+// driver has. In-place editors (Mastodon, syndicate.Updater) edit on any change, preserving
+// engagement. Replace-only silos (Bluesky, syndicate.Replacer) can't edit a card visibly, so
+// they only act on an explicit --resync, where the swap's engagement reset is opted into.
+func (r *synRunner) edit(post syndicate.Post, fp, id string, prior syndicate.Record) {
+	if strings.TrimSpace(prior.URL) == "" {
+		// No silo handle was ever recorded (e.g. posted via a fire-and-forget driver like
+		// Bridgy) → nothing to edit. Skip cleanly; this isn't a failure.
+		r.skipped++
+		r.log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "skipped", "note", "no recorded silo URL to edit")
+		return
+	}
+	up, isUpdater := r.open[id].(syndicate.Updater)
+	rp, isReplacer := r.open[id].(syndicate.Replacer)
+	var action string
+	var edit func() (string, error)
+	switch {
+	case isUpdater:
+		action, edit = "edit", func() (string, error) { return up.Update(context.Background(), post, prior) }
+	case isReplacer && r.resync:
+		action, edit = "replace", func() (string, error) { return rp.Replace(context.Background(), post, prior) }
+	case isReplacer:
+		r.skipped++
+		r.log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "skipped", "note", "silo can't edit a card in place; run --resync to refresh (resets likes/replies)")
+		return
+	default:
+		r.skipped++
+		r.log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "unsupported", "note", "driver can't edit a published copy")
+		return
+	}
+	if r.dryRun {
+		r.log.Step("SYNDICATE", "would-"+action, "post", post.URL, "to", id)
+		r.updated++
+		return
+	}
+	url, err := edit()
+	if err != nil {
+		r.failed++
+		r.log.Step("SYNDICATE", action, "url", post.URL, "to", id, "status", "failed", "error", err.Error())
+		return
+	}
+	if strings.TrimSpace(url) != "" {
+		prior.URL = url
+	}
+	prior.Fingerprint, prior.SyndicatedAt = fp, r.now
+	r.ledger.Set(post.Key, id, prior)
+	r.updated++
+	r.log.Step("SYNDICATE", action, "url", post.URL, "to", id, "silo", prior.URL, "status", "ok")
 }
 
 // syndicateTargets intersects a post's chosen targets with the env's allowed set; nil chosen

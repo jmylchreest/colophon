@@ -152,7 +152,7 @@ generation:
   # ── images ──────────────────────────────────────────────────────────────────
   image:
     enabled: true                              # [optional] default true; per-modality switch
-    provider: google                           # [required] google|minimax|openai|together|deepinfra|custom
+    provider: google                           # [required] google|minimax|openai|xai|together|deepinfra|custom
     model: gemini-3.1-flash-image              # [optional] default: the provider profile's default model
     api_key: "{env:GEMINI_API_KEY}"            # [optional] default: the provider's env var (kept out of config)
     base_url: ""                               # [optional] override endpoint (required for `custom`)
@@ -186,7 +186,10 @@ generation:
     output_dir: content/assets/generated       # [optional] default shown; clip cache + sidecars
     concurrency: 5                             # [optional] default 5; max parallel clips
     reuse: exact                               # [optional] exact | content (reuse a prior voice's reading)
-    pronunciation_dict: en_GB                  # [optional] built-in name (contrib/pronunciation) or a YAML path
+    pronunciation_dict: en_GB                  # [optional] built-in name (contrib/pronunciation: en_GB, es_ES) or a
+                                               #   YAML path. A naked ref applies to the SITE DEFAULT LANGUAGE only;
+                                               #   per-language: {en: en_GB, es: es_ES} (BCP-47 keys, es-MX → es).
+                                               #   A language with no entry gets no dictionary.
     transcript:                                # [optional] how post content becomes spoken text
       wrap_up: true                            # [optional] default true; append a closing "visit the post" note
       expand_acronyms: true                    # [optional] default true; read SSH as "Secure Shell"

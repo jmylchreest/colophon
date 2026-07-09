@@ -88,7 +88,7 @@
       <time class="dt-published"{% if p.date %} datetime="{{ p.date }}"{% endif %}>{% if p.date %}{{ p.date }}{% endif %}</time>
       <div>
         <div class="pt"><a class="post-row-link u-url p-name" href="{{ base_path }}{{ p.url }}">{{ p.title }}</a></div>
-        <div class="badges">{% if p.draft %}<span class="chip">draft</span>{% endif %}{% if p.embargoed %}<span class="chip">embargoed</span>{% endif %}{% if p.series %}<span class="chip chip-series">series</span>{% endif %}{% for tg in p.tags %}<a class="chip" href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</div>
+        <div class="badges">{% if p.draft %}<span class="chip">draft</span>{% endif %}{% if p.embargoed %}<span class="chip">embargoed</span>{% endif %}{% if p.series %}<span class="chip chip-series">series</span>{% endif %}{% if p.langs %}{% for l in p.langs %}<a class="chip chip-lang" href="{{ l.url }}" hreflang="{{ l.lang }}" title="{{ l.label }}" aria-label="{{ l.label }}"{% if l.current %} aria-current="true"{% endif %}>{{ l.lang|upper }}</a>{% endfor %}{% endif %}{% for tg in p.tags %}<a class="chip" href="{{ tg.url }}">#{{ tg.name }}</a>{% endfor %}</div>
       </div>
     </li>
   {% endfor %}
