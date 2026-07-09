@@ -1,4 +1,4 @@
-go 1.26.4
+go 1.26.5
 
 // The colophon SSG and the standalone search engine are separate modules in one repo so the
 // engine keeps its own lean go.mod while co-development stays one-repo / one-PR. This workspace
