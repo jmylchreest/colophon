@@ -3,7 +3,22 @@
 User-facing changes by release. Each entry points at the guide where the feature is documented
 in full (or where it should be, when end-user docs catch up).
 
-## Unreleased
+## v0.0.33
+
+- **xAI (Grok Imagine) image provider.** `generation.image.provider: xai` targets xAI's
+  OpenAI-compatible images endpoint (default model `grok-imagine-image-quality`, key from
+  `XAI_API_KEY`); the standard `aspect` param is sent as xAI's `aspect_ratio`. See
+  [Image & audio generation → Providers](image-generation.md#providers).
+
+- **Per-language pronunciation dictionaries.** `pronunciation_dict:` now takes either a naked ref
+  (`en_GB`) — which applies to the **site default language only**, no longer to every language — or a
+  map keyed by BCP-47 tag: `pronunciation_dict: {en: en_GB, es: es_ES}` (matched exact-then-base, so
+  `es-MX` uses `es`). A language with no entry gets no dictionary, so an English dict never rewrites a
+  Spanish reading. A Spanish dict (`es_ES`) is now bundled alongside `en_GB`. For ElevenLabs, each dict
+  syncs as its own account dictionary (named `colophon:<site>/<ref>`); a previously-synced dictionary
+  is adopted when its rules are unchanged. Spoken block cues ("Here, the post shows a code example…")
+  now also follow a translation's language detected from its `<slug>.<lang>.md` filename, not just an
+  explicit frontmatter `lang:`. Default-language readings keep their content identity — no re-render.
 
 - **Multi-language posts (translations).** Set `languages:` on the site and add a `<slug>.<lang>.md`
   file (e.g. `my-post.es.md`) to publish a translation at `/<lang>/<slug>/`, linked to the original by
