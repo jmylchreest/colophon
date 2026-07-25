@@ -1,0 +1,41 @@
+# Notify the website repo (jmylchreest/colophon.blog) when a push touches anything the
+# generated docs are built from, so docs.colophon.blog regenerates immediately instead of
+# waiting for its nightly cron. The receiver checks out THIS commit, regenerates the docs
+# content, and deploys only if the generated output actually changed.
+#
+# Needs the COLOPHON_BLOG_DISPATCH_TOKEN secret: a fine-grained PAT scoped to the
+# jmylchreest/colophon.blog repository with Contents: Read and write (that is the
+# permission the repository_dispatch API requires). Without the secret the job
+# no-ops with a notice rather than failing the push.
+
+name: docs-dispatch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"           # hand-written guides, config reference, changelog
+      - "cmd/**"            # CLI entry point
+      - "internal/cli/**"   # command/flag definitions — the --help output
+      - "internal/scaffold/**" # `colophon init` output, quoted in the docs
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch to colophon.blog
+        env:
+          TOKEN: ${{ secrets.COLOPHON_BLOG_DISPATCH_TOKEN }}
+          SHA: ${{ github.sha }}
+          COMPARE: ${{ github.event.compare }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::notice::COLOPHON_BLOG_DISPATCH_TOKEN not set — skipping docs dispatch (the website's nightly cron will pick this up)"
+            exit 0
+          fi
+          curl -sf -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/jmylchreest/colophon.blog/dispatches \
+            -d "$(printf '{"event_type":"colophon-docs","client_payload":{"sha":"%s","compare":"%s"}}' "$SHA" "$COMPARE")"
+          echo "dispatched colophon-docs for $SHA"
