@@ -25,6 +25,7 @@ type Post struct {
 	Summary   string
 	Text      string // syndicate_text override, else empty (driver derives from title/summary)
 	Tags      []string
+	Lang      string // BCP-47 language of this post (a translation's own), tagged on the silo copy
 	Published string // RFC3339, or ""
 }
 

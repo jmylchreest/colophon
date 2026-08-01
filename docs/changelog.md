@@ -3,6 +3,17 @@
 User-facing changes by release. Each entry points at the guide where the feature is documented
 in full (or where it should be, when end-user docs catch up).
 
+## v0.0.35
+
+- **Syndication targets are per-language.** A post with translations used to send *every* language's
+  version to *every* account. Each syndicator now declares the post language it accepts —
+  `lang: es`, `lang: [en, fr]`, or `lang: "*"` for all — and an omitted `lang:` means the site's
+  default language only, so the Spanish target takes the Spanish post and the English target the
+  English one. Single-language sites are unaffected. The language also reaches the silo: Mastodon
+  statuses set `language`, Bluesky records set `langs`, and the `command` driver gets
+  `COLOPHON_POST_LANG`. `doctor` warns about a `lang:` the site doesn't publish. See
+  [Syndication → Multi-language sites](syndication.md#multi-language-sites-one-target-per-language).
+
 ## v0.0.34
 
 - **`serve --open` lands in an environment that has drafts.** `serve` builds every environment at

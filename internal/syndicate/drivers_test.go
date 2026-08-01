@@ -38,7 +38,7 @@ func TestBlueskySyndicator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	url, err := s.Syndicate(context.Background(), Post{Title: "Hello world", URL: "https://b.example/posts/x/", Summary: "a summary"})
+	url, err := s.Syndicate(context.Background(), Post{Title: "Hello world", URL: "https://b.example/posts/x/", Summary: "a summary", Lang: "es-MX"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,6 +54,9 @@ func TestBlueskySyndicator(t *testing.T) {
 	}
 	if embed, _ := rec["embed"].(map[string]any); embed["$type"] != "app.bsky.embed.external" {
 		t.Errorf("embed = %v", rec["embed"])
+	}
+	if langs, _ := rec["langs"].([]any); len(langs) != 1 || langs[0] != "es-MX" {
+		t.Errorf("record langs = %v", rec["langs"])
 	}
 }
 
@@ -75,7 +78,7 @@ func TestMastodonSyndicator(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	url, err := s.Syndicate(context.Background(), Post{Title: "Hi", URL: "https://b.example/posts/x/"})
+	url, err := s.Syndicate(context.Background(), Post{Title: "Hi", URL: "https://b.example/posts/x/", Lang: "es-MX"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,6 +88,9 @@ func TestMastodonSyndicator(t *testing.T) {
 	status, _ := body["status"].(string)
 	if !strings.Contains(status, "Hi") || !strings.Contains(status, "https://b.example/posts/x/") {
 		t.Errorf("status text = %q", status)
+	}
+	if body["language"] != "es" { // Mastodon wants the primary subtag
+		t.Errorf("status language = %v", body["language"])
 	}
 }
 

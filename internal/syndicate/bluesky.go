@@ -105,7 +105,7 @@ func (s *blueskySyndicator) Replace(ctx context.Context, p Post, prior Record) (
 
 // blueskyRecord builds the app.bsky.feed.post record (text + external embed card linking back).
 func blueskyRecord(p Post) map[string]any {
-	return map[string]any{
+	rec := map[string]any{
 		"$type":     "app.bsky.feed.post",
 		"text":      blueskyText(p),
 		"createdAt": time.Now().UTC().Format(time.RFC3339),
@@ -118,6 +118,10 @@ func blueskyRecord(p Post) map[string]any {
 			},
 		},
 	}
+	if lang := strings.TrimSpace(p.Lang); lang != "" {
+		rec["langs"] = []string{lang} // so a translation isn't shown as the account's language
+	}
+	return rec
 }
 
 // blueskyText is the post body: the custom blurb, else the title, trimmed to the limit. The

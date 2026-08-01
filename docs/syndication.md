@@ -147,6 +147,38 @@ environments:
 Secrets (tokens, app passwords) **only** come from the environment via `{env:VAR}` — never written as
 literals.
 
+### Multi-language sites: one target per language
+
+A [translation](content.md#multiple-languages-translations) is a full post of its own, so without a
+rule every account would receive *both* the English and the Spanish version of the same piece. Each
+target therefore declares the post language it accepts:
+
+```yaml
+federation:
+  syndication:
+    - { id: masto-en, driver: mastodon, instance: https://hachyderm.io, token: "{env:MASTODON_TOKEN}" }
+    - { id: masto-es, driver: mastodon, lang: es, instance: https://mastodon.social, token: "{env:MASTODON_ES_TOKEN}" }
+    - { id: bsky,     driver: bluesky,  lang: "*", handle: me.bsky.social, app_password: "{env:BLUESKY_APP_PASSWORD}" }
+```
+
+| `lang:` | Receives |
+|---------|----------|
+| *(omitted)* | The **site's default language** only (`sites[].lang`, default `en`). |
+| `lang: es` | Spanish posts only. |
+| `lang: [en, fr]` | Either language. |
+| `lang: "*"` | Every language — one account for the whole site. |
+
+Tags match case-insensitively, and a bare subtag covers its regions (`es` accepts `es-MX`; `es-MX`
+accepts `es`, but not `es-ES`). `colophon doctor` warns about a `lang:` the site doesn't publish, and
+`--verbose` reports each post the language filter held back.
+
+Because a translation has its own URL it also has its own ledger entry, so the two copies are tracked
+independently. The language is passed on to the silo too: Mastodon statuses set `language`, Bluesky
+records set `langs`, and the `command` driver gets `COLOPHON_POST_LANG`.
+
+> **Single-language sites are unaffected** — every post is in the default language, so an omitted
+> `lang:` matches everything as before.
+
 ### Scheduling
 
 `syndicate` is idempotent (the ledger guards it), so it's safe to run after every publish, or on a
@@ -165,7 +197,7 @@ differ only in **how the silo post is created** and **where the auth lives**.
 notifier. Maximum flexibility; colophon holds no silo credentials.
 
 **How:** runs your program once per post. The post is passed as environment variables
-(`COLOPHON_POST_URL`, `_TITLE`, `_SUMMARY`, `_TEXT`, `_TAGS`, `_KEY`, `_PUBLISHED`) and as JSON on
+(`COLOPHON_POST_URL`, `_TITLE`, `_SUMMARY`, `_TEXT`, `_TAGS`, `_LANG`, `_KEY`, `_PUBLISHED`) and as JSON on
 stdin. The **first line of stdout** is taken as the silo URL (print nothing for fire-and-forget); a
 non-zero exit is a failure. Post content is never interpolated into the command, so it can't inject
 shell.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jmylchreest/colophon/internal/build"
 	"github.com/jmylchreest/colophon/internal/config"
+	"github.com/jmylchreest/colophon/internal/core"
 	"github.com/jmylchreest/colophon/internal/publish"
 	"github.com/jmylchreest/colophon/internal/render"
 	"github.com/jmylchreest/colophon/internal/source"
@@ -48,6 +49,7 @@ func (c *DoctorCmd) Run() error {
 	checkThemes(root, cfg, r)
 	checkCredentials(cfg, r)
 	checkEnvRefs(cfg, r)
+	checkSyndication(cfg, r)
 	checkContent(cfg, r)
 	checkAssets(cfg, r)
 	checkAliases(cfg, r)
@@ -137,6 +139,37 @@ func checkThemes(root string, cfg *config.Config, r *report) {
 			r.warn("environment %q: theme %q not found — falls back to the default", e.Name, e.Theme)
 		}
 	}
+}
+
+// checkSyndication warns about a syndicator whose `lang:` names a language the site doesn't
+// publish — the target would silently never receive a post.
+func checkSyndication(cfg *config.Config, r *report) {
+	for _, s := range cfg.Sites {
+		published := []string{core.DefaultLang(s.Lang)}
+		for _, l := range s.Languages {
+			if !contains(published, l) {
+				published = append(published, l)
+			}
+		}
+		for _, sc := range s.Federation.Syndication {
+			for _, want := range sc.Lang {
+				if strings.TrimSpace(want) == "*" || matchesAny(want, published) {
+					continue
+				}
+				r.warn("syndicator %q targets language %q, which site %q doesn't publish (%s) — it will never receive a post",
+					sc.ID, want, s.ID, strings.Join(published, ", "))
+			}
+		}
+	}
+}
+
+func matchesAny(want string, langs []string) bool {
+	for _, l := range langs {
+		if core.LangMatches(want, l) {
+			return true
+		}
+	}
+	return false
 }
 
 // checkCredentials warns when a publisher's deploy-secret env vars aren't set. Only publishers an

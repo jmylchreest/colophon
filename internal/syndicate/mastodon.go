@@ -46,7 +46,7 @@ func (s *mastodonSyndicator) Syndicate(ctx context.Context, p Post) (string, err
 	}
 	err := retryIdempotent(ctx, func() error {
 		return postJSON(ctx, s.instance+"/api/v1/statuses", s.token, headers,
-			map[string]any{"status": mastodonText(p, s.limit)}, &status)
+			mastodonStatus(p, s.limit), &status)
 	})
 	if err != nil {
 		return "", fmt.Errorf("mastodon %q: %w", s.id, err)
@@ -67,12 +67,22 @@ func (s *mastodonSyndicator) Update(ctx context.Context, p Post, prior Record) (
 	// Editing is idempotent (same id, replaces content) → retry any transient failure.
 	err := retryIdempotent(ctx, func() error {
 		return putJSON(ctx, s.instance+"/api/v1/statuses/"+id, s.token, nil,
-			map[string]any{"status": mastodonText(p, s.limit)}, &status)
+			mastodonStatus(p, s.limit), &status)
 	})
 	if err != nil {
 		return "", fmt.Errorf("mastodon %q: edit: %w", s.id, err)
 	}
 	return firstURL(status.URL, prior.URL), nil
+}
+
+// mastodonStatus is the create/edit form: the status text, plus `language` so a translation is
+// tagged with its own language rather than the account's default.
+func mastodonStatus(p Post, limit int) map[string]any {
+	form := map[string]any{"status": mastodonText(p, limit)}
+	if lang := core.PrimarySubtag(p.Lang); lang != "" {
+		form["language"] = lang
+	}
+	return form
 }
 
 // mastodonText composes the status: the blurb (custom text, else the title) and the link, kept

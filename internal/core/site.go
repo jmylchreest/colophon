@@ -1,5 +1,7 @@
 package core
 
+import "strings"
+
 // Site is a published blog target: a theme, a set of personas allowed to publish
 // to it, and the publishers its output deploys to.
 type Site struct {
@@ -125,9 +127,27 @@ type Federation struct {
 // is {id, driver, settings}: the driver picks the mechanic (command|mastodon|bluesky|bridgy) and
 // Settings carries its options (e.g. command, instance, handle). Tokens come via {env:VAR}.
 type SyndicatorConf struct {
-	ID       string         `yaml:"id"`
-	Driver   string         `yaml:"driver"`
+	ID     string `yaml:"id"`
+	Driver string `yaml:"driver"`
+	// Lang is the post language(s) this target accepts — a tag, a list, or "*" for all. Unset
+	// means the site's default language only, so translations don't go to every account.
+	Lang     []string       `yaml:"lang,omitempty"`
 	Settings map[string]any `yaml:",remain"`
+}
+
+// AcceptsLang reports whether a post in lang should be syndicated to this target, given the site's
+// default language.
+func (c SyndicatorConf) AcceptsLang(lang, defLang string) bool {
+	want := c.Lang
+	if len(want) == 0 {
+		want = []string{DefaultLang(defLang)}
+	}
+	for _, w := range want {
+		if strings.TrimSpace(w) == "*" || LangMatches(w, DefaultLang(lang)) {
+			return true
+		}
+	}
+	return false
 }
 
 // WebSub advertises one or more WebSub hubs in the feeds (rel="hub") so subscribers

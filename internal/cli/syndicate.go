@@ -78,6 +78,7 @@ func (c *SyndicateCmd) Run() error {
 	if env.BaseURL != "" {
 		base = env.BaseURL
 	}
+	defLang := core.DefaultLang(site.Lang)
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	r := &synRunner{open: open, ledger: ledger, log: log, dryRun: c.DryRun, resync: c.Resync, now: now}
@@ -85,7 +86,11 @@ func (c *SyndicateCmd) Run() error {
 		if e.Type != "post" || e.Draft || e.SyndicateOff {
 			continue
 		}
-		targets := syndicateTargets(e.SyndicateTargets, allowed)
+		targets, otherLang := langTargets(syndicateTargets(e.SyndicateTargets, allowed), open, e.Lang, defLang)
+		if len(otherLang) > 0 {
+			log.Detail("SYNDICATE", "skip", "post", e.URL, "lang", core.DefaultLang(e.Lang),
+				"not_sent_to", strings.Join(otherLang, ","), "reason", "target is for another language")
+		}
 		if len(targets) == 0 {
 			continue
 		}
@@ -96,6 +101,7 @@ func (c *SyndicateCmd) Run() error {
 			Summary:   e.Description,
 			Text:      e.SyndicateText,
 			Tags:      e.Tags,
+			Lang:      core.DefaultLang(e.Lang),
 			Published: stampDate(e.Date),
 		}
 		fp := syndicate.Fingerprint(post)
@@ -118,10 +124,16 @@ func (c *SyndicateCmd) Run() error {
 	return nil
 }
 
+// target is an opened syndicator plus its config, so the run loop can read its `lang:` filter.
+type target struct {
+	core.SyndicatorConf
+	syn syndicate.Syndicator
+}
+
 // openSyndicators opens the configured syndicators named by the env's allowed set (and only
 // those), erroring when the env names an id with no federation.syndication entry.
-func openSyndicators(confs []core.SyndicatorConf, allowed []string, envName string) (map[string]syndicate.Syndicator, error) {
-	open := map[string]syndicate.Syndicator{}
+func openSyndicators(confs []core.SyndicatorConf, allowed []string, envName string) (map[string]target, error) {
+	open := map[string]target{}
 	for _, sc := range confs {
 		if !contains(allowed, sc.ID) {
 			continue
@@ -130,7 +142,7 @@ func openSyndicators(confs []core.SyndicatorConf, allowed []string, envName stri
 		if err != nil {
 			return nil, err
 		}
-		open[sc.ID] = s
+		open[sc.ID] = target{SyndicatorConf: sc, syn: s}
 	}
 	for _, id := range allowed {
 		if _, ok := open[id]; !ok {
@@ -144,7 +156,7 @@ func openSyndicators(confs []core.SyndicatorConf, allowed []string, envName stri
 // ledger state, counting what happened (or, in dry-run, what would). It mutates the ledger but
 // never saves it — the caller decides (dry-run discards).
 type synRunner struct {
-	open   map[string]syndicate.Syndicator
+	open   map[string]target
 	ledger *syndicate.Ledger
 	log    *clog.Logger
 	dryRun bool
@@ -176,7 +188,7 @@ func (r *synRunner) postNew(post syndicate.Post, fp, id string) {
 		r.posted++
 		return
 	}
-	url, err := r.open[id].Syndicate(context.Background(), post)
+	url, err := r.open[id].syn.Syndicate(context.Background(), post)
 	if err != nil {
 		r.failed++
 		r.log.Step("SYNDICATE", "post", "url", post.URL, "to", id, "status", "failed", "error", err.Error())
@@ -214,8 +226,8 @@ func (r *synRunner) edit(post syndicate.Post, fp, id string, prior syndicate.Rec
 		r.log.Step("SYNDICATE", "edit", "url", post.URL, "to", id, "status", "skipped", "note", "no recorded silo URL to edit")
 		return
 	}
-	up, isUpdater := r.open[id].(syndicate.Updater)
-	rp, isReplacer := r.open[id].(syndicate.Replacer)
+	up, isUpdater := r.open[id].syn.(syndicate.Updater)
+	rp, isReplacer := r.open[id].syn.(syndicate.Replacer)
 	var action string
 	var edit func() (string, error)
 	switch {
@@ -265,6 +277,19 @@ func syndicateTargets(chosen, allowed []string) []string {
 		}
 	}
 	return out
+}
+
+// langTargets splits targets by whether they accept a post in lang: keep is syndicated to, other
+// is the targets configured for a different language (a translation's siblings).
+func langTargets(targets []string, open map[string]target, lang, defLang string) (keep, other []string) {
+	for _, id := range targets {
+		if open[id].AcceptsLang(lang, defLang) {
+			keep = append(keep, id)
+		} else {
+			other = append(other, id)
+		}
+	}
+	return keep, other
 }
 
 func contains(xs []string, x string) bool {

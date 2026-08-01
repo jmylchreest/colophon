@@ -60,6 +60,42 @@ publishers:
 	}
 }
 
+// A syndicator's `lang:` takes a scalar or a list, and must not fall through into driver Settings.
+func TestLoadSyndicatorLang(t *testing.T) {
+	cfg := `
+sites:
+  - id: main
+    lang: en
+    languages: [en, es]
+    personas: [default]
+    federation:
+      syndication:
+        - { id: bsky, driver: bluesky, handle: me.bsky.social, app_password: pw }
+        - { id: masto-es, driver: mastodon, lang: es, instance: https://i, token: t }
+        - { id: masto-eu, driver: mastodon, lang: [fr, de], instance: https://i, token: t }
+`
+	c, err := Load(writeProject(t, cfg, validPersona))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	syn := c.Sites[0].Federation.Syndication
+	if len(syn) != 3 {
+		t.Fatalf("got %d syndicators", len(syn))
+	}
+	if syn[0].Lang != nil {
+		t.Errorf("unset lang = %v, want nil", syn[0].Lang)
+	}
+	if len(syn[1].Lang) != 1 || syn[1].Lang[0] != "es" {
+		t.Errorf("scalar lang = %v", syn[1].Lang)
+	}
+	if len(syn[2].Lang) != 2 || syn[2].Lang[1] != "de" {
+		t.Errorf("list lang = %v", syn[2].Lang)
+	}
+	if _, leaked := syn[1].Settings["lang"]; leaked {
+		t.Error("lang leaked into driver settings")
+	}
+}
+
 func TestLoadGenerationProfiles(t *testing.T) {
 	cfg := `
 sites:

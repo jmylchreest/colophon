@@ -45,6 +45,7 @@ func (c *commandSyndicator) Syndicate(ctx context.Context, p Post) (string, erro
 		"COLOPHON_POST_SUMMARY="+p.Summary,
 		"COLOPHON_POST_TEXT="+p.Text,
 		"COLOPHON_POST_TAGS="+strings.Join(p.Tags, ","),
+		"COLOPHON_POST_LANG="+p.Lang,
 		"COLOPHON_POST_PUBLISHED="+p.Published,
 	)
 	cmd.Stdin = bytes.NewReader(payload)

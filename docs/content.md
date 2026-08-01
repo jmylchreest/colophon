@@ -300,6 +300,8 @@ content/posts/my-post.fr.md    → French    →  /fr/posts/my-post/
 - A small, dismissible banner offers a reader their preferred language (from the browser) when the
   post is available in it — it never force-redirects.
 - Each translation is a normal post, so it gets its own spoken reading, feeds, glossary and deck.
+- Syndication targets each accept one language, so the Spanish account gets the Spanish post and the
+  English account the English one — see [Syndication → Multi-language sites](syndication.md#multi-language-sites-one-target-per-language).
 - A `.<lang>` is only treated as a language when `<lang>` is in `languages` — a file like
   `my.notes.md` is unaffected.
 

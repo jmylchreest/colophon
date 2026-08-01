@@ -3,15 +3,12 @@ package build
 import (
 	"regexp"
 	"strings"
+
+	"github.com/jmylchreest/colophon/internal/core"
 )
 
 // defaultLang returns the BCP-47 language tag or "en" when unset — used for <html lang>.
-func defaultLang(lang string) string {
-	if l := strings.TrimSpace(lang); l != "" {
-		return l
-	}
-	return "en"
-}
+func defaultLang(lang string) string { return core.DefaultLang(lang) }
 
 // objectFits is the allowed set of CSS object-fit values, exposed to authors as the `*_fit`
 // frontmatter so they can choose how an image fills its box: cover (crop to fill, the theme
