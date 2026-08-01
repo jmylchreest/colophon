@@ -3,6 +3,16 @@
 User-facing changes by release. Each entry points at the guide where the feature is documented
 in full (or where it should be, when end-user docs catch up).
 
+## v0.0.34
+
+- **`serve --open` lands in an environment that has drafts.** `serve` builds every environment at
+  once, and `--open` used to take the first one listed. With production first that meant
+  `--open=latest` opened the production build, which omits drafts — so the post you were writing
+  404'd. `--open` now defaults to the first environment that *includes* drafts (falling back to the
+  first environment when none do), and the new `--env` flag picks one explicitly; an unknown name
+  fails immediately, listing what's available, instead of quietly serving the wrong site. See
+  [Personas → Preview](personas.md).
+
 ## v0.0.33
 
 - **xAI (Grok Imagine) image provider.** `generation.image.provider: xai` targets xAI's

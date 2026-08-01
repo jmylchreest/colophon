@@ -11,6 +11,7 @@ import (
 type ServeCmd struct {
 	Addr     string `help:"Address to listen on" default:":8080"`
 	Open     string `help:"Open a target in the browser: latest | home | sitemap | atom | rss | json | robots | <slug>"`
+	Env      string `help:"Environment --open resolves in (default: the first environment that includes drafts)"`
 	Showcase bool   `help:"Inject a built-in /showcase/ page (embedded in the binary, never written to content) demonstrating every markdown/style feature in the active theme"`
 	Verbose  bool   `short:"v" help:"Log each rebuild and attach source locations"`
 	Pprof    string `help:"Enable net/http/pprof (addr, or 1 for localhost:6060)" hidden:""`
@@ -30,5 +31,5 @@ func (c *ServeCmd) Run() error {
 		return err
 	}
 	defer profiling.Serve(c.Pprof)()
-	return srv.ListenAndServe(c.Addr, c.Open)
+	return srv.ListenAndServe(c.Addr, c.Env, c.Open)
 }

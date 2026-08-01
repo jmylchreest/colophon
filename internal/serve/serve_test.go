@@ -64,3 +64,42 @@ func TestBeginShutdownIdempotent(t *testing.T) {
 		t.Fatal("shutdown channel was not closed")
 	}
 }
+
+// TestPickTargetPrefersDrafts covers the --open environment choice. A config listing
+// production first meant `serve --open=latest` opened production, where drafts are excluded
+// and the post being written 404s; the default now follows drafts, and --env overrides it.
+func TestPickTargetPrefersDrafts(t *testing.T) {
+	targets := []target{
+		{name: "production"},
+		{name: "preview", drafts: true},
+		{name: "dist", drafts: true},
+	}
+	for _, tc := range []struct {
+		env  string
+		want string
+	}{
+		{"", "preview"},
+		{"production", "production"},
+		{"dist", "dist"},
+	} {
+		got, err := pickTarget(targets, tc.env)
+		if err != nil {
+			t.Fatalf("pickTarget(%q): %v", tc.env, err)
+		}
+		if got.name != tc.want {
+			t.Errorf("pickTarget(%q) = %q, want %q", tc.env, got.name, tc.want)
+		}
+	}
+
+	if _, err := pickTarget(targets, "prevue"); err == nil {
+		t.Error("pickTarget with an unknown env: want error, got nil")
+	}
+	// No env includes drafts: fall back to the first rather than opening nothing.
+	got, err := pickTarget([]target{{name: "production"}, {name: "staging"}}, "")
+	if err != nil || got == nil || got.name != "production" {
+		t.Errorf("pickTarget(no drafts) = %v, %v; want production", got, err)
+	}
+	if got, err := pickTarget(nil, ""); got != nil || err != nil {
+		t.Errorf("pickTarget(nil) = %v, %v; want nil, nil", got, err)
+	}
+}

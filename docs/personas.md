@@ -122,7 +122,11 @@ Preview, and jump straight to a page:
 ```sh
 colophon serve --open=latest     # opens the newest post in the browser
 colophon serve --open=sitemap    # also: home | atom | rss | json | robots | <slug>
+colophon serve --open=latest --env=production   # pick which environment --open lands in
 ```
+Every environment is served at once under `/<site>/<env>/`. `--open` defaults to the first
+environment that includes drafts, since a production env omits them and a just-written post
+would 404 there.
 `serve` also prints the home/latest/sitemap/feed URLs at startup, so an agent can read them
 without a browser.
 

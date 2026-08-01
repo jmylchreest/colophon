@@ -157,13 +157,18 @@ func targetsFor(cfg *config.Config, showcase bool) (string, []target, error) {
 }
 
 // ListenAndServe builds every environment once, starts the file watcher, then serves. When
-// openTarget is non-empty it opens that well-known location (latest|home|sitemap|feeds|…) of
-// the first environment in the browser once the server is up.
-func (s *Server) ListenAndServe(addr, openTarget string) error {
+// openTarget is non-empty it opens that well-known location (latest|home|sitemap|feeds|…) in
+// the browser once the server is up, in environment openEnv (see pickTarget for the default).
+func (s *Server) ListenAndServe(addr, openEnv, openTarget string) error {
 	s.addr = addr // set before any build so each env gets its local base_url
 	s.mu.RLock()
 	targets := s.targets
 	s.mu.RUnlock()
+	// Resolve the open environment before the (slow) builds so a typo fails fast.
+	open, err := pickTarget(targets, openEnv)
+	if err != nil {
+		return err
+	}
 	for _, t := range targets {
 		if err := s.forceBuild(t); err != nil {
 			return fmt.Errorf("build %s: %w", t.name, err)
@@ -193,9 +198,9 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 		}
 		s.log.Step("SERVE", "", kv...)
 	}
-	if len(targets) > 0 && openTarget != "" {
-		if u, ok := s.resolveURL(addr, targets[0], openTarget); ok {
-			s.log.Step("SERVE", "", "open", u)
+	if open != nil && openTarget != "" {
+		if u, ok := s.resolveURL(addr, *open, openTarget); ok {
+			s.log.Step("SERVE", "", "open", u, "env", open.name)
 			go openBrowserAfter(ctx, 300*time.Millisecond, u)
 		} else {
 			s.log.Step("SERVE", "", "open_unknown", openTarget)
@@ -229,6 +234,35 @@ func (s *Server) ListenAndServe(addr, openTarget string) error {
 		<-watchDone // the watcher saw ctx cancel; wait for it to close the fsnotify watcher
 		return err
 	}
+}
+
+// pickTarget chooses the environment --open lands in. A named env must exist (a typo is an
+// error listing what's available rather than a silent fallback). With no name it prefers the
+// first draft-including environment: previewing is the point of serve, and a production env
+// omits drafts, so `--open=latest` there routinely 404s on the post being written. It falls
+// back to the first environment when none include drafts, and is nil when there are none.
+func pickTarget(targets []target, env string) (*target, error) {
+	if env != "" {
+		for i := range targets {
+			if targets[i].name == env {
+				return &targets[i], nil
+			}
+		}
+		names := make([]string, len(targets))
+		for i, t := range targets {
+			names[i] = t.name
+		}
+		return nil, fmt.Errorf("unknown environment %q: have %s", env, strings.Join(names, ", "))
+	}
+	for i := range targets {
+		if targets[i].drafts {
+			return &targets[i], nil
+		}
+	}
+	if len(targets) > 0 {
+		return &targets[0], nil
+	}
+	return nil, nil
 }
 
 // resolveURL maps an --open target name to a full URL under the given environment.
