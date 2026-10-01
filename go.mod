@@ -10,7 +10,7 @@ require (
 	github.com/jmylchreest/statsfactory/packages/sdk-go v0.0.0-20260609230132-bf9e155d8714
 	github.com/knadh/koanf/parsers/yaml v1.1.1
 	github.com/knadh/koanf/providers/rawbytes v1.0.1
-	github.com/knadh/koanf/v2 v2.3.6
+	github.com/knadh/koanf/v2 v2.3.7
 	github.com/yuin/goldmark v1.8.6
 	go.yaml.in/yaml/v3 v3.0.5
 	lukechampine.com/blake3 v1.4.1
