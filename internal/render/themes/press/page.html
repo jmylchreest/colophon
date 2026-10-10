@@ -155,7 +155,8 @@
 <script>document.addEventListener('DOMContentLoaded',function(){document.querySelectorAll('.math').forEach(function(el){try{katex.render(el.textContent,el,{displayMode:el.classList.contains('math-display'),throwOnError:false});}catch(e){}});});</script>
 {% endif %}
 {% if has_mermaid %}
-<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({startOnLoad:true,theme:(document.documentElement.dataset.theme==='light'?'default':'dark')})"></script>
+<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js"></script>
+<script defer src="{{ base_path }}mermaid-init.js"></script>
 {% endif %}
 {% if glossary_head %}{{ glossary_head|safe }}{% endif %}
 {% if analytics_head %}{{ analytics_head|safe }}{% endif %}

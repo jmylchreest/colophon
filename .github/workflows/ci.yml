@@ -66,6 +66,9 @@ jobs:
         run: node --test search.test.mjs
         working-directory: search
 
+      - name: Test browser renderers
+        run: node --test internal/build/assets/mentions.test.mjs internal/render/mermaid.test.mjs
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -84,7 +87,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.10.1
+          version: v2.14.0
 
   vuln:
     name: Vulnerability scan

@@ -24,6 +24,9 @@ import (
 // of per build — every Extend (registering parser/renderer pairs) runs a single time.
 var sharedMarkdown = newMarkdown()
 
+// Code blocks may carry accessibility attributes on either element.
+var codeBlockRE = regexp.MustCompile(`<pre\b[^>]*>\s*<code\b`)
+
 // newMarkdown builds the shared goldmark renderer. colophon emits progressive-enhancement
 // HTML: special blocks become semantic elements that carry their raw source as text and
 // are tagged by type, so a no-JS theme shows readable raw text while a theme that knows

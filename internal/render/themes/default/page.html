@@ -57,7 +57,8 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 {% endif %}
 {% if has_mermaid %}
-<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js" onload="mermaid.initialize({ startOnLoad: true })"></script>
+<script defer src="{{ base_path }}vendor/mermaid/mermaid.min.js"></script>
+<script defer src="{{ base_path }}mermaid-init.js"></script>
 {% endif %}
 {% if mentions_enabled or has_syndication %}<link rel="stylesheet" href="{{ base_path }}mentions.css">{% endif %}{% if mentions_enabled %}<script defer src="{{ base_path }}mentions.js"></script>{% endif %}
 {% if glossary_head %}{{ glossary_head|safe }}{% endif %}

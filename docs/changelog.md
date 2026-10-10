@@ -3,6 +3,32 @@
 User-facing changes by release. Each entry points at the guide where the feature is documented
 in full (or where it should be, when end-user docs catch up).
 
+## v0.0.36
+
+- **Diagrams follow theme changes.** Pages and slide decks re-render Mermaid diagrams from their
+  original source when the colour theme changes. Rendering is serialised across rapid toggles,
+  and hidden slides remain lazy so diagrams are measured only when visible.
+- **Code highlighting on accessible blocks.** Pages now detect code blocks whose `<pre>` tag
+  carries keyboard-focus attributes and load the syntax highlighter. Previously the exact-tag
+  check missed these blocks in both bundled page themes. Slide decks use the same detection.
+  Press also uses its active theme's text colours for highlighted tokens, keeping them readable
+  when a page or deck switches between light and dark mode.
+- **Webmention cache containment.** Received target paths are validated before the cache is
+  regenerated. Cache reads and writes stay within their directory, including when a path contains
+  a symlink. Crafted targets can no longer write JSON outside the webmention cache.
+- **Safe webmention links.** Static HTML, theme variables and the live browser renderer accept
+  only absolute HTTP(S) sender links and avatar URLs. This prevents executable URL schemes from
+  reaching published links, including from previously cached mentions.
+- **Lower memory use during local publishing.** Deployed files are hashed as streams instead of
+  being loaded entirely into memory. A 16 MiB media-file benchmark reduced allocations from
+  about 16 MiB to 34 KiB per scan, with identical content hashes and about 3% lower elapsed time.
+- **Dependency refresh.** Both Go modules require Go 1.26.9. Runtime dependencies include
+  go-git 5.19.3, koanf 2.3.8, x/crypto 0.58.0 and x/net 0.61.0, plus updated transitive libraries.
+  Bundled browser assets are Mermaid 11.17.2, KaTeX 0.19.0 and highlight.js 11.12.0. Mermaid stays
+  on its patched 11.x line to avoid the browser requirement changes in version 12. The vendor
+  refresh script records exact versions and verifies archive integrity. CI uses golangci-lint
+  2.14.0 and exercises webmention URL validation and Mermaid theme changes.
+
 ## v0.0.35
 
 - **Syndication targets are per-language.** A post with translations used to send *every* language's

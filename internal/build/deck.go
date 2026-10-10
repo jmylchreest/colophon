@@ -515,7 +515,7 @@ func deckHydration(base, body string) (head, scripts string) {
 		h.WriteString(`<link rel="stylesheet" href="` + base + `vendor/katex/katex.min.css">`)
 		s.WriteString(`<script defer src="` + base + `vendor/katex/katex.min.js" onload="document.querySelectorAll('.math').forEach(function(el){try{katex.render(el.textContent,el,{displayMode:el.classList.contains('math-display'),throwOnError:false})}catch(e){}})"></script>`)
 	}
-	if strings.Contains(body, "<pre") && strings.Contains(body, "<code") {
+	if codeBlockRE.MatchString(body) {
 		h.WriteString(`<link rel="stylesheet" href="` + base + `vendor/highlight/github-dark.min.css">`)
 		s.WriteString(`<script defer src="` + base + `vendor/highlight/highlight.min.js" onload="hljs.highlightAll()"></script>`)
 	}
@@ -523,6 +523,7 @@ func deckHydration(base, body string) (head, scripts string) {
 		// Load the lib only — the reader renders each diagram when its slide first becomes visible
 		// (Mermaid can't measure a display:none container, so startOnLoad would emit empty SVGs).
 		s.WriteString(`<script defer src="` + base + `vendor/mermaid/mermaid.min.js"></script>`)
+		s.WriteString(`<script defer src="` + base + `mermaid-init.js"></script>`)
 	}
 	return h.String(), s.String()
 }
@@ -601,8 +602,7 @@ var post=document.body.getAttribute('data-post')||'';
 var counter=document.createElement('div');counter.className='deck-counter';counter.setAttribute('aria-live','polite');document.body.appendChild(counter);
 var hint=document.createElement('div');hint.className='deck-hint';hint.textContent='← → navigate · Enter play/pause · P presenter · +/− autocue speed · T theme · F fullscreen · Esc exit';document.body.appendChild(hint);
 var i=Math.min(slides.length-1,Math.max(0,(parseInt(location.hash.slice(1),10)||1)-1));
-var mermaidReady=false;
-function renderMermaid(s){if(!window.mermaid)return;if(!mermaidReady){try{mermaid.initialize({startOnLoad:false,theme:(d.dataset.theme==='light'?'default':'dark')});}catch(e){}mermaidReady=true;}var nodes=s.querySelectorAll('.mermaid:not([data-processed])');if(!nodes.length)return;try{var p=mermaid.run({nodes:nodes});if(p&&p.then){p.then(function(){fit(s);});}}catch(e){}}
+function renderMermaid(s){if(window.colophonMermaid)colophonMermaid.render(s).then(function(){fit(s);}).catch(function(){});}
 function fit(s){var b=s.querySelector('.slide-body');if(!b)return;b.style.transform='';var avail=s.clientHeight-b.offsetTop-24;if(avail>0&&b.scrollHeight>avail+2){b.style.transform='scale('+Math.max(0.45,avail/b.scrollHeight).toFixed(3)+')';}}
 function show(n){i=Math.max(0,Math.min(slides.length-1,n));slides.forEach(function(s,k){s.classList.toggle('active',k===i);s.setAttribute('aria-hidden',k!==i);if(k===i){s.tabIndex=-1;s.focus({preventScroll:true});renderMermaid(s);fit(s);}});location.hash=i+1;updateCounter();}
 function go(n){stopAuto();show(n);} // any MANUAL navigation cancels the autocue
@@ -620,7 +620,7 @@ else if(e.key==='-'||e.key==='_'){setCueSpeed(cueSpeed-0.1);}
 });
 function togglePresenter(){var on=deck.classList.toggle('presenter');if(pBtn)pBtn.setAttribute('aria-pressed',on);fit(slides[i]);}
 function toggleFull(){if(!document.fullscreenElement){d.requestFullscreen&&d.requestFullscreen();}else{document.exitFullscreen();}}
-function setTheme(t){d.dataset.theme=t;try{localStorage.setItem('press-theme',t);}catch(e){}if(tBtn)tBtn.setAttribute('aria-label',t==='dark'?'Switch to light theme':'Switch to dark theme');}
+function setTheme(t){d.dataset.theme=t;try{localStorage.setItem('press-theme',t);}catch(e){}if(tBtn)tBtn.setAttribute('aria-label',t==='dark'?'Switch to light theme':'Switch to dark theme');renderMermaid(slides[i]);}
 // Autocue: a teleprompter — auto-scroll the slide's notes, then advance. Cancelled by manual nav.
 var autoOn=false,autoRAF=0,autoStart=0,autoDur=0,cueSpeed=1;
 try{var _cs=parseFloat(localStorage.getItem('deck-cue-speed'));if(_cs)cueSpeed=Math.max(0.5,Math.min(3,_cs));}catch(e){}

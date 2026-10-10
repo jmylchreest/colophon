@@ -21,9 +21,10 @@ test:
     go test -race ./...
     cd search && go test ./...
 
-# run the JavaScript reader's parity tests against the emitted fixture
+# run JavaScript search parity and browser rendering tests
 test-js:
     cd search && go test ./... >/dev/null && node --test search.test.mjs
+    node --test internal/build/assets/mentions.test.mjs internal/render/mermaid.test.mjs
 
 # vet + golangci-lint
 lint:

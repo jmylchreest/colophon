@@ -302,6 +302,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; font-size: 0.82rem; color: var(--link); }
 .prose .pullquote figcaption::before { content: "— "; }
 .math-display { display: block; overflow-x: auto; margin: 1.5rem 0; text-align: center; }
+/* Use the active theme's contrast-tested text colours for highlighted code, including decks.
+   The vendor's dark palette otherwise leaves pale tokens on a light code background. */
+.prose code.hljs { color: var(--text); background: transparent; }
+.prose .hljs [class*="hljs-"] { color: var(--text); background: transparent; }
+.prose .hljs .hljs-keyword,
+.prose .hljs .hljs-built_in,
+.prose .hljs .hljs-title,
+.prose .hljs .hljs-string { color: var(--link); }
+.prose .hljs .hljs-comment,
+.prose .hljs .hljs-quote { color: var(--muted); }
 pre.mermaid { background: none; border: 0; text-align: center; }
 
 .post-foot { padding: 2rem 0 1.5rem; border-top: 1px solid var(--border); }

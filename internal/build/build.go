@@ -982,7 +982,7 @@ func buildPages(docs []sourceDoc, includeDrafts bool, now time.Time, basePath, b
 		p.ImageFit, p.ImagePos = fm.ImageFit, fm.ImagePosition
 		p.HasMermaid = strings.Contains(html, `class="mermaid"`)
 		p.HasMath = strings.Contains(html, `class="math`)
-		p.HasCode = strings.Contains(html, "<pre><code")
+		p.HasCode = codeBlockRE.MatchString(html)
 		p.Tags = fm.Tags
 		p.Syndication = normalizeSyndication(fm.Syndication)
 		p.WebmentionsOff = fm.Webmentions != nil && !*fm.Webmentions

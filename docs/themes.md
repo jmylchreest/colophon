@@ -242,6 +242,17 @@ The `default` theme loads vendored libraries from `themes/default/vendor/`, gate
 {% endif %}
 ```
 
+To refresh the bundled libraries, update the pinned versions, archive URLs and SHA-512 integrity
+values in `contrib/scripts/vendor-libraries.json`, then run
+`python3 contrib/scripts/update-vendor.py`. The script verifies each npm archive before copying
+its browser assets, fonts and licence. Keep Mermaid on 11.x until the browser requirements of
+version 12 have been reviewed. After an update, check math, diagrams and syntax highlighting in
+both a normal page and a slide deck.
+
+The bundled themes load `mermaid-init.js` after Mermaid. It preserves diagram source and
+re-renders when `data-theme` changes (or when the system theme changes without an explicit
+theme). Slide decks use the same renderer but only measure visible diagrams.
+
 Your theme is free to do something else with the same markup: load the libraries from a CDN,
 swap in a different highlighter, or — like the `minimal` theme — do nothing and let the raw
 text stand. The markup contract (`<pre class="mermaid">`, `<span class="math …">`,
