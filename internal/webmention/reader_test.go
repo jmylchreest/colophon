@@ -2,11 +2,26 @@ package webmention
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
+
+func TestFetchJF2RejectsUnsafeTargets(t *testing.T) {
+	for _, target := range []string{"https://b.example/../../outside/", "https://b.example/%2e%2e/%2e%2e/outside/", `https://b.example/..%5coutside/`} {
+		t.Run(target, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_ = json.NewEncoder(w).Encode(jf2Feed{Children: []jf2Item{{WmTarget: target}}})
+			}))
+			defer srv.Close()
+			if _, err := FetchJF2(context.Background(), srv.Client(), srv.URL, "b.example", ""); err == nil {
+				t.Fatal("accepted a target that escapes the cache")
+			}
+		})
+	}
+}
 
 func TestReadEndpoint(t *testing.T) {
 	cases := []struct{ source, receiver, want string }{

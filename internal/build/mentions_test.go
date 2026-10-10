@@ -14,6 +14,25 @@ func wmSite(mode string) core.Site {
 	}}}
 }
 
+func TestMentionsRejectUnsafeURLs(t *testing.T) {
+	for _, typ := range []string{"like", "reply"} {
+		m := webmention.Mention{Type: typ, URL: "javascript:alert(1)", Content: "Keep this reply",
+			Author: webmention.MentionAuthor{Name: "Ada", URL: "data:text/html,bad", Photo: "javascript:alert(2)"}}
+		html := mentionsHTML(webmention.Mentions{Mentions: []webmention.Mention{m}})
+		if strings.Contains(html, "javascript:") || strings.Contains(html, "data:text/html") {
+			t.Fatalf("unsafe URL in %s HTML: %s", typ, html)
+		}
+		if !strings.Contains(html, "Ada") {
+			t.Fatalf("author lost from %s HTML: %s", typ, html)
+		}
+		vars := mentionVars([]webmention.Mention{m})[0]
+		author := vars["author"].(map[string]any)
+		if vars["url"] != "" || author["url"] != "" || author["photo"] != "" {
+			t.Fatalf("unsafe URLs in template variables: %+v", vars)
+		}
+	}
+}
+
 func TestWebmentionMode(t *testing.T) {
 	cases := map[string]string{"asset": "asset", "LIVE": "live", "  asset ": "asset", "nonsense": "disabled", "": "disabled"}
 	for in, want := range cases {

@@ -79,6 +79,9 @@ func FetchJF2(ctx context.Context, client *http.Client, endpoint, domain, token 
 				continue
 			}
 			key := KeyForURL(target)
+			if _, err := cacheFile(key); err != nil {
+				return nil, fmt.Errorf("invalid webmention target %q: %w", target, err)
+			}
 			m := out[key]
 			m.Target = target
 			m.Mentions = append(m.Mentions, normaliseJF2(it))

@@ -101,6 +101,7 @@ func mentionsAttrs(src, liveTarget, blockJSON string) string {
 func mentionVars(ms []webmention.Mention) []map[string]any {
 	out := make([]map[string]any, 0, len(ms))
 	for _, m := range ms {
+		m = webmention.SafeMention(m)
 		out = append(out, map[string]any{
 			"type":      m.Type,
 			"url":       m.URL,
@@ -125,6 +126,7 @@ func mentionsHTML(m webmention.Mentions) string {
 	var faces, replies strings.Builder
 	totalFaces, shownFaces := 0, 0
 	for _, x := range ms {
+		x = webmention.SafeMention(x)
 		switch x.Type {
 		case "like", "repost":
 			totalFaces++

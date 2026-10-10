@@ -23,13 +23,31 @@
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!data) return; // 404/error → leave any baked content untouched
-        const list = (live ? fromJF2(data) : fromAsset(data)).filter((m) => !blocked(m, block));
+        const list = (live ? fromJF2(data) : fromAsset(data)).map(safeMention).filter((m) => !blocked(m, block));
         render(el, list);
       })
       .catch(() => {}); // network error → leave baked content
   });
 
   // ---- source shapes ------------------------------------------------------
+
+  // Sender URLs need protocol validation even when all visible text is escaped.
+  function safeURL(raw) {
+    if (typeof raw !== "string") return "";
+    raw = raw.trim();
+    if (/[\x00-\x1f\x7f\\]/.test(raw) || !/^https?:\/\//i.test(raw)) return "";
+    try {
+      const u = new URL(raw);
+      return u.hostname && (u.protocol === "https:" || u.protocol === "http:") ? raw : "";
+    } catch (_) { return ""; }
+  }
+
+  function safeMention(m) {
+    const author = m.author || {};
+    return { ...m, url: safeURL(m.url), author: {
+      ...author, url: safeURL(author.url), photo: safeURL(author.photo),
+    } };
+  }
 
   // Our normalised asset: { target, mentions: [{type, author{name,url,photo}, url, content, published}] }
   function fromAsset(data) {

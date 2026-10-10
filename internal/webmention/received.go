@@ -2,6 +2,8 @@ package webmention
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -55,18 +57,33 @@ func CacheDir(root string) string {
 	return filepath.Join(root, ".colophon", "cache", "webmentions")
 }
 
-// cacheFile is the on-disk path for a key ("" → index.json).
-func cacheFile(dir, key string) string {
+// cacheFile validates URL-derived keys before they reach the filesystem.
+func cacheFile(key string) (string, error) {
 	if key == "" {
 		key = "index"
 	}
-	return filepath.Join(dir, filepath.FromSlash(key)+".json")
+	if key == "." || !fs.ValidPath(key) || strings.ContainsAny(key, "\\:\x00") {
+		return "", fmt.Errorf("invalid webmention cache key %q", key)
+	}
+	return filepath.Localize(key + ".json")
 }
 
 // LoadCached reads the cached Mentions for a key. A missing file is not an error — it yields
 // an empty result, so a build with no fetched data renders nothing and stays green.
 func LoadCached(dir, key string) (Mentions, error) {
-	b, err := os.ReadFile(cacheFile(dir, key))
+	name, err := cacheFile(key)
+	if err != nil {
+		return Mentions{}, err
+	}
+	root, err := os.OpenRoot(dir)
+	if os.IsNotExist(err) {
+		return Mentions{}, nil
+	}
+	if err != nil {
+		return Mentions{}, err
+	}
+	defer func() { _ = root.Close() }()
+	b, err := root.ReadFile(name)
 	if os.IsNotExist(err) {
 		return Mentions{}, nil
 	}
@@ -82,13 +99,24 @@ func LoadCached(dir, key string) (Mentions, error) {
 
 // SaveCached writes the Mentions for a key, creating parent dirs.
 func SaveCached(dir, key string, m Mentions) error {
-	path := cacheFile(dir, key)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	name, err := cacheFile(key)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	if err := root.MkdirAll(filepath.Dir(name), 0o755); err != nil {
 		return err
 	}
 	b, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(b, '\n'), 0o644)
+	return root.WriteFile(name, append(b, '\n'), 0o644)
 }
