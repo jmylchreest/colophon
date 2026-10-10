@@ -1,0 +1,2 @@
+# Keep upstream browser bundles byte-for-byte, including whitespace in template strings.
+internal/render/themes/default/vendor/** -whitespace

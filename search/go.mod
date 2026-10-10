@@ -4,4 +4,4 @@
 // colophon SSG's dependency graph. See ../docs/design/search.md.
 module github.com/jmylchreest/colophon/search
 
-go 1.26.4
+go 1.26.9
