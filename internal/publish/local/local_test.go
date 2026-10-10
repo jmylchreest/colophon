@@ -1,6 +1,7 @@
 package local
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -10,6 +11,25 @@ import (
 	"github.com/jmylchreest/colophon/internal/config"
 	"github.com/jmylchreest/colophon/internal/publish"
 )
+
+func BenchmarkDeployedMedia(b *testing.B) {
+	dir := b.TempDir()
+	data := bytes.Repeat([]byte("media"), (16<<20)/5)
+	if err := os.WriteFile(filepath.Join(dir, "recording.mp4"), data, 0o644); err != nil {
+		b.Fatal(err)
+	}
+	p := &Publisher{dest: dir}
+	want := publish.MD5Hex(data)
+	b.SetBytes(int64(len(data)))
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		state, _, err := p.Deployed(context.Background())
+		if err != nil || state["recording.mp4"] != want {
+			b.Fatalf("hash mismatch or error: %v", err)
+		}
+	}
+}
 
 func newLocal(t *testing.T, deleteOrphaned bool) (*Publisher, string) {
 	t.Helper()

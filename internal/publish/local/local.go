@@ -4,7 +4,10 @@ package local
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -57,15 +60,28 @@ func (p *Publisher) Deployed(ctx context.Context) (core.State, bool, error) {
 		if d.IsDir() {
 			return nil
 		}
-		b, err := os.ReadFile(path)
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		f, err := os.Open(path)
 		if err != nil {
 			return err
+		}
+		// Stream media files so memory use does not grow with the largest asset.
+		h := md5.New() // Same change-detection fingerprint as publish.MD5Hex.
+		_, copyErr := io.Copy(h, f)
+		closeErr := f.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		if closeErr != nil {
+			return closeErr
 		}
 		rel, err := filepath.Rel(p.dest, path)
 		if err != nil {
 			return err
 		}
-		state[filepath.ToSlash(rel)] = publish.MD5Hex(b)
+		state[filepath.ToSlash(rel)] = hex.EncodeToString(h.Sum(nil))
 		return nil
 	})
 	return state, true, err
